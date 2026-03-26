@@ -3,37 +3,126 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { StatusBadge } from '@/components/shared/StatusBadge'
-import { DeadlineCountdown } from '@/components/shared/DeadlineCountdown'
-import { CardSkeleton } from '@/components/shared/LoadingSkeleton'
-import { formatDate, formatDateTime } from '@/lib/utils'
-import { ArrowLeft, Globe, Mail, Phone, DollarSign } from 'lucide-react'
+import * as Tabs from '@radix-ui/react-tabs'
+import {
+  ArrowLeft,
+  Globe,
+  Mail,
+  Phone,
+  DollarSign,
+  Building2,
+  Calendar,
+  User,
+  FileText,
+  ClipboardList,
+  StickyNote,
+  Briefcase,
+} from 'lucide-react'
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+}
+
+function getColor(name: string) {
+  const colors = [
+    'bg-blue-500',
+    'bg-green-500',
+    'bg-purple-500',
+    'bg-amber-500',
+    'bg-rose-500',
+    'bg-cyan-500',
+  ]
+  return colors[name.length % colors.length]
+}
+
+const statusLabel: Record<string, string> = {
+  active: 'Activo',
+  inactive: 'Inactivo',
+  onboarding: 'Onboarding',
+  paused: 'Pausado',
+  risk: 'En riesgo',
+  scaling: 'Escalando',
+}
+
+const statusColor: Record<string, string> = {
+  active: 'bg-green-50 text-green-700 border-green-200',
+  inactive: 'bg-slate-50 text-slate-500 border-slate-200',
+  onboarding: 'bg-blue-50 text-blue-700 border-blue-200',
+  paused: 'bg-amber-50 text-amber-700 border-amber-200',
+  risk: 'bg-red-50 text-red-700 border-red-200',
+  scaling: 'bg-purple-50 text-purple-700 border-purple-200',
+}
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 interface ClientDetail {
   id: string
   name: string
+  brand: string | null
   email: string | null
   phone: string | null
+  whatsapp: string | null
   contactPerson: string | null
+  country: string | null
+  currency: string
   industry: string | null
   website: string | null
   notes: string | null
+  observations: string | null
   status: string
-  monthlyBudget: string | null
+  monthlyFee: string | null
+  serviceType: string | null
   contractStart: string | null
   contractEnd: string | null
   accountManager: { id: string; fullName: string } | null
-  tasks: Array<{ id: string; title: string; status: string; priority: string; deadline: string | null; createdBy: { fullName: string } }>
-  reports: Array<{ id: string; title: string; status: string; reportType: string; createdAt: string; submittedBy: { fullName: string } }>
-  audits: Array<{ id: string; title: string; status: string; overallStatus: string | null; complianceScore: number | null; executedAt: string | null }>
+  tasks: Array<{
+    id: string
+    title: string
+    status: string
+    priority: string
+    deadline: string | null
+    createdBy: { fullName: string }
+  }>
+  reports: Array<{
+    id: string
+    title: string
+    status: string
+    reportType: string
+    createdAt: string
+    submittedBy: { fullName: string }
+  }>
+  audits: Array<{
+    id: string
+    title: string
+    status: string
+    overallStatus: string | null
+    complianceScore: number | null
+    executedAt: string | null
+  }>
 }
+
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export default function ClientDetailPage() {
   const params = useParams()
   const router = useRouter()
   const [client, setClient] = useState<ClientDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'tasks' | 'reports' | 'audits'>('tasks')
 
   useEffect(() => {
     async function load() {
@@ -50,146 +139,363 @@ export default function ClientDetailPage() {
       }
     }
     load()
-  }, [params.id])
+  }, [params.id, router])
 
-  if (loading) return <div className="max-w-5xl mx-auto space-y-4"><CardSkeleton /><CardSkeleton /></div>
+  if (loading) {
+    return (
+      <div className="max-w-5xl mx-auto space-y-4">
+        {[1, 2].map((i) => (
+          <div
+            key={i}
+            className="animate-pulse rounded-xl border border-slate-200 bg-white p-6 space-y-3"
+          >
+            <div className="h-5 w-1/3 rounded bg-slate-200" />
+            <div className="h-4 w-2/3 rounded bg-slate-100" />
+            <div className="h-4 w-1/2 rounded bg-slate-100" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   if (!client) return null
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/clients" className="text-zinc-400 hover:text-white"><ArrowLeft className="h-5 w-5" /></Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/clients"
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <div
+            className={`flex h-12 w-12 items-center justify-center rounded-full text-base font-semibold text-white ${getColor(client.name)}`}
+          >
+            {getInitials(client.name)}
+          </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">{client.name}</h1>
-            {client.industry && <p className="text-sm text-zinc-400">{client.industry}</p>}
+            <h1 className="text-2xl font-bold text-slate-900">
+              {client.name}
+            </h1>
+            <div className="flex items-center gap-2 mt-0.5">
+              {client.brand && (
+                <span className="text-sm text-slate-500">{client.brand}</span>
+              )}
+              {client.brand && client.industry && (
+                <span className="text-slate-300">-</span>
+              )}
+              {client.industry && (
+                <span className="text-sm text-slate-500">
+                  {client.industry}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-        <StatusBadge status={client.status} />
+        <span
+          className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium ${statusColor[client.status] || statusColor.inactive}`}
+        >
+          {statusLabel[client.status] || client.status}
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="space-y-4">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Información</h2>
-            {client.contactPerson && (
-              <div><p className="text-xs text-zinc-500">Contacto</p><p className="text-sm text-white">{client.contactPerson}</p></div>
-            )}
-            {client.email && (
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-zinc-500" />
-                <a href={`mailto:${client.email}`} className="text-sm text-indigo-400 hover:text-indigo-300">{client.email}</a>
+      {/* Tabs */}
+      <Tabs.Root defaultValue="resumen">
+        <Tabs.List className="flex border-b border-slate-200">
+          {[
+            { value: 'resumen', label: 'Resumen', icon: User },
+            { value: 'proyectos', label: 'Proyectos', icon: Briefcase },
+            { value: 'reportes', label: 'Reportes', icon: FileText },
+            { value: 'notas', label: 'Notas', icon: StickyNote },
+          ].map((tab) => (
+            <Tabs.Trigger
+              key={tab.value}
+              value={tab.value}
+              className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-colors data-[state=active]:border-[#2563eb] data-[state=active]:text-[#2563eb]"
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+            </Tabs.Trigger>
+          ))}
+        </Tabs.List>
+
+        {/* Resumen tab */}
+        <Tabs.Content value="resumen" className="pt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Contact info */}
+            <div className="rounded-xl border border-slate-200 bg-white p-6">
+              <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">
+                Informacion de contacto
+              </h2>
+              <div className="space-y-4">
+                {client.contactPerson && (
+                  <div className="flex items-start gap-3">
+                    <User className="h-4 w-4 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">
+                        Persona de contacto
+                      </p>
+                      <p className="text-sm text-slate-900">
+                        {client.contactPerson}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {client.email && (
+                  <div className="flex items-start gap-3">
+                    <Mail className="h-4 w-4 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Email</p>
+                      <a
+                        href={`mailto:${client.email}`}
+                        className="text-sm text-[#2563eb] hover:underline"
+                      >
+                        {client.email}
+                      </a>
+                    </div>
+                  </div>
+                )}
+                {client.phone && (
+                  <div className="flex items-start gap-3">
+                    <Phone className="h-4 w-4 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Telefono</p>
+                      <p className="text-sm text-slate-900">{client.phone}</p>
+                    </div>
+                  </div>
+                )}
+                {client.website && (
+                  <div className="flex items-start gap-3">
+                    <Globe className="h-4 w-4 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Sitio web</p>
+                      <a
+                        href={client.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-[#2563eb] hover:underline"
+                      >
+                        {client.website}
+                      </a>
+                    </div>
+                  </div>
+                )}
+                {client.country && (
+                  <div className="flex items-start gap-3">
+                    <Building2 className="h-4 w-4 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Pais</p>
+                      <p className="text-sm text-slate-900">{client.country}</p>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-            {client.phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-zinc-500" />
-                <span className="text-sm text-zinc-300">{client.phone}</span>
+            </div>
+
+            {/* Financial & account info */}
+            <div className="rounded-xl border border-slate-200 bg-white p-6">
+              <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">
+                Cuenta y finanzas
+              </h2>
+              <div className="space-y-4">
+                {client.monthlyFee && (
+                  <div className="flex items-start gap-3">
+                    <DollarSign className="h-4 w-4 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Valor mensual</p>
+                      <p className="text-lg font-semibold text-slate-900">
+                        ${Number(client.monthlyFee).toLocaleString()}{' '}
+                        <span className="text-sm font-normal text-slate-500">
+                          {client.currency}/mes
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {client.serviceType && (
+                  <div className="flex items-start gap-3">
+                    <ClipboardList className="h-4 w-4 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Tipo de servicio</p>
+                      <p className="text-sm text-slate-900">
+                        {client.serviceType}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {(client.contractStart || client.contractEnd) && (
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-4 w-4 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Contrato</p>
+                      <p className="text-sm text-slate-900">
+                        {client.contractStart &&
+                          formatDate(client.contractStart)}
+                        {client.contractStart && client.contractEnd && ' - '}
+                        {client.contractEnd && formatDate(client.contractEnd)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {client.accountManager && (
+                  <div className="flex items-start gap-3">
+                    <User className="h-4 w-4 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Account Manager</p>
+                      <p className="text-sm text-slate-900">
+                        {client.accountManager.fullName}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-            {client.website && (
-              <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4 text-zinc-500" />
-                <a href={client.website} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-400 hover:text-indigo-300">{client.website}</a>
-              </div>
-            )}
-            {client.monthlyBudget && (
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-zinc-500" />
-                <span className="text-sm text-white">${Number(client.monthlyBudget).toLocaleString()}/mes</span>
-              </div>
-            )}
-            {(client.contractStart || client.contractEnd) && (
-              <div>
-                <p className="text-xs text-zinc-500 mb-1">Contrato</p>
-                <p className="text-sm text-zinc-300">
-                  {client.contractStart && formatDate(client.contractStart)}
-                  {client.contractStart && client.contractEnd && ' → '}
-                  {client.contractEnd && formatDate(client.contractEnd)}
+            </div>
+
+            {/* Recent tasks */}
+            <div className="rounded-xl border border-slate-200 bg-white p-6 lg:col-span-2">
+              <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">
+                Tareas recientes
+              </h2>
+              {client.tasks.length === 0 ? (
+                <p className="text-sm text-slate-500 py-4 text-center">
+                  No hay tareas asignadas a este cliente
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {client.tasks.slice(0, 5).map((task) => (
+                    <Link
+                      key={task.id}
+                      href={`/tasks/${task.id}`}
+                      className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-3 hover:bg-slate-100 transition-colors"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">
+                          {task.title}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          por {task.createdBy.fullName}
+                          {task.deadline && ` - Vence: ${formatDate(task.deadline)}`}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+                          task.status === 'completed'
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : task.status === 'in_progress'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : 'bg-slate-50 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {task.status === 'completed'
+                          ? 'Completada'
+                          : task.status === 'in_progress'
+                            ? 'En progreso'
+                            : task.status === 'pending'
+                              ? 'Pendiente'
+                              : task.status}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </Tabs.Content>
+
+        {/* Proyectos tab */}
+        <Tabs.Content value="proyectos" className="pt-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">
+              Proyectos del cliente
+            </h2>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Briefcase className="h-10 w-10 text-slate-300 mb-3" />
+              <p className="text-sm text-slate-500">
+                Los proyectos asociados a este cliente aparecen aqui.
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                Asigna proyectos desde el modulo de Proyectos.
+              </p>
+            </div>
+          </div>
+        </Tabs.Content>
+
+        {/* Reportes tab */}
+        <Tabs.Content value="reportes" className="pt-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">
+              Reportes del cliente ({client.reports.length})
+            </h2>
+            {client.reports.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <FileText className="h-10 w-10 text-slate-300 mb-3" />
+                <p className="text-sm text-slate-500">
+                  No hay reportes para este cliente
                 </p>
               </div>
-            )}
-            {client.accountManager && (
-              <div>
-                <p className="text-xs text-zinc-500 mb-1">Account Manager</p>
-                <p className="text-sm text-white">{client.accountManager.fullName}</p>
+            ) : (
+              <div className="space-y-2">
+                {client.reports.map((report) => (
+                  <Link
+                    key={report.id}
+                    href={`/reports/${report.id}`}
+                    className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 p-3 hover:bg-slate-100 transition-colors"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">
+                        {report.title}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        por {report.submittedBy.fullName} -{' '}
+                        {formatDate(report.createdAt)}
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full border bg-blue-50 text-blue-700 border-blue-200 px-2.5 py-0.5 text-xs font-medium">
+                      {report.reportType}
+                    </span>
+                  </Link>
+                ))}
               </div>
             )}
           </div>
+        </Tabs.Content>
 
-          {client.notes && (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-              <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-2">Notas internas</h2>
-              <p className="text-sm text-zinc-300 whitespace-pre-wrap">{client.notes}</p>
-            </div>
-          )}
-        </div>
+        {/* Notas tab */}
+        <Tabs.Content value="notas" className="pt-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">
+              Notas internas
+            </h2>
+            {client.notes ? (
+              <div className="rounded-lg bg-slate-50 border border-slate-100 p-4">
+                <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                  {client.notes}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500 py-4 text-center">
+                No hay notas registradas para este cliente
+              </p>
+            )}
 
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex border-b border-zinc-800">
-            {(['tasks', 'reports', 'audits'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-4 py-2.5 text-sm font-medium transition-colors ${tab === t ? 'border-b-2 border-indigo-500 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-              >
-                {t === 'tasks' ? `Tareas (${client.tasks.length})` : t === 'reports' ? `Reportes (${client.reports.length})` : `Auditorías (${client.audits.length})`}
-              </button>
-            ))}
+            {client.observations && (
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">
+                  Observaciones
+                </h3>
+                <div className="rounded-lg bg-slate-50 border border-slate-100 p-4">
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">
+                    {client.observations}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-
-          {tab === 'tasks' && (
-            <div className="space-y-2">
-              {client.tasks.length === 0 ? <p className="text-sm text-zinc-500 py-8 text-center">No hay tareas para este cliente</p> : client.tasks.map((task) => (
-                <Link key={task.id} href={`/tasks/${task.id}`} className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium text-white">{task.title}</p>
-                    <p className="text-xs text-zinc-500 mt-0.5">por {task.createdBy.fullName}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={task.status} />
-                    <DeadlineCountdown deadline={task.deadline} />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {tab === 'reports' && (
-            <div className="space-y-2">
-              {client.reports.length === 0 ? <p className="text-sm text-zinc-500 py-8 text-center">No hay reportes para este cliente</p> : client.reports.map((report) => (
-                <Link key={report.id} href={`/reports/${report.id}`} className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium text-white">{report.title}</p>
-                    <p className="text-xs text-zinc-500 mt-0.5">por {report.submittedBy.fullName} · {formatDateTime(report.createdAt)}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={report.reportType} />
-                    <StatusBadge status={report.status} />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {tab === 'audits' && (
-            <div className="space-y-2">
-              {client.audits.length === 0 ? <p className="text-sm text-zinc-500 py-8 text-center">No hay auditorías para este cliente</p> : client.audits.map((audit) => (
-                <Link key={audit.id} href={`/audits/${audit.id}`} className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium text-white">{audit.title}</p>
-                    {audit.executedAt && <p className="text-xs text-zinc-500 mt-0.5">{formatDateTime(audit.executedAt)}</p>}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {audit.overallStatus && <StatusBadge status={audit.overallStatus} />}
-                    {audit.complianceScore !== null && <span className="text-sm font-bold text-white">{audit.complianceScore}%</span>}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+        </Tabs.Content>
+      </Tabs.Root>
     </div>
   )
 }

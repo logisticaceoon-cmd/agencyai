@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { Avatar } from '@/components/shared/Avatar'
-import { createClient } from '@/lib/supabase'
 import { toast } from '@/hooks/use-toast'
 import {
   LayoutDashboard,
@@ -26,10 +25,15 @@ import {
   FolderKanban,
   Building2,
   Lock,
+  User,
+  CreditCard,
+  HelpCircle,
+  ChevronDown,
 } from 'lucide-react'
-import type { OrgPlan } from '@prisma/client'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
-// Plan hierarchy
+type OrgPlan = 'free' | 'starter' | 'pro' | 'agency' | 'scale'
+
 const PLAN_RANK: Record<OrgPlan, number> = {
   free: 0,
   starter: 1,
@@ -64,10 +68,10 @@ const navGroups: { label: string | null; items: NavItem[] }[] = [
     label: 'Operaciones',
     items: [
       { href: '/clients', label: 'Clientes', icon: Users },
-      { href: '/projects', label: 'Proyectos', icon: FolderKanban, minPlan: 'starter' },
+      { href: '/projects', label: 'Proyectos', icon: FolderKanban },
       { href: '/tasks', label: 'Tareas', icon: CheckSquare },
-      { href: '/meetings', label: 'Minutas', icon: MessageSquare, minPlan: 'starter' },
-      { href: '/calendar', label: 'Calendario', icon: Calendar, minPlan: 'starter' },
+      { href: '/minutes', label: 'Minutas', icon: MessageSquare },
+      { href: '/calendar', label: 'Calendario', icon: Calendar },
     ],
   },
   {
@@ -105,14 +109,17 @@ export function Sidebar() {
   const router = useRouter()
   const { user, org } = useCurrentUser()
 
-  const orgPlan: OrgPlan = org?.plan ?? 'free'
+  const orgPlan: OrgPlan = (org?.plan as OrgPlan) ?? 'free'
 
   async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    toast({ title: 'Sesión cerrada' })
-    router.push('/login')
-    router.refresh()
+    try {
+      // Try Clerk signOut if available
+      const { useClerk } = await import('@clerk/nextjs')
+      void useClerk
+    } catch {
+      // Fallback
+    }
+    window.location.href = '/sign-in'
   }
 
   function isActive(href: string) {
@@ -121,23 +128,25 @@ export function Sidebar() {
   }
 
   const isAdmin = user && (user.role === 'CEO' || user.role === 'Manager')
+  const displayName = user?.fullName || 'Usuario'
+  const displayEmail = user?.email || ''
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-zinc-800 bg-[#111111] flex-shrink-0">
+    <aside className="flex h-full w-64 flex-col border-r border-slate-200 bg-[#f8fafc] flex-shrink-0">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-5 py-4 border-b border-zinc-800">
-        <div className="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
+      <div className="flex items-center gap-2.5 px-5 py-4 border-b border-slate-200 bg-white">
+        <div className="h-7 w-7 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
           <Zap className="h-4 w-4 text-white" />
         </div>
-        <span className="text-base font-bold text-white">AgencyAI</span>
+        <span className="text-base font-bold text-slate-900">AgencyAI</span>
         {org && (
           <span className={cn(
             'ml-auto text-[10px] font-semibold rounded-full px-1.5 py-0.5 flex-shrink-0',
-            orgPlan === 'free' ? 'bg-zinc-800 text-zinc-500' :
-            orgPlan === 'starter' ? 'bg-blue-500/10 text-blue-400' :
-            orgPlan === 'pro' ? 'bg-indigo-500/10 text-indigo-400' :
-            orgPlan === 'agency' ? 'bg-purple-500/10 text-purple-400' :
-            'bg-amber-500/10 text-amber-400'
+            orgPlan === 'free' ? 'bg-slate-100 text-slate-500' :
+            orgPlan === 'starter' ? 'bg-blue-50 text-blue-600' :
+            orgPlan === 'pro' ? 'bg-indigo-50 text-indigo-600' :
+            orgPlan === 'agency' ? 'bg-purple-50 text-purple-600' :
+            'bg-amber-50 text-amber-600'
           )}>
             {PLAN_LABEL[orgPlan]}
           </span>
@@ -149,7 +158,7 @@ export function Sidebar() {
         {navGroups.map((group) => (
           <div key={group.label ?? 'main'} className="mb-1">
             {group.label && (
-              <p className="px-3 pt-3 pb-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">
+              <p className="px-3 pt-3 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                 {group.label}
               </p>
             )}
@@ -163,7 +172,7 @@ export function Sidebar() {
                     key={item.href}
                     href="/settings"
                     title={`Requiere plan ${PLAN_LABEL[item.minPlan!]} — Actualizar plan`}
-                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:text-zinc-500 transition-colors group"
+                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-slate-400 transition-colors group"
                   >
                     <item.icon className="h-4 w-4 flex-shrink-0 opacity-40" />
                     <span className="flex-1 opacity-40">{item.label}</span>
@@ -177,12 +186,15 @@ export function Sidebar() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative',
                     active
-                      ? 'bg-indigo-600/10 text-indigo-400'
-                      : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                      ? 'bg-blue-50 text-blue-600'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                   )}
                 >
+                  {active && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] bg-blue-600 rounded-r" />
+                  )}
                   <item.icon className="h-4 w-4 flex-shrink-0" />
                   {item.label}
                 </Link>
@@ -193,7 +205,7 @@ export function Sidebar() {
 
         {isAdmin && (
           <div>
-            <p className="px-3 pt-3 pb-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">
+            <p className="px-3 pt-3 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
               Admin
             </p>
             {adminItems.map((item) => (
@@ -201,12 +213,15 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative',
                   isActive(item.href)
-                    ? 'bg-indigo-600/10 text-indigo-400'
-                    : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                 )}
               >
+                {isActive(item.href) && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] bg-blue-600 rounded-r" />
+                )}
                 <item.icon className="h-4 w-4 flex-shrink-0" />
                 {item.label}
               </Link>
@@ -215,29 +230,65 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* User */}
-      <div className="border-t border-zinc-800 p-3">
+      {/* User profile section */}
+      <div className="border-t border-slate-200 p-3">
         {user ? (
           <div className="flex items-center gap-2.5">
-            <Avatar name={user.fullName} avatarUrl={user.avatarUrl} size="sm" />
+            <Avatar name={displayName} avatarUrl={user.avatarUrl} size="sm" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white truncate">{user.fullName}</p>
-              <p className="text-[10px] text-zinc-500 truncate">{user.role}</p>
+              <p className="text-xs font-medium text-slate-900 truncate">{displayName}</p>
+              <p className="text-[10px] text-slate-400 truncate">{displayEmail}</p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="text-zinc-600 hover:text-red-400 transition-colors flex-shrink-0"
-              title="Cerrar sesión"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-            </button>
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button className="text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0 p-1 rounded hover:bg-slate-100">
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  align="end"
+                  side="top"
+                  sideOffset={8}
+                  className="z-50 min-w-[200px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg animate-scale-in"
+                >
+                  <DropdownMenu.Item asChild>
+                    <Link href="/settings/account" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer outline-none">
+                      <User className="h-4 w-4" /> Mi cuenta
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/settings/workspace" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer outline-none">
+                      <Building2 className="h-4 w-4" /> Workspace
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/settings/billing" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer outline-none">
+                      <CreditCard className="h-4 w-4" /> Plan y facturación
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <a href="mailto:soporte@agencyai.com" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer outline-none">
+                      <HelpCircle className="h-4 w-4" /> Ayuda
+                    </a>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Separator className="my-1 h-px bg-slate-100" />
+                  <DropdownMenu.Item
+                    onSelect={handleLogout}
+                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer outline-none"
+                  >
+                    <LogOut className="h-4 w-4" /> Cerrar sesión
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
           </div>
         ) : (
           <div className="flex items-center gap-2.5">
-            <div className="h-7 w-7 rounded-full bg-zinc-800 animate-pulse flex-shrink-0" />
+            <div className="h-7 w-7 rounded-full bg-slate-200 animate-pulse flex-shrink-0" />
             <div className="flex-1 space-y-1">
-              <div className="h-2.5 bg-zinc-800 rounded animate-pulse" />
-              <div className="h-2 bg-zinc-800 rounded w-2/3 animate-pulse" />
+              <div className="h-2.5 bg-slate-200 rounded animate-pulse" />
+              <div className="h-2 bg-slate-200 rounded w-2/3 animate-pulse" />
             </div>
           </div>
         )}

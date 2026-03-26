@@ -30,9 +30,18 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
+  const search = searchParams.get('search')
 
   const where: Record<string, unknown> = { organizationId: ctx.org.id }
   if (status) where.status = status
+
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { brand: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+    ]
+  }
 
   const clients = await prisma.client.findMany({
     where,

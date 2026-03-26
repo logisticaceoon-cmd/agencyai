@@ -1,209 +1,411 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { PageHeader } from '@/components/shared/PageHeader'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/auth'
-import { Calendar as CalIcon, ChevronLeft, ChevronRight, CheckSquare, MessageSquare, DollarSign, Clock } from 'lucide-react'
+import {
+  Calendar as CalIcon,
+  ChevronLeft,
+  ChevronRight,
+  CheckSquare,
+  Video,
+  Plus,
+  X,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  format,
+  isSameMonth,
+  isToday,
+  addMonths,
+  subMonths,
+  isSameDay,
+  parseISO,
+} from 'date-fns'
+import { es } from 'date-fns/locale'
 
-interface CalendarEvent {
+interface CalendarTask {
   id: string
-  type: 'task' | 'meeting' | 'payment'
+  title: string
+  deadline: string
+  status: string
+  priority: string
+  client?: { name: string } | null
+}
+
+interface CalendarMeeting {
+  id: string
+  title: string
+  date: string
+  client?: { name: string } | null
+}
+
+interface DayEvent {
+  id: string
+  type: 'task' | 'meeting'
   title: string
   date: string
   status?: string
   priority?: string
-  amount?: number
   client?: string
 }
 
-const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
 export default function CalendarPage() {
   const { org } = useAuthStore()
-  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [events, setEvents] = useState<DayEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedDay, setSelectedDay] = useState<number | null>(new Date().getDate())
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
 
-  const month = currentDate.getMonth() + 1
-  const year = currentDate.getFullYear()
+  const fetchEvents = useCallback(async () => {
+    setLoading(true)
+    try {
+      const monthStr = format(currentMonth, 'yyyy-MM')
+      const res = await fetch(`/api/calendar?month=${monthStr}`)
+      const data = await res.json()
+
+      const mapped: DayEvent[] = [
+        ...(data.tasks || []).map((t: CalendarTask) => ({
+          id: t.id,
+          type: 'task' as const,
+          title: t.title,
+          date: t.deadline,
+          status: t.status,
+          priority: t.priority,
+          client: t.client?.name,
+        })),
+        ...(data.meetings || []).map((m: CalendarMeeting) => ({
+          id: m.id,
+          type: 'meeting' as const,
+          title: m.title,
+          date: m.date,
+          client: m.client?.name,
+        })),
+      ]
+      setEvents(mapped)
+    } catch {
+      setEvents([])
+    } finally {
+      setLoading(false)
+    }
+  }, [currentMonth])
 
   useEffect(() => {
-    setLoading(true)
-    fetch(`/api/calendar?month=${month}&year=${year}`)
-      .then(r => r.json())
-      .then(j => { setEvents(j.data || []); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [month, year])
+    if (org) fetchEvents()
+  }, [org, fetchEvents])
 
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const firstDayOfWeek = new Date(year, month - 1, 1).getDay()
+  const monthStart = startOfMonth(currentMonth)
+  const monthEnd = endOfMonth(currentMonth)
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 })
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 })
+  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
 
-  const getEventsForDay = (day: number) => {
-    return events.filter(e => {
-      const d = new Date(e.date)
-      return d.getDate() === day && d.getMonth() + 1 === month && d.getFullYear() === year
+  const getEventsForDay = (day: Date): DayEvent[] => {
+    return events.filter((e) => {
+      const eventDate = parseISO(e.date)
+      return isSameDay(eventDate, day)
     })
   }
 
-  const navigate = (dir: -1 | 1) => {
-    const d = new Date(currentDate)
-    d.setMonth(d.getMonth() + dir)
-    setCurrentDate(d)
-    setSelectedDay(null)
+  const handleDayClick = (day: Date) => {
+    setSelectedDay(day)
+    setPanelOpen(true)
   }
-
-  const today = new Date()
-  const isToday = (day: number) => day === today.getDate() && month === today.getMonth() + 1 && year === today.getFullYear()
 
   const selectedEvents = selectedDay ? getEventsForDay(selectedDay) : []
 
-  const typeIcon = (type: string) => {
-    switch (type) {
-      case 'task': return <CheckSquare className="h-3.5 w-3.5 text-blue-400" />
-      case 'meeting': return <MessageSquare className="h-3.5 w-3.5 text-indigo-400" />
-      case 'payment': return <DollarSign className="h-3.5 w-3.5 text-yellow-400" />
-      default: return <Clock className="h-3.5 w-3.5 text-zinc-400" />
-    }
-  }
-
-  const typeColor = (type: string) => {
-    switch (type) {
-      case 'task': return 'bg-blue-500'
-      case 'meeting': return 'bg-indigo-500'
-      case 'payment': return 'bg-yellow-500'
-      default: return 'bg-zinc-500'
-    }
-  }
+  const taskCount = (day: Date) =>
+    getEventsForDay(day).filter((e) => e.type === 'task').length
+  const meetingCount = (day: Date) =>
+    getEventsForDay(day).filter((e) => e.type === 'meeting').length
 
   if (!org) return null
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Calendario" description="Tareas, reuniones y pagos del mes" />
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Calendario</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Visualiza tareas y reuniones del mes
+          </p>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="relative flex gap-6">
         {/* Calendar Grid */}
-        <div className="lg:col-span-2 rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <div className="flex-1 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          {/* Month Navigation */}
           <div className="flex items-center justify-between mb-5">
-            <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-zinc-800 transition-colors">
-              <ChevronLeft className="h-5 w-5 text-zinc-400" />
+            <button
+              onClick={() => setCurrentMonth((m) => subMonths(m, 1))}
+              className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              <ChevronLeft className="h-5 w-5 text-slate-500" />
             </button>
-            <h2 className="text-lg font-semibold text-white">{MONTHS[month - 1]} {year}</h2>
-            <button onClick={() => navigate(1)} className="p-1.5 rounded-lg hover:bg-zinc-800 transition-colors">
-              <ChevronRight className="h-5 w-5 text-zinc-400" />
+            <h2 className="text-lg font-semibold text-slate-900 capitalize">
+              {format(currentMonth, 'MMMM yyyy', { locale: es })}
+            </h2>
+            <button
+              onClick={() => setCurrentMonth((m) => addMonths(m, 1))}
+              className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              <ChevronRight className="h-5 w-5 text-slate-500" />
             </button>
           </div>
 
+          {/* Day Names Header */}
           <div className="grid grid-cols-7 gap-1 mb-2">
-            {DAYS.map(d => (
-              <div key={d} className="text-center text-xs font-medium text-zinc-500 py-2">{d}</div>
+            {DAY_NAMES.map((d) => (
+              <div
+                key={d}
+                className="text-center text-xs font-semibold text-slate-400 uppercase tracking-wider py-2"
+              >
+                {d}
+              </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
-            {Array.from({ length: firstDayOfWeek }).map((_, i) => <div key={`e-${i}`} />)}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1
-              const dayEvents = getEventsForDay(day)
-              const isSelected = selectedDay === day
-
-              return (
-                <button
-                  key={day}
-                  onClick={() => setSelectedDay(day)}
-                  className={cn(
-                    'relative flex flex-col items-center py-2 rounded-lg text-sm transition-colors min-h-[52px]',
-                    isSelected ? 'bg-indigo-600 text-white' : isToday(day) ? 'bg-indigo-500/20 text-indigo-300' : 'hover:bg-zinc-800 text-zinc-300'
-                  )}
-                >
-                  <span className={cn('text-sm', isToday(day) && !isSelected && 'font-bold')}>{day}</span>
-                  {dayEvents.length > 0 && (
-                    <div className="flex gap-0.5 mt-1">
-                      {dayEvents.slice(0, 3).map((e, j) => (
-                        <div key={j} className={cn('w-1.5 h-1.5 rounded-full', typeColor(e.type))} />
-                      ))}
-                    </div>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Legend */}
-          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-zinc-800">
-            <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-              <div className="w-2 h-2 rounded-full bg-blue-500" /> Tareas
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-              <div className="w-2 h-2 rounded-full bg-indigo-500" /> Reuniones
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-              <div className="w-2 h-2 rounded-full bg-yellow-500" /> Pagos
-            </div>
-          </div>
-        </div>
-
-        {/* Day Detail Panel */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <h3 className="font-semibold text-white mb-4">
-            {selectedDay ? `${selectedDay} de ${MONTHS[month - 1]}` : 'Selecciona un día'}
-          </h3>
-
-          {!selectedDay ? (
-            <p className="text-sm text-zinc-500">Haz clic en un día para ver sus eventos.</p>
-          ) : selectedEvents.length === 0 ? (
-            <div className="text-center py-8">
-              <CalIcon className="h-8 w-8 text-zinc-700 mx-auto mb-2" />
-              <p className="text-sm text-zinc-500">Sin eventos este día</p>
+          {/* Calendar Days */}
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
-            <div className="space-y-3">
-              {selectedEvents.map(event => (
-                <div key={event.id} className="flex items-start gap-3 p-3 rounded-lg bg-zinc-800/50 border border-zinc-700/50">
-                  <div className="mt-0.5">{typeIcon(event.type)}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{event.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-zinc-500 capitalize">{event.type === 'task' ? 'Tarea' : event.type === 'meeting' ? 'Reunión' : 'Pago'}</span>
-                      {event.client && <span className="text-xs text-zinc-600">• {event.client}</span>}
-                    </div>
-                    {event.amount && <p className="text-xs text-yellow-400 mt-1">${event.amount.toLocaleString()}</p>}
-                    {event.status && (
-                      <span className={cn(
-                        'inline-block text-xs px-1.5 py-0.5 rounded mt-1',
-                        event.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                        event.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                        'bg-zinc-700 text-zinc-300'
-                      )}>{event.status}</span>
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((day) => {
+                const inMonth = isSameMonth(day, currentMonth)
+                const today = isToday(day)
+                const isSelected =
+                  selectedDay && isSameDay(day, selectedDay)
+                const dayTasks = taskCount(day)
+                const dayMeetings = meetingCount(day)
+
+                return (
+                  <button
+                    key={day.toISOString()}
+                    onClick={() => handleDayClick(day)}
+                    className={cn(
+                      'relative flex flex-col items-start p-2 rounded-lg text-sm transition-all min-h-[72px] border',
+                      inMonth
+                        ? 'text-slate-900'
+                        : 'text-slate-300',
+                      today && !isSelected
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-transparent',
+                      isSelected
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : inMonth
+                        ? 'hover:bg-slate-50'
+                        : 'hover:bg-slate-50/50'
                     )}
-                  </div>
-                </div>
-              ))}
+                  >
+                    <span
+                      className={cn(
+                        'text-sm font-medium',
+                        today && !isSelected && 'text-blue-600 font-bold'
+                      )}
+                    >
+                      {format(day, 'd')}
+                    </span>
+
+                    {(dayTasks > 0 || dayMeetings > 0) && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {dayTasks > 0 && (
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full',
+                              isSelected
+                                ? 'bg-white/20 text-white'
+                                : 'bg-blue-100 text-blue-700'
+                            )}
+                          >
+                            <CheckSquare className="h-2.5 w-2.5" />
+                            {dayTasks}
+                          </span>
+                        )}
+                        {dayMeetings > 0 && (
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full',
+                              isSelected
+                                ? 'bg-white/20 text-white'
+                                : 'bg-green-100 text-green-700'
+                            )}
+                          >
+                            <Video className="h-2.5 w-2.5" />
+                            {dayMeetings}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           )}
 
-          {/* Summary counters */}
-          {events.length > 0 && (
-            <div className="mt-6 pt-4 border-t border-zinc-800 space-y-2">
-              <p className="text-xs font-medium text-zinc-400 mb-2">Resumen del mes</p>
-              <div className="flex justify-between text-xs">
-                <span className="text-zinc-500">Tareas</span>
-                <span className="text-blue-400">{events.filter(e => e.type === 'task').length}</span>
+          {/* Legend */}
+          <div className="flex items-center gap-5 mt-4 pt-4 border-t border-slate-200">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-600" /> Tareas
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <div className="w-2.5 h-2.5 rounded-full bg-green-600" /> Reuniones
+            </div>
+          </div>
+        </div>
+
+        {/* Slide-in Day Panel */}
+        <div
+          className={cn(
+            'fixed top-0 right-0 h-full w-96 bg-white border-l border-slate-200 shadow-xl z-50 transition-transform duration-300 ease-in-out',
+            panelOpen ? 'translate-x-0' : 'translate-x-full'
+          )}
+        >
+          <div className="flex flex-col h-full">
+            {/* Panel Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-200">
+              <div>
+                <h3 className="font-semibold text-slate-900">
+                  {selectedDay
+                    ? format(selectedDay, "d 'de' MMMM, yyyy", {
+                        locale: es,
+                      })
+                    : 'Selecciona un día'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {selectedEvents.length} evento
+                  {selectedEvents.length !== 1 ? 's' : ''}
+                </p>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-zinc-500">Reuniones</span>
-                <span className="text-indigo-400">{events.filter(e => e.type === 'meeting').length}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-zinc-500">Pagos pendientes</span>
-                <span className="text-yellow-400">{events.filter(e => e.type === 'payment').length}</span>
+              <div className="flex items-center gap-2">
+                <button className="p-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+                  <Plus className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setPanelOpen(false)}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  <X className="h-4 w-4 text-slate-400" />
+                </button>
               </div>
             </div>
-          )}
+
+            {/* Panel Content */}
+            <div className="flex-1 overflow-y-auto p-5">
+              {selectedEvents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <CalIcon className="h-10 w-10 text-slate-300 mb-3" />
+                  <p className="text-sm text-slate-500">
+                    Sin eventos este día
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Haz clic en + para agregar uno
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className={cn(
+                        'flex items-start gap-3 p-3 rounded-lg border transition-colors hover:shadow-sm',
+                        event.type === 'task'
+                          ? 'border-blue-200 bg-blue-50/50'
+                          : 'border-green-200 bg-green-50/50'
+                      )}
+                    >
+                      <div className="mt-0.5">
+                        {event.type === 'task' ? (
+                          <CheckSquare className="h-4 w-4 text-blue-600" />
+                        ) : (
+                          <Video className="h-4 w-4 text-green-600" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                          {event.title}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-slate-500">
+                            {event.type === 'task' ? 'Tarea' : 'Reunión'}
+                          </span>
+                          {event.client && (
+                            <span className="text-xs text-slate-400">
+                              &bull; {event.client}
+                            </span>
+                          )}
+                        </div>
+                        {event.status && (
+                          <span
+                            className={cn(
+                              'inline-block text-xs px-2 py-0.5 rounded-full mt-1.5 font-medium',
+                              event.status === 'completed'
+                                ? 'bg-green-100 text-green-700'
+                                : event.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : event.status === 'in_progress'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-slate-100 text-slate-600'
+                            )}
+                          >
+                            {event.status === 'completed'
+                              ? 'Completada'
+                              : event.status === 'pending'
+                              ? 'Pendiente'
+                              : event.status === 'in_progress'
+                              ? 'En progreso'
+                              : event.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Panel Summary */}
+            {events.length > 0 && (
+              <div className="p-5 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                  Resumen del mes
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                    <p className="text-lg font-bold text-blue-600">
+                      {events.filter((e) => e.type === 'task').length}
+                    </p>
+                    <p className="text-xs text-blue-600/70">Tareas</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-green-50 border border-green-100">
+                    <p className="text-lg font-bold text-green-600">
+                      {events.filter((e) => e.type === 'meeting').length}
+                    </p>
+                    <p className="text-xs text-green-600/70">Reuniones</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Overlay */}
+        {panelOpen && (
+          <div
+            className="fixed inset-0 bg-black/10 z-40"
+            onClick={() => setPanelOpen(false)}
+          />
+        )}
       </div>
     </div>
   )

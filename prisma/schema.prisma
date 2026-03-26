@@ -45,6 +45,7 @@ enum UserStatus {
 enum TaskStatus {
   pending
   in_progress
+  review
   completed
   rejected
 }

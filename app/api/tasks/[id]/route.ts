@@ -1,17 +1,23 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { getOrgContext } from '@/lib/org'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
-  status: z.enum(['pending', 'in_progress', 'completed', 'rejected']).optional(),
+  status: z.enum(['pending', 'in_progress', 'completed', 'rejected', 'review']).optional(),
   progressPercent: z.number().min(0).max(100).optional(),
   priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
   deadline: z.string().optional(),
+  estimatedHours: z.number().optional(),
   actualHours: z.number().optional(),
   assignedTo: z.array(z.string()).optional(),
+  projectId: z.string().optional(),
+  clientId: z.string().optional(),
+  department: z.string().optional(),
+  taskType: z.string().optional(),
+  checklist: z.array(z.object({ label: z.string(), done: z.boolean() })).optional(),
 })
 
 export async function GET(
@@ -20,26 +26,27 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const ctx = await getOrgContext()
+    if ('error' in ctx) return ctx.error
 
     const task = await prisma.task.findUnique({
-      where: { id },
+      where: { id, organizationId: ctx.org.id },
       include: {
-        createdBy: true,
-        client: true,
+        createdBy: { select: { id: true, fullName: true, avatarUrl: true } },
+        client: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true } },
         validatedBy: { select: { id: true, fullName: true } },
         subtasks: {
-          include: { createdBy: { select: { id: true, fullName: true } } },
+          include: {
+            createdBy: { select: { id: true, fullName: true } },
+          },
+          orderBy: { createdAt: 'asc' },
         },
         comments: {
           include: { author: { select: { id: true, fullName: true, avatarUrl: true } } },
           orderBy: { createdAt: 'asc' },
         },
+        _count: { select: { comments: true, subtasks: true } },
         activityLog: {
           include: { user: { select: { id: true, fullName: true } } },
           orderBy: { createdAt: 'desc' },
@@ -50,13 +57,13 @@ export async function GET(
 
     if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Team can only see their own tasks
-    if (dbUser.role === 'Team' && !task.assignedTo.includes(dbUser.id)) {
+    // Trafficker can only see their own tasks
+    if (ctx.membership.role === 'trafficker' && !task.assignedTo.includes(ctx.user.id)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     return NextResponse.json({ data: task })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -67,42 +74,56 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getOrgContext()
+    if ('error' in ctx) return ctx.error
 
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-
-    const task = await prisma.task.findUnique({ where: { id } })
+    const task = await prisma.task.findUnique({
+      where: { id, organizationId: ctx.org.id },
+    })
     if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Team can only update their own tasks (progress only)
-    if (dbUser.role === 'Team' && !task.assignedTo.includes(dbUser.id)) {
+    // Trafficker can only update their own tasks
+    if (ctx.membership.role === 'trafficker' && !task.assignedTo.includes(ctx.user.id)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()
     const data = updateSchema.parse(body)
 
+    // Build update payload
+    const updateData: Record<string, unknown> = { ...data }
+    if (data.deadline) {
+      updateData.deadline = new Date(data.deadline)
+    }
+    if (data.projectId === '') {
+      updateData.projectId = null
+    }
+    if (data.clientId === '') {
+      updateData.clientId = null
+    }
+
     const updated = await prisma.task.update({
       where: { id },
-      data: {
-        ...data,
-        deadline: data.deadline ? new Date(data.deadline) : undefined,
+      data: updateData,
+      include: {
+        createdBy: { select: { id: true, fullName: true, avatarUrl: true } },
+        client: { select: { id: true, name: true } },
+        project: { select: { id: true, name: true } },
+        _count: { select: { comments: true, subtasks: true } },
       },
     })
 
-    // Log
+    // Log activity
     await prisma.activityLog.create({
       data: {
-        userId: dbUser.id,
+        organizationId: ctx.org.id,
+        userId: ctx.user.id,
         actionType: 'task_updated',
         entityType: 'task',
         entityId: id,
         taskId: id,
-        description: `Tarea actualizada por ${dbUser.fullName}`,
-        changes: data as any,
+        description: `Tarea actualizada: ${updated.title}`,
+        changes: JSON.parse(JSON.stringify(data)),
       },
     })
 
@@ -121,18 +142,39 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const ctx = await getOrgContext()
+    if ('error' in ctx) return ctx.error
 
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser || dbUser.role === 'Team') {
+    // Only admin can delete tasks
+    if (ctx.membership.role === 'trafficker') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    await prisma.task.delete({ where: { id } })
+    const task = await prisma.task.findUnique({
+      where: { id, organizationId: ctx.org.id },
+    })
+    if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    // Soft delete: mark as rejected with a note
+    await prisma.task.update({
+      where: { id },
+      data: { status: 'rejected' },
+    })
+
+    await prisma.activityLog.create({
+      data: {
+        organizationId: ctx.org.id,
+        userId: ctx.user.id,
+        actionType: 'task_deleted',
+        entityType: 'task',
+        entityId: id,
+        taskId: id,
+        description: `Tarea eliminada: ${task.title}`,
+      },
+    })
+
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

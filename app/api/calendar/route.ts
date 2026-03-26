@@ -7,21 +7,36 @@ export async function GET(request: Request) {
   if ('error' in ctx) return ctx.error
 
   const { searchParams } = new URL(request.url)
-  const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1))
-  const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
+  const monthParam = searchParams.get('month') // format: YYYY-MM
 
-  const startDate = new Date(year, month - 1, 1)
-  const endDate = new Date(year, month, 0, 23, 59, 59)
+  let startDate: Date
+  let endDate: Date
 
-  const [tasks, meetings, finances] = await Promise.all([
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    const [year, month] = monthParam.split('-').map(Number)
+    startDate = new Date(year, month - 1, 1)
+    endDate = new Date(year, month, 0, 23, 59, 59, 999)
+  } else {
+    // Fallback: use legacy month/year params or current month
+    const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1))
+    const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
+    startDate = new Date(year, month - 1, 1)
+    endDate = new Date(year, month, 0, 23, 59, 59, 999)
+  }
+
+  const [tasks, meetings] = await Promise.all([
     prisma.task.findMany({
       where: {
         organizationId: ctx.org.id,
         deadline: { gte: startDate, lte: endDate },
       },
       select: {
-        id: true, title: true, deadline: true, status: true, priority: true,
-        client: { select: { name: true } },
+        id: true,
+        title: true,
+        deadline: true,
+        status: true,
+        priority: true,
+        client: { select: { id: true, name: true } },
       },
       orderBy: { deadline: 'asc' },
     }),
@@ -31,51 +46,15 @@ export async function GET(request: Request) {
         date: { gte: startDate, lte: endDate },
       },
       select: {
-        id: true, title: true, date: true,
-        client: { select: { name: true } },
-      },
-      orderBy: { date: 'asc' },
-    }),
-    prisma.finance.findMany({
-      where: {
-        organizationId: ctx.org.id,
-        month, year,
-        isPaid: false,
-      },
-      select: {
-        id: true, description: true, date: true, amount: true, type: true,
-        client: { select: { name: true } },
+        id: true,
+        title: true,
+        date: true,
+        attendees: true,
+        client: { select: { id: true, name: true } },
       },
       orderBy: { date: 'asc' },
     }),
   ])
 
-  const events = [
-    ...tasks.map(t => ({
-      id: t.id,
-      type: 'task' as const,
-      title: t.title,
-      date: t.deadline,
-      status: t.status,
-      priority: t.priority,
-      client: t.client?.name,
-    })),
-    ...meetings.map(m => ({
-      id: m.id,
-      type: 'meeting' as const,
-      title: m.title,
-      date: m.date,
-      client: m.client?.name,
-    })),
-    ...finances.map(f => ({
-      id: f.id,
-      type: 'payment' as const,
-      title: f.description,
-      date: f.date,
-      amount: Number(f.amount),
-      client: f.client?.name,
-    })),
-  ].sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime())
-
-  return NextResponse.json({ data: events, month, year })
+  return NextResponse.json({ tasks, meetings })
 }
