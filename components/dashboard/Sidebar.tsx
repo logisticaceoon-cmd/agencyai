@@ -112,14 +112,11 @@ export function Sidebar() {
   const orgPlan: OrgPlan = (org?.plan as OrgPlan) ?? 'free'
 
   async function handleLogout() {
-    try {
-      // Try Clerk signOut if available
-      const { useClerk } = await import('@clerk/nextjs')
-      void useClerk
-    } catch {
-      // Fallback
-    }
-    window.location.href = '/sign-in'
+    const supabase = (await import('@/lib/supabase')).createClient()
+    await supabase.auth.signOut()
+    toast({ title: 'Sesión cerrada' })
+    router.push('/sign-in')
+    router.refresh()
   }
 
   function isActive(href: string) {

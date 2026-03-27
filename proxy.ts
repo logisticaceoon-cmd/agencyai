@@ -1,18 +1,62 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 
-const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/pricing(.*)',
-  '/api/webhooks(.*)',
-  '/',
-])
+export async function proxy(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({ request })
 
-export default clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
-    await auth.protect()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { pathname } = request.nextUrl
+
+  // Skip API routes and static assets
+  if (pathname.startsWith('/api/') || pathname.startsWith('/_next/')) {
+    return supabaseResponse
   }
-})
+
+  // Public routes — no auth needed
+  const publicRoutes = ['/', '/sign-in', '/sign-up', '/login', '/register', '/pricing']
+  const isPublicRoute = publicRoutes.includes(pathname) || pathname.startsWith('/invite/') || pathname.startsWith('/portal/')
+
+  // Unauthenticated user trying to access protected route
+  if (!user && !isPublicRoute) {
+    return NextResponse.redirect(new URL('/sign-in', request.url))
+  }
+
+  // Authenticated user trying to access auth pages → redirect to dashboard
+  if (user && (pathname === '/sign-in' || pathname === '/sign-up' || pathname === '/login' || pathname === '/register')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // Authenticated user visiting root → redirect to dashboard
+  if (user && pathname === '/') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  return supabaseResponse
+}
 
 export const config = {
   matcher: [
