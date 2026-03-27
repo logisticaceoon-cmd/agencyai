@@ -17,7 +17,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className={`${inter.className} bg-white text-slate-900 antialiased`}>
+      <body className={`${inter.className} bg-white text-slate-900 antialiased`} suppressHydrationWarning>
         {children}
         <Toaster />
       </body>

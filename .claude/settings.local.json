@@ -46,7 +46,9 @@
       "Bash(node scripts/fix-migrations.mjs)",
       "Bash(gh repo:*)",
       "Bash(gh auth:*)",
-      "Bash(node scripts/apply-rls-policies.mjs)"
+      "Bash(node scripts/apply-rls-policies.mjs)",
+      "Bash(node scripts/migrate-orgs-to-workspaces.mjs)",
+      "Bash(node -e \":*)"
     ]
   }
 }
