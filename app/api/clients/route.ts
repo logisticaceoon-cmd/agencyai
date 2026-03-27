@@ -33,10 +33,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json({ data: data || [] })
   } catch (err) {
     console.error('Error in GET /api/clients:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json({ data: [], error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data, { status: 201 })
+    return NextResponse.json({ data }, { status: 201 })
   } catch (err) {
     console.error('Error in POST /api/clients:', err)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })

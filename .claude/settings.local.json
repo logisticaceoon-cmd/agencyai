@@ -48,7 +48,8 @@
       "Bash(gh auth:*)",
       "Bash(node scripts/apply-rls-policies.mjs)",
       "Bash(node scripts/migrate-orgs-to-workspaces.mjs)",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(node scripts/fix-rls-cycle.mjs)"
     ]
   }
 }

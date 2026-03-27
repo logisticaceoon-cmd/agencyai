@@ -36,8 +36,8 @@ export async function GET(request: Request) {
     data: transactions || [],
     commissionClients: commClients || [],
     summary: {
-      totalIncome: (transactions || []).filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0),
-      totalExpenses: (transactions || []).filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0),
+      totalIncome: (transactions || []).filter((t: { type: string }) => t.type === 'income').reduce((s: number, t: { amount: number }) => s + Number(t.amount), 0),
+      totalExpenses: (transactions || []).filter((t: { type: string }) => t.type === 'expense').reduce((s: number, t: { amount: number }) => s + Number(t.amount), 0),
     },
   })
 }

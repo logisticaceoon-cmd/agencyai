@@ -35,19 +35,20 @@ export async function GET(request: Request) {
 
     // For each project, count tasks by status
     const projectsWithTaskCounts = await Promise.all(
-      (projects || []).map(async (project) => {
+      (projects || []).map(async (project: Record<string, unknown>) => {
         const { data: tasks } = await supabase
           .from('tasks')
           .select('status')
-          .eq('project_id', project.id)
+          .eq('project_id', project.id as string)
           .eq('workspace_id', workspaceId)
           .is('deleted_at', null)
 
+        type TaskRow = { status: string }
         const taskCounts = {
           total: tasks?.length || 0,
-          todo: tasks?.filter((t) => t.status === 'todo').length || 0,
-          in_progress: tasks?.filter((t) => t.status === 'in_progress').length || 0,
-          done: tasks?.filter((t) => t.status === 'done').length || 0,
+          todo: tasks?.filter((t: TaskRow) => t.status === 'todo').length || 0,
+          in_progress: tasks?.filter((t: TaskRow) => t.status === 'in_progress').length || 0,
+          done: tasks?.filter((t: TaskRow) => t.status === 'done').length || 0,
         }
 
         return { ...project, task_counts: taskCounts }

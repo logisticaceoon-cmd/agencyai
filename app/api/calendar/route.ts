@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
     // Enrich milestones with project names
     const milestones = milestonesResult.data || []
-    const projectIds = [...new Set(milestones.map(m => m.project_id).filter(Boolean))]
+    const projectIds = [...new Set(milestones.map((m: { project_id: string }) => m.project_id).filter(Boolean))]
     let projectMap: Record<string, string> = {}
     if (projectIds.length > 0) {
       const { data: projects } = await supabase
@@ -49,10 +49,10 @@ export async function GET(request: Request) {
         .select('id, name')
         .in('id', projectIds)
       if (projects) {
-        projectMap = Object.fromEntries(projects.map(p => [p.id, p.name]))
+        projectMap = Object.fromEntries(projects.map((p: { id: string; name: string }) => [p.id, p.name]))
       }
     }
-    const enrichedMilestones = milestones.map(m => ({
+    const enrichedMilestones = milestones.map((m: { project_id?: string; [key: string]: unknown }) => ({
       ...m,
       project_name: m.project_id ? (projectMap[m.project_id] || null) : null,
     }))
