@@ -48,6 +48,9 @@ const projectSchema = z.object({
   status: z
     .enum(['onboarding', 'active', 'review', 'paused', 'completed'])
     .optional(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  budget: z.string().optional(),
+  ownerId: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   color: z.string().optional(),
@@ -90,6 +93,7 @@ export default function ProjectsPage() {
   const { user } = useCurrentUser()
   const [projects, setProjects] = useState<Project[]>([])
   const [clients, setClients] = useState<ClientOption[]>([])
+  const [members, setMembers] = useState<{ id: string; name: string; email: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
@@ -154,6 +158,7 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     loadClients()
+    fetch('/api/team').then(r => r.json()).then(j => setMembers((j.data || []).map((m: { user_id: string; name: string; email: string }) => ({ id: m.user_id, name: m.name || m.email, email: m.email })))).catch(() => {})
   }, [loadClients])
 
   // ── Handlers ───────────────────────────────────────────────────────────
@@ -165,6 +170,9 @@ export default function ProjectsPage() {
       description: '',
       clientId: '',
       status: 'active',
+      priority: 'medium',
+      budget: '',
+      ownerId: '',
       startDate: '',
       endDate: '',
       color: PROJECT_COLORS[0],
@@ -197,6 +205,9 @@ export default function ProjectsPage() {
         clientId: data.clientId || undefined,
         startDate: data.startDate || undefined,
         endDate: data.endDate || undefined,
+        budget: data.budget ? parseFloat(data.budget) : undefined,
+        ownerId: data.ownerId || undefined,
+        priority: data.priority || undefined,
       }
 
       if (editingProject) {
@@ -444,9 +455,9 @@ export default function ProjectsPage() {
                 </label>
                 <textarea
                   {...register('description')}
-                  rows={3}
+                  rows={4}
                   className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
-                  placeholder="Descripcion del proyecto..."
+                  placeholder="Describe el alcance, objetivos y entregables del proyecto..."
                 />
               </div>
 
@@ -483,6 +494,54 @@ export default function ProjectsPage() {
                     <option value="completed">Completado</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Presupuesto & Prioridad */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Presupuesto ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...register('budget')}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Prioridad
+                  </label>
+                  <select
+                    {...register('priority')}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="low">Baja</option>
+                    <option value="medium">Media</option>
+                    <option value="high">Alta</option>
+                    <option value="urgent">Urgente</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Responsable */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Responsable
+                </label>
+                <select
+                  {...register('ownerId')}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">Sin asignar</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Fechas */}

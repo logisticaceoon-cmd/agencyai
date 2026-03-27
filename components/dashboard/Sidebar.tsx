@@ -78,18 +78,18 @@ const navGroups: { label: string | null; items: NavItem[] }[] = [
     label: 'Reportes',
     items: [
       { href: '/reports', label: 'Reportes', icon: FileText },
-      { href: '/kpis', label: 'KPIs y Métricas', icon: BarChart2, minPlan: 'pro' },
-      { href: '/objectives', label: 'Objetivos', icon: Target, minPlan: 'pro' },
+      { href: '/kpis', label: 'KPIs y Metricas', icon: BarChart2 },
+      { href: '/objectives', label: 'Objetivos', icon: Target },
     ],
   },
   {
-    label: 'Gestión',
+    label: 'Gestion',
     items: [
-      { href: '/audits', label: 'Auditorías', icon: Search, minPlan: 'pro' },
-      { href: '/docs', label: 'Documentos', icon: BookOpen, minPlan: 'starter' },
-      { href: '/finances', label: 'Finanzas', icon: DollarSign, minPlan: 'pro' },
-      { href: '/recordings', label: 'Grabaciones', icon: Video, minPlan: 'agency' },
-      { href: '/alerts', label: 'IA & Alertas', icon: Zap, minPlan: 'agency' },
+      { href: '/audits', label: 'Auditorias', icon: Search },
+      { href: '/docs', label: 'Documentos', icon: BookOpen },
+      { href: '/finances', label: 'Finanzas', icon: DollarSign },
+      { href: '/recordings', label: 'Grabaciones', icon: Video },
+      { href: '/alerts', label: 'IA & Alertas', icon: Zap },
     ],
   },
 ]

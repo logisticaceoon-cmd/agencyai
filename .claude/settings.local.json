@@ -36,7 +36,17 @@
       "Bash(grep -r \"\\(\\).*{\\\\s*$\\\\|\\(\\).*{\\\\s*\\\\}\" 'C:/Users/Rafael B/agencyai/app/api')",
       "Bash(grep -r \"Clerk\\\\|clerk\\\\|getAuth\\\\|currentUser\" 'C:/Users/Rafael B/agencyai' --include=*.ts --include=*.tsx)",
       "Bash(grep -r \"empty\\\\|placeholder\\\\|TODO\\\\|FIXME\\\\|HACK\\\\|NotImplemented\\\\|unimplemented\" 'C:/Users/Rafael B/agencyai/app' --include=*.ts --include=*.tsx)",
-      "Bash(grep -E \"\\\\.ts$\")"
+      "Bash(grep -E \"\\\\.ts$\")",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "Bash(node scripts/run-migrations.mjs)",
+      "Bash(node scripts/check-schema.mjs)",
+      "Bash(node scripts/run-all-migrations.mjs)",
+      "Bash(node scripts/check-columns.mjs)",
+      "Bash(node scripts/fix-migrations.mjs)",
+      "Bash(gh repo:*)",
+      "Bash(gh auth:*)",
+      "Bash(node scripts/apply-rls-policies.mjs)"
     ]
   }
 }
