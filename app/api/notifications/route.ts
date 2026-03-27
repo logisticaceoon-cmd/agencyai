@@ -1,31 +1,53 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(request: Request) {
-  try {
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await getAuthContext()
+  if (isAuthError(auth)) return auth
+  const { supabase, workspaceId, userId } = auth
 
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const { searchParams } = new URL(request.url)
+  const page = parseInt(searchParams.get('page') || '1')
+  const limit = parseInt(searchParams.get('limit') || '20')
+  const filter = searchParams.get('filter')
 
-    const { searchParams } = new URL(request.url)
-    const unreadOnly = searchParams.get('unread') === 'true'
+  let query = supabase
+    .from('notifications')
+    .select('*', { count: 'exact' })
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range((page - 1) * limit, page * limit - 1)
 
-    const notifications = await prisma.notification.findMany({
-      where: {
-        userId: dbUser.id,
-        ...(unreadOnly && { isRead: false }),
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    })
+  if (filter === 'unread') query = query.eq('read', false)
+  if (filter === 'warning') query = query.eq('type', 'warning')
+  if (filter === 'info') query = query.eq('type', 'info')
 
-    return NextResponse.json({ notifications })
-  } catch (error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
+  const { data, error, count } = await query
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  const { count: unreadCount } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', userId)
+    .eq('read', false)
+
+  return NextResponse.json({
+    notifications: (data || []).map(n => ({
+      id: n.id,
+      title: n.title,
+      message: n.message,
+      type: n.type,
+      isRead: n.read,
+      link: n.link,
+      relatedEntityType: n.type,
+      relatedEntityId: null,
+      createdAt: n.created_at,
+    })),
+    unreadCount: unreadCount || 0,
+    total: count || 0,
+    page,
+    limit,
+  })
 }

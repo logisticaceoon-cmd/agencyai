@@ -1,116 +1,101 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
-
-const createSchema = z.object({
-  name: z.string().min(1, 'El nombre es obligatorio'),
-  description: z.string().optional(),
-  clientId: z.string().optional(),
-  managerId: z.string().optional(),
-  serviceType: z
-    .enum([
-      'meta_ads',
-      'google_ads',
-      'landing_page',
-      'ecommerce',
-      'mentoring',
-      'social_media',
-      'seo',
-      'email_marketing',
-      'content',
-      'design',
-      'other',
-    ])
-    .optional(),
-  status: z
-    .enum(['onboarding', 'active', 'review', 'paused', 'completed'])
-    .optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  color: z.string().optional(),
-})
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(request: Request) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-  const { searchParams } = new URL(request.url)
-  const clientId = searchParams.get('client_id')
-  const status = searchParams.get('status')
+    const { searchParams } = new URL(request.url)
+    const clientId = searchParams.get('client_id')
+    const status = searchParams.get('status')
 
-  const where: Record<string, unknown> = { organizationId: ctx.org.id }
-  if (clientId) where.clientId = clientId
-  if (status) where.status = status
+    let query = supabase
+      .from('projects')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
 
-  const projects = await prisma.project.findMany({
-    where,
-    include: {
-      client: { select: { id: true, name: true } },
-      manager: { select: { id: true, fullName: true } },
-      _count: { select: { tasks: true } },
-      tasks: {
-        select: { status: true },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  // Calculate task completion stats for each project
-  const data = projects.map((p) => {
-    const totalTasks = p.tasks.length
-    const completedTasks = p.tasks.filter(
-      (t) => t.status === 'completed'
-    ).length
-    const progressPercent =
-      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
-
-    const { tasks, ...rest } = p
-    return {
-      ...rest,
-      totalTasks,
-      completedTasks,
-      progressPercent,
+    if (clientId) {
+      query = query.eq('client_id', clientId)
     }
-  })
 
-  return NextResponse.json({ data })
+    if (status) {
+      query = query.eq('status', status)
+    }
+
+    const { data: projects, error } = await query
+
+    if (error) {
+      console.error('Error fetching projects:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // For each project, count tasks by status
+    const projectsWithTaskCounts = await Promise.all(
+      (projects || []).map(async (project) => {
+        const { data: tasks } = await supabase
+          .from('tasks')
+          .select('status')
+          .eq('project_id', project.id)
+          .eq('workspace_id', workspaceId)
+          .is('deleted_at', null)
+
+        const taskCounts = {
+          total: tasks?.length || 0,
+          todo: tasks?.filter((t) => t.status === 'todo').length || 0,
+          in_progress: tasks?.filter((t) => t.status === 'in_progress').length || 0,
+          done: tasks?.filter((t) => t.status === 'done').length || 0,
+        }
+
+        return { ...project, task_counts: taskCounts }
+      })
+    )
+
+    return NextResponse.json(projectsWithTaskCounts)
+  } catch (err) {
+    console.error('Error in GET /api/projects:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
 }
 
 export async function POST(request: Request) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
-
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
+
     const body = await request.json()
-    const data = createSchema.parse(body)
 
-    const project = await prisma.project.create({
-      data: {
-        organizationId: ctx.org.id,
-        name: data.name,
-        description: data.description,
-        clientId: data.clientId || undefined,
-        managerId: data.managerId || undefined,
-        serviceType: data.serviceType || undefined,
-        status: data.status ?? 'active',
-        startDate: data.startDate ? new Date(data.startDate) : undefined,
-        endDate: data.endDate ? new Date(data.endDate) : undefined,
-      },
-      include: {
-        client: { select: { id: true, name: true } },
-        manager: { select: { id: true, fullName: true } },
-      },
-    })
+    const { data, error } = await supabase
+      .from('projects')
+      .insert({
+        workspace_id: workspaceId,
+        client_id: body.client_id || null,
+        name: body.name,
+        description: body.description || null,
+        status: body.status || 'active',
+        priority: body.priority || 'medium',
+        color: body.color || null,
+        start_date: body.start_date || null,
+        due_date: body.due_date || null,
+        budget: body.budget || null,
+        budget_spent: body.budget_spent || 0,
+        owner_id: body.owner_id || null,
+      })
+      .select()
+      .single()
 
-    return NextResponse.json({ data: project }, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+    if (error) {
+      console.error('Error creating project:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+
+    return NextResponse.json(data, { status: 201 })
+  } catch (err) {
+    console.error('Error in POST /api/projects:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import confetti from 'canvas-confetti'
+import { createClient } from '@/lib/supabase'
 import {
   Zap, ArrowRight, ArrowLeft, User, Briefcase, Building2, Users,
   Globe, Mail, Check, Megaphone, Palette, Code, Radio, MessageCircle,
@@ -15,60 +16,60 @@ const STORAGE_KEY = 'agencyai_onboarding'
 
 interface OnboardingData {
   step: number
-  nombreCompleto: string
+  fullName: string
   cargo: string
-  tipoAgencia: string
-  cantidadPersonas: string
-  cantidadClientes: string
-  gestionProyectos: string
-  nombreAgencia: string
-  moneda: string
+  agencyType: string
+  teamSize: string
+  clientCount: string
+  projectTool: string
+  workspaceName: string
+  currency: string
   timezone: string
   invites: { email: string; role: string }[]
 }
 
 const defaultData: OnboardingData = {
   step: 1,
-  nombreCompleto: '',
+  fullName: '',
   cargo: '',
-  tipoAgencia: '',
-  cantidadPersonas: '',
-  cantidadClientes: '',
-  gestionProyectos: '',
-  nombreAgencia: '',
-  moneda: 'ARS',
+  agencyType: '',
+  teamSize: '',
+  clientCount: '',
+  projectTool: '',
+  workspaceName: '',
+  currency: 'ARS',
   timezone: 'America/Argentina/Buenos_Aires',
-  invites: [{ email: '', role: 'trafficker' }],
+  invites: [{ email: '', role: 'admin' }],
 }
 
 const agencyTypes = [
   { id: 'marketing_digital', label: 'Marketing Digital', icon: Megaphone },
-  { id: 'diseno_creatividad', label: 'Diseño y Creatividad', icon: Palette },
+  { id: 'diseno_creatividad', label: 'Diseno y Creatividad', icon: Palette },
   { id: 'desarrollo_web', label: 'Desarrollo Web/App', icon: Code },
-  { id: 'relaciones_publicas', label: 'Relaciones Públicas', icon: Radio },
-  { id: 'consultoria', label: 'Consultoría', icon: Briefcase },
+  { id: 'relaciones_publicas', label: 'Relaciones Publicas', icon: Radio },
+  { id: 'consultoria', label: 'Consultoria', icon: Briefcase },
   { id: 'social_media', label: 'Social Media', icon: MessageCircle },
-  { id: 'produccion', label: 'Producción', icon: Video },
+  { id: 'produccion', label: 'Produccion', icon: Video },
   { id: 'otra', label: 'Otra', icon: HelpCircle },
 ]
 
-const teamSizeOptions = ['Solo', '2-5', '6-20', 'Más de 20']
-const clientCountOptions = ['1-5', '6-20', 'Más de 20']
+const teamSizeOptions = ['Solo', '2-5', '6-20', 'Mas de 20']
+const clientCountOptions = ['1-5', '6-20', 'Mas de 20']
 const projectTools = ['Excel / Sheets', 'Trello', 'ClickUp', 'Notion', 'Sin sistema']
 
 const timezones = [
   { value: 'America/Argentina/Buenos_Aires', label: 'Buenos Aires (GMT-3)' },
-  { value: 'America/Sao_Paulo', label: 'São Paulo (GMT-3)' },
+  { value: 'America/Sao_Paulo', label: 'Sao Paulo (GMT-3)' },
   { value: 'America/Montevideo', label: 'Montevideo (GMT-3)' },
   { value: 'America/Santiago', label: 'Santiago (GMT-4)' },
   { value: 'America/Caracas', label: 'Caracas (GMT-4)' },
-  { value: 'America/Bogota', label: 'Bogotá (GMT-5)' },
+  { value: 'America/Bogota', label: 'Bogota (GMT-5)' },
   { value: 'America/Lima', label: 'Lima (GMT-5)' },
   { value: 'America/New_York', label: 'Nueva York (GMT-5)' },
-  { value: 'America/Mexico_City', label: 'Ciudad de México (GMT-6)' },
+  { value: 'America/Mexico_City', label: 'Ciudad de Mexico (GMT-6)' },
   { value: 'America/Chicago', label: 'Chicago (GMT-6)' },
   { value: 'America/Denver', label: 'Denver (GMT-7)' },
-  { value: 'America/Los_Angeles', label: 'Los Ángeles (GMT-8)' },
+  { value: 'America/Los_Angeles', label: 'Los Angeles (GMT-8)' },
 ]
 
 export default function OnboardingPage() {
@@ -151,42 +152,77 @@ export default function OnboardingPage() {
   async function createWorkspace() {
     setLoading(true)
     try {
-      const res = await fetch('/api/organizations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: data.nombreAgencia.trim(),
-          slug: data.nombreAgencia
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-|-$/g, '')
-            .slice(0, 50),
-          plan: 'free',
-          industry: data.tipoAgencia,
-          country: '',
-          onboarding: {
-            fullName: data.nombreCompleto,
-            role: data.cargo,
-            agencyType: data.tipoAgencia,
-            teamSize: data.cantidadPersonas,
-            clientCount: data.cantidadClientes,
-            projectTool: data.gestionProyectos,
-            currency: data.moneda,
-            timezone: data.timezone,
-            invites: data.invites.filter((i) => i.email.trim()),
-          },
-        }),
-      })
-      if (!res.ok) {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        console.error('No authenticated user found')
         setLoading(false)
         return
       }
+
+      // Check if workspace already exists for this user
+      const { data: existing } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('owner_id', user.id)
+        .limit(1)
+        .single()
+
+      if (existing) {
+        localStorage.setItem('agencyai_workspace_id', existing.id)
+      } else {
+        // Create workspace
+        const { data: workspace, error } = await supabase.from('workspaces').insert({
+          name: data.workspaceName,
+          slug: data.workspaceName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+          currency: data.currency,
+          timezone: data.timezone,
+          agency_type: data.agencyType,
+          plan: 'free',
+          owner_id: user.id,
+        }).select().single()
+
+        if (error) {
+          console.error('Error creating workspace:', error)
+          setLoading(false)
+          return
+        }
+
+        // Create workspace member for owner
+        await supabase.from('workspace_members').insert({
+          workspace_id: workspace.id,
+          user_id: user.id,
+          role: 'owner',
+          email: user.email,
+          name: data.fullName,
+          status: 'active',
+        })
+
+        localStorage.setItem('agencyai_workspace_id', workspace.id)
+
+        // Send invites if any
+        for (const invite of data.invites) {
+          if (invite.email.trim()) {
+            await supabase.from('workspace_members').insert({
+              workspace_id: workspace.id,
+              user_id: invite.email, // placeholder until they register
+              role: invite.role,
+              email: invite.email,
+              status: 'invited',
+            })
+          }
+        }
+      }
+
       localStorage.removeItem(STORAGE_KEY)
-      nextStep()
-    } catch {
-      // error handling
+      setFadeIn(false)
+      setTimeout(() => {
+        update({ step: 7 })
+        setFadeIn(true)
+      }, 150)
+    } catch (err) {
+      console.error('Error during workspace creation:', err)
     } finally {
       setLoading(false)
     }
@@ -200,7 +236,7 @@ export default function OnboardingPage() {
 
   function addInvite() {
     if (data.invites.length >= 3) return
-    update({ invites: [...data.invites, { email: '', role: 'trafficker' }] })
+    update({ invites: [...data.invites, { email: '', role: 'admin' }] })
   }
 
   function removeInvite(index: number) {
@@ -225,10 +261,10 @@ export default function OnboardingPage() {
 
   const canProceed = () => {
     switch (data.step) {
-      case 2: return data.nombreCompleto.trim() && data.cargo
-      case 3: return !!data.tipoAgencia
-      case 4: return data.cantidadPersonas && data.cantidadClientes && data.gestionProyectos
-      case 5: return data.nombreAgencia.trim()
+      case 2: return data.fullName.trim() && data.cargo
+      case 3: return !!data.agencyType
+      case 4: return data.teamSize && data.clientCount && data.projectTool
+      case 5: return data.workspaceName.trim()
       default: return true
     }
   }
@@ -265,17 +301,17 @@ export default function OnboardingPage() {
             fadeIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
           )}
         >
-          {/* ─── Step 1: Welcome ─── */}
+          {/* Step 1: Welcome */}
           {data.step === 1 && (
             <div className="p-8 text-center">
               <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-blue-50 border border-blue-100 mb-6">
                 <Sparkles className="h-8 w-8 text-blue-600" />
               </div>
               <h1 className="text-2xl font-bold text-slate-900 mb-3">
-                ¡Bienvenido a AgencyAI!
+                Bienvenido a AgencyAI
               </h1>
               <p className="text-slate-500 mb-6 max-w-md mx-auto">
-                Vamos a configurar tu workspace en unos minutos. Gestioná clientes, proyectos, finanzas y equipo desde un solo lugar.
+                Vamos a configurar tu workspace en unos minutos. Gestiona clientes, proyectos, finanzas y equipo desde un solo lugar.
               </p>
               <div className="grid grid-cols-2 gap-3 mb-8 text-left max-w-sm mx-auto">
                 {[
@@ -299,7 +335,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ─── Step 2: Profile ─── */}
+          {/* Step 2: Profile */}
           {data.step === 2 && (
             <div className="p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -319,8 +355,8 @@ export default function OnboardingPage() {
                   </label>
                   <input
                     type="text"
-                    value={data.nombreCompleto}
-                    onChange={(e) => update({ nombreCompleto: e.target.value })}
+                    value={data.fullName}
+                    onChange={(e) => update({ fullName: e.target.value })}
                     placeholder="Tu nombre completo"
                     className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
                   />
@@ -336,7 +372,7 @@ export default function OnboardingPage() {
                     className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
                   >
                     <option value="">Seleccionar cargo...</option>
-                    <option value="dueno">Dueño/a</option>
+                    <option value="dueno">Dueno/a</option>
                     <option value="director">Director/a</option>
                     <option value="manager">Manager</option>
                     <option value="freelancer">Freelancer</option>
@@ -346,7 +382,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ─── Step 3: Agency Type ─── */}
+          {/* Step 3: Agency Type */}
           {data.step === 3 && (
             <div className="p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -355,7 +391,7 @@ export default function OnboardingPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Tipo de agencia</h2>
-                  <p className="text-sm text-slate-500">¿A qué se dedica tu agencia?</p>
+                  <p className="text-sm text-slate-500">A que se dedica tu agencia?</p>
                 </div>
               </div>
 
@@ -364,27 +400,27 @@ export default function OnboardingPage() {
                   <button
                     key={id}
                     type="button"
-                    onClick={() => update({ tipoAgencia: id })}
+                    onClick={() => update({ agencyType: id })}
                     className={cn(
                       'flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all',
-                      data.tipoAgencia === id
+                      data.agencyType === id
                         ? 'border-blue-500 bg-blue-50 shadow-sm'
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                     )}
                   >
                     <div className={cn(
                       'h-10 w-10 rounded-lg flex items-center justify-center',
-                      data.tipoAgencia === id ? 'bg-blue-100' : 'bg-slate-100'
+                      data.agencyType === id ? 'bg-blue-100' : 'bg-slate-100'
                     )}>
-                      <Icon className={cn('h-5 w-5', data.tipoAgencia === id ? 'text-blue-600' : 'text-slate-500')} />
+                      <Icon className={cn('h-5 w-5', data.agencyType === id ? 'text-blue-600' : 'text-slate-500')} />
                     </div>
                     <span className={cn(
                       'text-xs font-medium',
-                      data.tipoAgencia === id ? 'text-blue-700' : 'text-slate-600'
+                      data.agencyType === id ? 'text-blue-700' : 'text-slate-600'
                     )}>
                       {label}
                     </span>
-                    {data.tipoAgencia === id && (
+                    {data.agencyType === id && (
                       <Check className="h-4 w-4 text-blue-600" />
                     )}
                   </button>
@@ -393,7 +429,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ─── Step 4: Team context ─── */}
+          {/* Step 4: Team context */}
           {data.step === 4 && (
             <div className="p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -407,20 +443,19 @@ export default function OnboardingPage() {
               </div>
 
               <div className="space-y-6">
-                {/* Team size */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    ¿Cuántas personas hay en tu equipo?
+                    Cuantas personas hay en tu equipo?
                   </label>
                   <div className="grid grid-cols-4 gap-2">
                     {teamSizeOptions.map((opt) => (
                       <button
                         key={opt}
                         type="button"
-                        onClick={() => update({ cantidadPersonas: opt })}
+                        onClick={() => update({ teamSize: opt })}
                         className={cn(
                           'rounded-lg border px-3 py-2.5 text-sm font-medium transition-all',
-                          data.cantidadPersonas === opt
+                          data.teamSize === opt
                             ? 'border-blue-500 bg-blue-50 text-blue-700'
                             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         )}
@@ -431,20 +466,19 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                {/* Client count */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    ¿Cuántos clientes gestionás?
+                    Cuantos clientes gestionas?
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {clientCountOptions.map((opt) => (
                       <button
                         key={opt}
                         type="button"
-                        onClick={() => update({ cantidadClientes: opt })}
+                        onClick={() => update({ clientCount: opt })}
                         className={cn(
                           'rounded-lg border px-3 py-2.5 text-sm font-medium transition-all',
-                          data.cantidadClientes === opt
+                          data.clientCount === opt
                             ? 'border-blue-500 bg-blue-50 text-blue-700'
                             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         )}
@@ -455,20 +489,19 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                {/* Project management tool */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    ¿Cómo gestionás tus proyectos hoy?
+                    Como gestionas tus proyectos hoy?
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {projectTools.map((opt) => (
                       <button
                         key={opt}
                         type="button"
-                        onClick={() => update({ gestionProyectos: opt })}
+                        onClick={() => update({ projectTool: opt })}
                         className={cn(
                           'rounded-lg border px-3 py-2.5 text-sm font-medium transition-all',
-                          data.gestionProyectos === opt
+                          data.projectTool === opt
                             ? 'border-blue-500 bg-blue-50 text-blue-700'
                             : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                         )}
@@ -482,7 +515,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ─── Step 5: Workspace ─── */}
+          {/* Step 5: Workspace */}
           {data.step === 5 && (
             <div className="p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -491,7 +524,7 @@ export default function OnboardingPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Tu workspace</h2>
-                  <p className="text-sm text-slate-500">Configurá los datos de tu agencia</p>
+                  <p className="text-sm text-slate-500">Configura los datos de tu agencia</p>
                 </div>
               </div>
 
@@ -502,8 +535,8 @@ export default function OnboardingPage() {
                   </label>
                   <input
                     type="text"
-                    value={data.nombreAgencia}
-                    onChange={(e) => update({ nombreAgencia: e.target.value })}
+                    value={data.workspaceName}
+                    onChange={(e) => update({ workspaceName: e.target.value })}
                     placeholder="Mi Agencia Digital"
                     className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
                   />
@@ -518,14 +551,14 @@ export default function OnboardingPage() {
                       </span>
                     </label>
                     <select
-                      value={data.moneda}
-                      onChange={(e) => update({ moneda: e.target.value })}
+                      value={data.currency}
+                      onChange={(e) => update({ currency: e.target.value })}
                       className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
                     >
                       <option value="ARS">ARS - Peso Argentino</option>
-                      <option value="USD">USD - Dólar Estadounidense</option>
+                      <option value="USD">USD - Dolar Estadounidense</option>
                       <option value="EUR">EUR - Euro</option>
-                      <option value="BRL">BRL - Real Brasileño</option>
+                      <option value="BRL">BRL - Real Brasileno</option>
                     </select>
                   </div>
 
@@ -551,7 +584,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ─── Step 6: Invite team ─── */}
+          {/* Step 6: Invite team */}
           {data.step === 6 && (
             <div className="p-8">
               <div className="flex items-center gap-3 mb-6">
@@ -559,8 +592,8 @@ export default function OnboardingPage() {
                   <UserPlus className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Invitá a tu equipo</h2>
-                  <p className="text-sm text-slate-500">Opcional — podés hacerlo después</p>
+                  <h2 className="text-lg font-semibold text-slate-900">Invita a tu equipo</h2>
+                  <p className="text-sm text-slate-500">Opcional -- podes hacerlo despues</p>
                 </div>
               </div>
 
@@ -582,8 +615,8 @@ export default function OnboardingPage() {
                       className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none transition-colors"
                     >
                       <option value="admin">Admin</option>
-                      <option value="trafficker">Trafficker</option>
-                      <option value="client">Cliente</option>
+                      <option value="member">Miembro</option>
+                      <option value="viewer">Viewer</option>
                     </select>
                     {data.invites.length > 1 && (
                       <button
@@ -605,40 +638,40 @@ export default function OnboardingPage() {
                   className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors mb-6"
                 >
                   <Plus className="h-4 w-4" />
-                  Agregar otra invitación
+                  Agregar otra invitacion
                 </button>
               )}
 
               <div className="rounded-lg bg-slate-50 border border-slate-100 p-4">
                 <p className="text-xs text-slate-500 text-center">
-                  Las invitaciones se enviarán una vez creado el workspace. También podés invitar miembros después desde Configuración.
+                  Las invitaciones se enviaran una vez creado el workspace. Tambien podes invitar miembros despues desde Configuracion.
                 </p>
               </div>
             </div>
           )}
 
-          {/* ─── Step 7: Done ─── */}
+          {/* Step 7: Done */}
           {data.step === 7 && (
             <div className="p-8 text-center">
               <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-green-50 border border-green-200 mb-6">
                 <Check className="h-8 w-8 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-3">¡Todo listo!</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mb-3">Todo listo!</h2>
               <p className="text-slate-500 mb-2">
-                Tu workspace <span className="font-semibold text-slate-900">{data.nombreAgencia}</span> fue creado exitosamente.
+                Tu workspace <span className="font-semibold text-slate-900">{data.workspaceName}</span> fue creado exitosamente.
               </p>
               <p className="text-sm text-slate-400 mb-8">
-                Ya podés empezar a gestionar tu agencia desde el dashboard.
+                Ya podes empezar a gestionar tu agencia desde el dashboard.
               </p>
 
               {/* Summary */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8 text-left max-w-md mx-auto">
                 {[
-                  { label: 'Agencia', value: data.nombreAgencia },
-                  { label: 'Tipo', value: agencyTypes.find((a) => a.id === data.tipoAgencia)?.label || '-' },
-                  { label: 'Moneda', value: data.moneda },
-                  { label: 'Equipo', value: data.cantidadPersonas },
-                  { label: 'Clientes', value: data.cantidadClientes },
+                  { label: 'Agencia', value: data.workspaceName },
+                  { label: 'Tipo', value: agencyTypes.find((a) => a.id === data.agencyType)?.label || '-' },
+                  { label: 'Moneda', value: data.currency },
+                  { label: 'Equipo', value: data.teamSize },
+                  { label: 'Clientes', value: data.clientCount },
                   { label: 'Invitados', value: `${data.invites.filter((i) => i.email.trim()).length} personas` },
                 ].map(({ label, value }) => (
                   <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">

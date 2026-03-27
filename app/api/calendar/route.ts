@@ -1,60 +1,68 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { prisma } from '@/lib/prisma'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(request: Request) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-  const { searchParams } = new URL(request.url)
-  const monthParam = searchParams.get('month') // format: YYYY-MM
+    const { searchParams } = new URL(request.url)
+    const month = searchParams.get('month') // Format: YYYY-MM
 
-  let startDate: Date
-  let endDate: Date
+    if (!month) {
+      return NextResponse.json({ error: 'Parámetro month requerido (YYYY-MM)' }, { status: 400 })
+    }
 
-  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
-    const [year, month] = monthParam.split('-').map(Number)
-    startDate = new Date(year, month - 1, 1)
-    endDate = new Date(year, month, 0, 23, 59, 59, 999)
-  } else {
-    // Fallback: use legacy month/year params or current month
-    const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1))
-    const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
-    startDate = new Date(year, month - 1, 1)
-    endDate = new Date(year, month, 0, 23, 59, 59, 999)
+    // Calculate month range
+    const [year, mon] = month.split('-').map(Number)
+    const startDate = new Date(year, mon - 1, 1).toISOString()
+    const endDate = new Date(year, mon, 0, 23, 59, 59, 999).toISOString()
+
+    // Fetch tasks and milestones in parallel
+    const [tasksResult, milestonesResult] = await Promise.all([
+      supabase
+        .from('tasks')
+        .select('id, title, status, priority, due_date, project_id, assignee_id')
+        .eq('workspace_id', workspaceId)
+        .is('deleted_at', null)
+        .gte('due_date', startDate)
+        .lte('due_date', endDate)
+        .order('due_date', { ascending: true }),
+
+      supabase
+        .from('project_milestones')
+        .select('id, title, due_date, completed, description, project_id')
+        .eq('workspace_id', workspaceId)
+        .gte('due_date', startDate)
+        .lte('due_date', endDate)
+        .order('due_date', { ascending: true }),
+    ])
+
+    // Enrich milestones with project names
+    const milestones = milestonesResult.data || []
+    const projectIds = [...new Set(milestones.map(m => m.project_id).filter(Boolean))]
+    let projectMap: Record<string, string> = {}
+    if (projectIds.length > 0) {
+      const { data: projects } = await supabase
+        .from('projects')
+        .select('id, name')
+        .in('id', projectIds)
+      if (projects) {
+        projectMap = Object.fromEntries(projects.map(p => [p.id, p.name]))
+      }
+    }
+    const enrichedMilestones = milestones.map(m => ({
+      ...m,
+      project_name: m.project_id ? (projectMap[m.project_id] || null) : null,
+    }))
+
+    return NextResponse.json({
+      tasks: tasksResult.data || [],
+      milestones: enrichedMilestones,
+    })
+  } catch (err) {
+    console.error('Error in GET /api/calendar:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
-
-  const [tasks, meetings] = await Promise.all([
-    prisma.task.findMany({
-      where: {
-        organizationId: ctx.org.id,
-        deadline: { gte: startDate, lte: endDate },
-      },
-      select: {
-        id: true,
-        title: true,
-        deadline: true,
-        status: true,
-        priority: true,
-        client: { select: { id: true, name: true } },
-      },
-      orderBy: { deadline: 'asc' },
-    }),
-    prisma.meeting.findMany({
-      where: {
-        organizationId: ctx.org.id,
-        date: { gte: startDate, lte: endDate },
-      },
-      select: {
-        id: true,
-        title: true,
-        date: true,
-        attendees: true,
-        client: { select: { id: true, name: true } },
-      },
-      orderBy: { date: 'asc' },
-    }),
-  ])
-
-  return NextResponse.json({ tasks, meetings })
 }

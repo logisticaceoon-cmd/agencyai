@@ -96,7 +96,8 @@ const navGroups: { label: string | null; items: NavItem[] }[] = [
 
 const adminItems: NavItem[] = [
   { href: '/settings', label: 'Workspace', icon: Building2 },
-  { href: '/admin', label: 'Equipo', icon: Settings },
+  { href: '/settings/team', label: 'Equipo', icon: Users },
+  { href: '/settings/billing', label: 'Facturacion', icon: CreditCard },
 ]
 
 function isUnlocked(itemMinPlan: OrgPlan | undefined, orgPlan: OrgPlan): boolean {

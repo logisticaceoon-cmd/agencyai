@@ -1,47 +1,42 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, X, Bot, Loader2 } from 'lucide-react'
+import { X, Send, Loader2, Bot } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface Message {
-  id: string
   role: 'user' | 'assistant'
   content: string
 }
 
-interface AgentWidgetProps {
-  moduleName: string
+interface AgentConfig {
+  name: string
+  description: string
+  module: string
+  suggestions: string[]
   context?: Record<string, unknown>
-  suggestions?: string[]
 }
 
-export function AgentWidget({ moduleName, context, suggestions = [] }: AgentWidgetProps) {
+export function AgentWidget({ config }: { config: AgentConfig }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [showSuggestions, setShowSuggestions] = useState(true)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
-
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 100)
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [open])
+  }, [messages])
 
   async function sendMessage(text: string) {
     if (!text.trim() || loading) return
 
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: text.trim(),
-    }
-    setMessages((prev) => [...prev, userMsg])
+    setShowSuggestions(false)
+    const userMsg: Message = { role: 'user', content: text.trim() }
+    setMessages(prev => [...prev, userMsg])
     setInput('')
     setLoading(true)
 
@@ -51,158 +46,125 @@ export function AgentWidget({ moduleName, context, suggestions = [] }: AgentWidg
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text.trim(),
-          module: moduleName,
-          context,
+          module: config.module,
+          context: config.context || {},
         }),
       })
 
       const data = await res.json()
-      const assistantMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.response || 'Sin respuesta',
-      }
-      setMessages((prev) => [...prev, assistantMsg])
+      setMessages(prev => [...prev, { role: 'assistant', content: data.response || 'Error al procesar.' }])
     } catch {
-      const errorMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'Error de conexion. Intenta nuevamente.',
-      }
-      setMessages((prev) => [...prev, errorMsg])
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Error de conexion. Intenta de nuevo.' }])
     } finally {
       setLoading(false)
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    sendMessage(input)
-  }
-
-  function handleSuggestion(text: string) {
-    sendMessage(text)
+  function handleClose() {
+    setOpen(false)
+    setMessages([])
+    setShowSuggestions(true)
   }
 
   return (
     <>
-      {/* Collapsed button */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-lg hover:bg-blue-700 transition-all hover:scale-105"
+          className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-all hover:scale-105 flex items-center justify-center group"
           title="Asistente IA"
         >
           <Bot className="h-6 w-6" />
+          <span className="absolute right-full mr-3 whitespace-nowrap bg-slate-900 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            Asistente IA
+          </span>
         </button>
       )}
 
-      {/* Expanded chat window */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 flex w-[400px] flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
-          style={{ height: '500px' }}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-[#2563eb] px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Bot className="h-5 w-5 text-white" />
-              <span className="text-sm font-semibold text-white">Asistente IA</span>
+        <div className="fixed bottom-6 right-6 z-50 w-[380px] h-[500px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-blue-600 to-blue-700">
+            <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
+              <Bot className="h-4 w-4 text-white" />
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              className="rounded-lg p-1 text-white/80 hover:bg-white/20 hover:text-white transition-colors"
-            >
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white truncate">{config.name}</p>
+              <p className="text-[10px] text-blue-100 truncate">{config.description}</p>
+            </div>
+            <button onClick={handleClose} className="text-white/80 hover:text-white transition-colors p-1">
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Messages area */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-            {messages.length === 0 && !loading && (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <Bot className="h-10 w-10 text-slate-300 mb-3" />
-                <p className="text-sm text-slate-500 mb-1">
-                  Hola, soy tu asistente IA
-                </p>
-                <p className="text-xs text-slate-400">
-                  Preguntame lo que necesites sobre {moduleName}
-                </p>
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.length === 0 && (
+              <div className="text-center py-8">
+                <Bot className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                <p className="text-sm text-slate-500">Hola! Soy tu {config.name.toLowerCase()}.</p>
+                <p className="text-xs text-slate-400 mt-1">Preguntame lo que necesites.</p>
               </div>
             )}
 
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+            {messages.map((msg, i) => (
+              <div key={i} className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                  className={cn(
+                    'max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
                     msg.role === 'user'
-                      ? 'bg-[#2563eb] text-white rounded-br-md'
-                      : 'bg-slate-50 text-slate-700 border border-slate-200 rounded-bl-md'
-                  }`}
+                      ? 'bg-blue-600 text-white rounded-br-md'
+                      : 'bg-slate-100 text-slate-800 rounded-bl-md'
+                  )}
                 >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  {msg.content}
                 </div>
               </div>
             ))}
 
-            {/* Typing indicator */}
             {loading && (
               <div className="flex justify-start">
-                <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-md bg-slate-50 border border-slate-200 px-4 py-3">
-                  <span className="inline-block h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="inline-block h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="inline-block h-2 w-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                <div className="bg-slate-100 rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-2">
+                  <Loader2 className="h-3.5 w-3.5 text-slate-400 animate-spin" />
+                  <span className="text-xs text-slate-400">Escribiendo...</span>
                 </div>
               </div>
             )}
 
-            <div ref={messagesEndRef} />
+            {showSuggestions && messages.length === 0 && (
+              <div className="space-y-2 pt-2">
+                {config.suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    onClick={() => sendMessage(s)}
+                    className="w-full text-left px-3 py-2 text-xs text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors border border-blue-100"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Suggestion chips */}
-          {messages.length === 0 && suggestions.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-4 pb-2">
-              {suggestions.map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSuggestion(s)}
-                  disabled={loading}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-blue-50 hover:text-[#2563eb] hover:border-blue-200 transition-colors disabled:opacity-50"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Input area */}
-          <form
-            onSubmit={handleSubmit}
-            className="flex items-center gap-2 border-t border-slate-200 px-4 py-3"
-          >
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Escribe tu pregunta..."
-              disabled={loading}
-              className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#2563eb] text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          <div className="border-t border-slate-100 p-3">
+            <form
+              onSubmit={(e) => { e.preventDefault(); sendMessage(input) }}
+              className="flex items-center gap-2"
             >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Escribi tu mensaje..."
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                disabled={loading}
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || loading}
+                className="h-9 w-9 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 disabled:opacity-50 transition-colors flex-shrink-0"
+              >
                 <Send className="h-4 w-4" />
-              )}
-            </button>
-          </form>
+              </button>
+            </form>
+          </div>
         </div>
       )}
     </>

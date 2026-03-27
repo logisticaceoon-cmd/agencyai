@@ -1,105 +1,82 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
-
-const createSchema = z.object({
-  name: z.string().min(1),
-  brand: z.string().optional(),
-  email: z.string().email().optional().or(z.literal('')),
-  phone: z.string().optional(),
-  whatsapp: z.string().optional(),
-  contactPerson: z.string().optional(),
-  accountManagerId: z.string().optional(),
-  industry: z.string().optional(),
-  website: z.string().optional(),
-  country: z.string().optional(),
-  currency: z.string().optional(),
-  notes: z.string().optional(),
-  monthlyFee: z.number().optional(),
-  commissionPct: z.number().optional(),
-  serviceType: z.string().optional(),
-  contractStart: z.string().optional(),
-  contractEnd: z.string().optional(),
-  status: z.enum(['active', 'paused', 'inactive', 'onboarding', 'risk', 'scaling']).optional(),
-})
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(request: Request) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-  const { searchParams } = new URL(request.url)
-  const status = searchParams.get('status')
-  const search = searchParams.get('search')
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get('status')
+    const search = searchParams.get('search')
 
-  const where: Record<string, unknown> = { organizationId: ctx.org.id }
-  if (status) where.status = status
+    let query = supabase
+      .from('clients')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
 
-  if (search) {
-    where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { brand: { contains: search, mode: 'insensitive' } },
-      { email: { contains: search, mode: 'insensitive' } },
-    ]
+    if (status) {
+      query = query.eq('status', status)
+    }
+
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%`)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching clients:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(data)
+  } catch (err) {
+    console.error('Error in GET /api/clients:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
-
-  const clients = await prisma.client.findMany({
-    where,
-    include: {
-      accountManager: { select: { id: true, fullName: true } },
-      _count: { select: { tasks: true, reports: true, projects: true } },
-    },
-    orderBy: { name: 'asc' },
-  })
-
-  return NextResponse.json({ data: clients })
 }
 
 export async function POST(request: Request) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
-
-  // Check client limit
-  const clientCount = await prisma.client.count({ where: { organizationId: ctx.org.id } })
-  if (clientCount >= ctx.org.maxClients) {
-    return NextResponse.json({
-      error: `Plan limit reached. Upgrade to add more clients (current limit: ${ctx.org.maxClients})`,
-    }, { status: 403 })
-  }
-
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
+
     const body = await request.json()
-    const data = createSchema.parse(body)
 
-    const client = await prisma.client.create({
-      data: {
-        organizationId: ctx.org.id,
-        name: data.name,
-        brand: data.brand,
-        email: data.email || undefined,
-        phone: data.phone,
-        whatsapp: data.whatsapp,
-        contactPerson: data.contactPerson,
-        accountManagerId: data.accountManagerId,
-        industry: data.industry,
-        website: data.website,
-        country: data.country,
-        currency: data.currency ?? 'USD',
-        notes: data.notes,
-        monthlyFee: data.monthlyFee,
-        commissionPct: data.commissionPct,
-        serviceType: data.serviceType,
-        contractStart: data.contractStart ? new Date(data.contractStart) : undefined,
-        contractEnd: data.contractEnd ? new Date(data.contractEnd) : undefined,
-        status: data.status ?? 'active',
-      },
-    })
+    const { data, error } = await supabase
+      .from('clients')
+      .insert({
+        workspace_id: workspaceId,
+        name: body.name,
+        company: body.company || null,
+        email: body.email || null,
+        phone: body.phone || null,
+        website: body.website || null,
+        logo_url: body.logo_url || null,
+        status: body.status || 'active',
+        industry: body.industry || null,
+        notes: body.notes || null,
+        monthly_value: body.monthly_value || null,
+        currency: body.currency || null,
+        pays_percentage: body.pays_percentage ?? false,
+        percentage_value: body.percentage_value || null,
+      })
+      .select()
+      .single()
 
-    return NextResponse.json({ data: client }, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+    if (error) {
+      console.error('Error creating client:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+
+    return NextResponse.json(data, { status: 201 })
+  } catch (err) {
+    console.error('Error in POST /api/clients:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

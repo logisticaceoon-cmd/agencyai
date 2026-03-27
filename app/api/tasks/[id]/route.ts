@@ -1,70 +1,41 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
-
-const updateSchema = z.object({
-  title: z.string().min(1).optional(),
-  description: z.string().optional(),
-  status: z.enum(['pending', 'in_progress', 'completed', 'rejected', 'review']).optional(),
-  progressPercent: z.number().min(0).max(100).optional(),
-  priority: z.enum(['critical', 'high', 'medium', 'low']).optional(),
-  deadline: z.string().optional(),
-  estimatedHours: z.number().optional(),
-  actualHours: z.number().optional(),
-  assignedTo: z.array(z.string()).optional(),
-  projectId: z.string().optional(),
-  clientId: z.string().optional(),
-  department: z.string().optional(),
-  taskType: z.string().optional(),
-  checklist: z.array(z.object({ label: z.string(), done: z.boolean() })).optional(),
-})
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
     const { id } = await params
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
 
-    const task = await prisma.task.findUnique({
-      where: { id, organizationId: ctx.org.id },
-      include: {
-        createdBy: { select: { id: true, fullName: true, avatarUrl: true } },
-        client: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true } },
-        validatedBy: { select: { id: true, fullName: true } },
-        subtasks: {
-          include: {
-            createdBy: { select: { id: true, fullName: true } },
-          },
-          orderBy: { createdAt: 'asc' },
-        },
-        comments: {
-          include: { author: { select: { id: true, fullName: true, avatarUrl: true } } },
-          orderBy: { createdAt: 'asc' },
-        },
-        _count: { select: { comments: true, subtasks: true } },
-        activityLog: {
-          include: { user: { select: { id: true, fullName: true } } },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        },
-      },
-    })
+    const { data: task, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .single()
 
-    if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-    // Trafficker can only see their own tasks
-    if (ctx.membership.role === 'trafficker' && !task.assignedTo.includes(ctx.user.id)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (error || !task) {
+      return NextResponse.json({ error: 'Tarea no encontrada' }, { status: 404 })
     }
 
-    return NextResponse.json({ data: task })
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    // Fetch subtasks
+    const { data: subtasks } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('parent_task_id', id)
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .order('position', { ascending: true })
+
+    return NextResponse.json({ ...task, subtasks: subtasks || [] })
+  } catch (err) {
+    console.error('Error in GET /api/tasks/[id]:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
@@ -73,66 +44,76 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
     const { id } = await params
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
-
-    const task = await prisma.task.findUnique({
-      where: { id, organizationId: ctx.org.id },
-    })
-    if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-    // Trafficker can only update their own tasks
-    if (ctx.membership.role === 'trafficker' && !task.assignedTo.includes(ctx.user.id)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
 
     const body = await request.json()
-    const data = updateSchema.parse(body)
 
-    // Build update payload
-    const updateData: Record<string, unknown> = { ...data }
-    if (data.deadline) {
-      updateData.deadline = new Date(data.deadline)
-    }
-    if (data.projectId === '') {
-      updateData.projectId = null
-    }
-    if (data.clientId === '') {
-      updateData.clientId = null
+    // Get current task to check status change
+    const { data: currentTask } = await supabase
+      .from('tasks')
+      .select('status, due_date, assignee_id, project_id, title')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .single()
+
+    if (!currentTask) {
+      return NextResponse.json({ error: 'Tarea no encontrada' }, { status: 404 })
     }
 
-    const updated = await prisma.task.update({
-      where: { id },
-      data: updateData,
-      include: {
-        createdBy: { select: { id: true, fullName: true, avatarUrl: true } },
-        client: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true } },
-        _count: { select: { comments: true, subtasks: true } },
-      },
-    })
-
-    // Log activity
-    await prisma.activityLog.create({
-      data: {
-        organizationId: ctx.org.id,
-        userId: ctx.user.id,
-        actionType: 'task_updated',
-        entityType: 'task',
-        entityId: id,
-        taskId: id,
-        description: `Tarea actualizada: ${updated.title}`,
-        changes: JSON.parse(JSON.stringify(data)),
-      },
-    })
-
-    return NextResponse.json({ data: updated })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+    const updateData: Record<string, unknown> = {
+      ...body,
+      updated_at: new Date().toISOString(),
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(updateData)
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating task:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // If status changed to 'done' and the task was overdue, notify
+    if (body.status === 'done' && currentTask.status !== 'done') {
+      const dueDate = currentTask.due_date ? new Date(currentTask.due_date) : null
+      const now = new Date()
+
+      if (dueDate && dueDate < now) {
+        // Task was overdue when completed - notify project owner
+        if (currentTask.project_id) {
+          const { data: project } = await supabase
+            .from('projects')
+            .select('owner_id')
+            .eq('id', currentTask.project_id)
+            .single()
+
+          if (project?.owner_id) {
+            await supabase.from('notifications').insert({
+              workspace_id: workspaceId,
+              user_id: project.owner_id,
+              title: 'Tarea atrasada completada',
+              message: `La tarea "${currentTask.title}" fue completada después de la fecha límite.`,
+              type: 'task',
+              read: false,
+              link: `/projects/${currentTask.project_id}`,
+            })
+          }
+        }
+      }
+    }
+
+    return NextResponse.json(data)
+  } catch (err) {
+    console.error('Error in PATCH /api/tasks/[id]:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
@@ -141,40 +122,26 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
     const { id } = await params
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
 
-    // Only admin can delete tasks
-    if (ctx.membership.role === 'trafficker') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
+
+    if (error || !data) {
+      return NextResponse.json({ error: 'Tarea no encontrada' }, { status: 404 })
     }
 
-    const task = await prisma.task.findUnique({
-      where: { id, organizationId: ctx.org.id },
-    })
-    if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-    // Soft delete: mark as rejected with a note
-    await prisma.task.update({
-      where: { id },
-      data: { status: 'rejected' },
-    })
-
-    await prisma.activityLog.create({
-      data: {
-        organizationId: ctx.org.id,
-        userId: ctx.user.id,
-        actionType: 'task_deleted',
-        entityType: 'task',
-        entityId: id,
-        taskId: id,
-        description: `Tarea eliminada: ${task.title}`,
-      },
-    })
-
     return NextResponse.json({ success: true })
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    console.error('Error in DELETE /api/tasks/[id]:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

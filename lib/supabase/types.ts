@@ -8,6 +8,8 @@ export interface Workspace {
   agency_type: string
   plan: string
   owner_id: string
+  stripe_customer_id: string | null
+  plan_expires_at: string | null
   created_at: string
   updated_at: string
 }

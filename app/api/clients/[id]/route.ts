@@ -1,66 +1,32 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
-
-const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  brand: z.string().optional(),
-  email: z.string().email().optional().or(z.literal('')),
-  phone: z.string().optional(),
-  whatsapp: z.string().optional(),
-  contactPerson: z.string().optional(),
-  accountManagerId: z.string().nullable().optional(),
-  industry: z.string().optional(),
-  website: z.string().optional(),
-  country: z.string().optional(),
-  currency: z.string().optional(),
-  notes: z.string().optional(),
-  observations: z.string().optional(),
-  monthlyFee: z.number().nullable().optional(),
-  commissionPct: z.number().nullable().optional(),
-  serviceType: z.string().optional(),
-  contractStart: z.string().nullable().optional(),
-  contractEnd: z.string().nullable().optional(),
-  status: z.enum(['active', 'paused', 'inactive', 'onboarding', 'risk', 'scaling']).optional(),
-})
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
     const { id } = await params
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
 
-    const client = await prisma.client.findFirst({
-      where: { id, organizationId: ctx.org.id },
-      include: {
-        accountManager: { select: { id: true, fullName: true } },
-        tasks: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-          include: { createdBy: { select: { id: true, fullName: true } } },
-        },
-        reports: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
-          include: { submittedBy: { select: { id: true, fullName: true } } },
-        },
-        audits: {
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-          include: { createdBy: { select: { id: true, fullName: true } } },
-        },
-      },
-    })
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .single()
 
-    if (!client) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (error || !data) {
+      return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 })
+    }
 
-    return NextResponse.json({ data: client })
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json(data)
+  } catch (err) {
+    console.error('Error in GET /api/clients/[id]:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
@@ -69,44 +35,45 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
     const { id } = await params
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
-
-    // Verify the client belongs to this org
-    const existing = await prisma.client.findFirst({
-      where: { id, organizationId: ctx.org.id },
-    })
-    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-    // Check permission — only admin/trafficker with CEO/Manager role
-    if (ctx.user.role === 'Team' && ctx.membership.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
 
     const body = await request.json()
-    const data = updateSchema.parse(body)
 
-    const client = await prisma.client.update({
-      where: { id },
-      data: {
-        ...data,
-        email: data.email || undefined,
-        contractStart: data.contractStart !== undefined
-          ? (data.contractStart ? new Date(data.contractStart) : null)
-          : undefined,
-        contractEnd: data.contractEnd !== undefined
-          ? (data.contractEnd ? new Date(data.contractEnd) : null)
-          : undefined,
-      },
-    })
+    const { data, error } = await supabase
+      .from('clients')
+      .update({
+        name: body.name,
+        company: body.company,
+        email: body.email,
+        phone: body.phone,
+        website: body.website,
+        logo_url: body.logo_url,
+        status: body.status,
+        industry: body.industry,
+        notes: body.notes,
+        monthly_value: body.monthly_value,
+        currency: body.currency,
+        pays_percentage: body.pays_percentage,
+        percentage_value: body.percentage_value,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
 
-    return NextResponse.json({ data: client })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+    if (error || !data) {
+      console.error('Error updating client:', error)
+      return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 })
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+
+    return NextResponse.json(data)
+  } catch (err) {
+    console.error('Error in PUT /api/clients/[id]:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
@@ -115,37 +82,26 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
     const { id } = await params
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
 
-    // Verify the client belongs to this org
-    const existing = await prisma.client.findFirst({
-      where: { id, organizationId: ctx.org.id },
-    })
-    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    const { data, error } = await supabase
+      .from('clients')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
 
-    // Check permission
-    if (ctx.user.role === 'Team' && ctx.membership.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (error || !data) {
+      return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 })
     }
 
-    // Soft delete: set status to inactive
-    const client = await prisma.client.update({
-      where: { id },
-      data: { status: 'inactive' },
-    })
-
-    return NextResponse.json({ data: client })
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('Error in DELETE /api/clients/[id]:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
-}
-
-// Keep backward compatibility with PATCH
-export async function PATCH(
-  request: Request,
-  context: { params: Promise<{ id: string }> }
-) {
-  return PUT(request, context)
 }

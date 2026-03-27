@@ -1,171 +1,125 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
-
-const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  clientId: z.string().nullable().optional(),
-  managerId: z.string().nullable().optional(),
-  serviceType: z
-    .enum([
-      'meta_ads',
-      'google_ads',
-      'landing_page',
-      'ecommerce',
-      'mentoring',
-      'social_media',
-      'seo',
-      'email_marketing',
-      'content',
-      'design',
-      'other',
-    ])
-    .nullable()
-    .optional(),
-  status: z
-    .enum(['onboarding', 'active', 'review', 'paused', 'completed'])
-    .optional(),
-  startDate: z.string().nullable().optional(),
-  endDate: z.string().nullable().optional(),
-  color: z.string().optional(),
-})
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
+    const { id } = await params
 
-  const { id } = await params
+    // Fetch project with client info
+    const { data: project, error } = await supabase
+      .from('projects')
+      .select('*, clients(id, name, company, email, logo_url)')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .single()
 
-  const project = await prisma.project.findFirst({
-    where: { id, organizationId: ctx.org.id },
-    include: {
-      client: { select: { id: true, name: true } },
-      manager: { select: { id: true, fullName: true } },
-      tasks: {
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          priority: true,
-          deadline: true,
-          assignedTo: true,
-          progressPercent: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { createdAt: 'asc' },
-      },
-    },
-  })
+    if (error || !project) {
+      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
+    }
 
-  if (!project) {
-    return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-  }
+    // Fetch tasks
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('project_id', id)
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .order('position', { ascending: true })
 
-  const totalTasks = project.tasks.length
-  const completedTasks = project.tasks.filter(
-    (t) => t.status === 'completed'
-  ).length
-  const progressPercent =
-    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+    // Fetch milestones
+    const { data: milestones } = await supabase
+      .from('project_milestones')
+      .select('*')
+      .eq('project_id', id)
+      .eq('workspace_id', workspaceId)
+      .order('position', { ascending: true })
 
-  return NextResponse.json({
-    data: {
+    // Calculate progress
+    const totalTasks = tasks?.length || 0
+    const completedTasks = tasks?.filter((t) => t.status === 'done').length || 0
+    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+
+    return NextResponse.json({
       ...project,
-      totalTasks,
-      completedTasks,
-      progressPercent,
-    },
-  })
+      tasks: tasks || [],
+      milestones: milestones || [],
+      progress,
+      total_tasks: totalTasks,
+      completed_tasks: completedTasks,
+    })
+  } catch (err) {
+    console.error('Error in GET /api/projects/[id]:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
 }
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
-
-  const { id } = await params
-
-  // Verify project belongs to org
-  const existing = await prisma.project.findFirst({
-    where: { id, organizationId: ctx.org.id },
-  })
-
-  if (!existing) {
-    return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-  }
-
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
+    const { id } = await params
+
     const body = await request.json()
-    const data = updateSchema.parse(body)
 
-    const project = await prisma.project.update({
-      where: { id },
-      data: {
-        ...(data.name !== undefined && { name: data.name }),
-        ...(data.description !== undefined && {
-          description: data.description,
-        }),
-        ...(data.clientId !== undefined && { clientId: data.clientId }),
-        ...(data.managerId !== undefined && { managerId: data.managerId }),
-        ...(data.serviceType !== undefined && {
-          serviceType: data.serviceType,
-        }),
-        ...(data.status !== undefined && { status: data.status }),
-        ...(data.startDate !== undefined && {
-          startDate: data.startDate ? new Date(data.startDate) : null,
-        }),
-        ...(data.endDate !== undefined && {
-          endDate: data.endDate ? new Date(data.endDate) : null,
-        }),
-      },
-      include: {
-        client: { select: { id: true, name: true } },
-        manager: { select: { id: true, fullName: true } },
-      },
-    })
+    const { data, error } = await supabase
+      .from('projects')
+      .update({
+        ...body,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
 
-    return NextResponse.json({ data: project })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+    if (error || !data) {
+      console.error('Error updating project:', error)
+      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
     }
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+
+    return NextResponse.json(data)
+  } catch (err) {
+    console.error('Error in PUT /api/projects/[id]:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
+    const { id } = await params
 
-  const { id } = await params
+    const { data, error } = await supabase
+      .from('projects')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
 
-  const existing = await prisma.project.findFirst({
-    where: { id, organizationId: ctx.org.id },
-  })
+    if (error || !data) {
+      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
+    }
 
-  if (!existing) {
-    return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('Error in DELETE /api/projects/[id]:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
-
-  // Soft delete: set status to completed (no deletedAt field in schema)
-  await prisma.project.update({
-    where: { id },
-    data: { status: 'completed' },
-  })
-
-  return NextResponse.json({ success: true })
 }

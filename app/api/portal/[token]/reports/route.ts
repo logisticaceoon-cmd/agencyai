@@ -1,0 +1,29 @@
+import { NextResponse } from 'next/server'
+import { createServiceRoleClient } from '@/lib/supabase-server'
+
+export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
+  const supabase = await createServiceRoleClient()
+
+  const { data: access } = await supabase
+    .from('client_portal_access')
+    .select('client_id, workspace_id, permissions')
+    .eq('access_token', token)
+    .single()
+
+  if (!access) return NextResponse.json({ error: 'Token invalido' }, { status: 404 })
+
+  const permissions = (access.permissions as Record<string, boolean>) || {}
+  if (!permissions.reports) return NextResponse.json({ error: 'Sin permiso' }, { status: 403 })
+
+  const { data, error } = await supabase
+    .from('reports')
+    .select('id, title, type, status, period_start, period_end, created_at')
+    .eq('client_id', access.client_id)
+    .eq('workspace_id', access.workspace_id)
+    .eq('status', 'sent')
+    .order('created_at', { ascending: false })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ data })
+}

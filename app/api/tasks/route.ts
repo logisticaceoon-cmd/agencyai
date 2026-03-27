@@ -1,143 +1,112 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
-import { createNotificationForMultiple } from '@/lib/notifications'
-
-const createSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().optional(),
-  assignedTo: z.array(z.string()).min(1),
-  deadline: z.string().optional(),
-  clientId: z.string().optional(),
-  projectId: z.string().optional(),
-  department: z.string().optional(),
-  status: z.enum(['pending', 'in_progress', 'completed', 'rejected', 'review']).default('pending'),
-  priority: z.enum(['critical', 'high', 'medium', 'low']).default('medium'),
-  taskType: z.string().optional(),
-  estimatedHours: z.number().optional(),
-  sopLink: z.string().optional(),
-  parentTaskId: z.string().optional(),
-  isRecurring: z.boolean().default(false),
-  recurrencePattern: z.string().optional(),
-  checklist: z.array(z.object({ label: z.string(), done: z.boolean() })).optional(),
-})
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(request: Request) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, role, userId } = auth
 
-  const { searchParams } = new URL(request.url)
-  const status = searchParams.get('status')
-  const priority = searchParams.get('priority')
-  const clientId = searchParams.get('clientId')
-  const projectId = searchParams.get('projectId')
-  const assignedTo = searchParams.get('assignedTo')
-  const page = parseInt(searchParams.get('page') || '1')
-  const limit = parseInt(searchParams.get('limit') || '50')
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get('status')
+    const priority = searchParams.get('priority')
+    const projectId = searchParams.get('project_id')
 
-  const where: Record<string, unknown> = { organizationId: ctx.org.id }
+    let query = supabase
+      .from('tasks')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .order('position', { ascending: true })
+      .order('created_at', { ascending: true })
 
-  // Trafficker only sees their own tasks
-  if (ctx.membership.role === 'trafficker') {
-    where.assignedTo = { has: ctx.user.id }
+    if (role === 'member') {
+      query = query.eq('assignee_id', userId)
+    }
+
+    if (status) {
+      query = query.eq('status', status)
+    }
+
+    if (priority) {
+      query = query.eq('priority', priority)
+    }
+
+    if (projectId) {
+      query = query.eq('project_id', projectId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching tasks:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json(data)
+  } catch (err) {
+    console.error('Error in GET /api/tasks:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
-
-  if (status) where.status = status
-  if (priority) where.priority = priority
-  if (clientId) where.clientId = clientId
-  if (projectId) where.projectId = projectId
-  if (assignedTo) where.assignedTo = { has: assignedTo }
-
-  const [tasks, total] = await Promise.all([
-    prisma.task.findMany({
-      where,
-      include: {
-        createdBy: { select: { id: true, fullName: true, avatarUrl: true } },
-        client: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true } },
-        validatedBy: { select: { id: true, fullName: true } },
-        _count: { select: { comments: true, subtasks: true } },
-      },
-      orderBy: [{ priority: 'asc' }, { deadline: 'asc' }, { createdAt: 'desc' }],
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.task.count({ where }),
-  ])
-
-  return NextResponse.json({ data: tasks, total, page, limit, hasMore: page * limit < total })
 }
 
 export async function POST(request: Request) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
-
-  if (ctx.membership.role === 'trafficker') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, role, userId } = auth
+
     const body = await request.json()
-    const data = createSchema.parse(body)
 
-    const task = await prisma.task.create({
-      data: {
-        organizationId: ctx.org.id,
-        title: data.title,
-        description: data.description,
-        createdById: ctx.user.id,
-        assignedTo: data.assignedTo,
-        deadline: data.deadline ? new Date(data.deadline) : undefined,
-        clientId: data.clientId || undefined,
-        projectId: data.projectId || undefined,
-        department: data.department,
-        status: data.status,
-        priority: data.priority,
-        taskType: data.taskType,
-        estimatedHours: data.estimatedHours,
-        sopLink: data.sopLink,
-        parentTaskId: data.parentTaskId || undefined,
-        isRecurring: data.isRecurring,
-        recurrencePattern: data.recurrencePattern,
-        checklist: data.checklist ?? undefined,
-      },
-      include: {
-        createdBy: { select: { id: true, fullName: true, avatarUrl: true } },
-        client: { select: { id: true, name: true } },
-        project: { select: { id: true, name: true } },
-        _count: { select: { comments: true, subtasks: true } },
-      },
-    })
-
-    await prisma.activityLog.create({
-      data: {
-        organizationId: ctx.org.id,
-        userId: ctx.user.id,
-        actionType: 'task_created',
-        entityType: 'task',
-        entityId: task.id,
-        taskId: task.id,
-        description: `Tarea creada: ${task.title}`,
-      },
-    })
-
-    const assigneesExcludingCreator = data.assignedTo.filter((id) => id !== ctx.user.id)
-    if (assigneesExcludingCreator.length > 0) {
-      await createNotificationForMultiple(assigneesExcludingCreator, {
-        title: 'Nueva tarea asignada',
-        message: `${ctx.user.fullName} te asigno: ${task.title}`,
-        type: 'task',
-        relatedEntityType: 'task',
-        relatedEntityId: task.id,
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        workspace_id: workspaceId,
+        project_id: body.project_id || null,
+        parent_task_id: body.parent_task_id || null,
+        title: body.title,
+        description: body.description || null,
+        status: body.status || 'todo',
+        priority: body.priority || 'medium',
+        assignee_id: body.assignee_id || null,
+        due_date: body.due_date || null,
+        estimated_hours: body.estimated_hours || null,
+        actual_hours: body.actual_hours || null,
+        tags: body.tags || null,
+        position: body.position ?? 0,
       })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error creating task:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ data: task }, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+    // If role is member, notify the workspace owner
+    if (role === 'member') {
+      const { data: workspace } = await supabase
+        .from('workspaces')
+        .select('owner_id')
+        .eq('id', workspaceId)
+        .single()
+
+      if (workspace?.owner_id) {
+        await supabase.from('notifications').insert({
+          workspace_id: workspaceId,
+          user_id: workspace.owner_id,
+          title: 'Nueva tarea creada',
+          message: `El miembro ${userId} creó la tarea: ${body.title}`,
+          type: 'task',
+          read: false,
+          link: `/projects/${body.project_id || ''}`,
+        })
+      }
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+
+    return NextResponse.json(data, { status: 201 })
+  } catch (err) {
+    console.error('Error in POST /api/tasks:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

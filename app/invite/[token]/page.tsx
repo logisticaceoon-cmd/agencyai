@@ -1,128 +1,72 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useState } from 'react'
+import { use } from 'react'
+import { Zap, Loader2, Check } from 'lucide-react'
 import Link from 'next/link'
-import { toast } from '@/hooks/use-toast'
-import { Zap, Building2, Check, AlertTriangle } from 'lucide-react'
 
-interface InvitationData {
-  id: string
-  email: string
-  role: string
-  organization: {
-    name: string
-    logoUrl: string | null
-    plan: string
-  }
-}
-
-export default function InvitePage() {
-  const { token } = useParams()
-  const router = useRouter()
-  const [invitation, setInvitation] = useState<InvitationData | null>(null)
+export default function InvitePage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = use(params)
+  const [loading, setLoading] = useState(false)
+  const [accepted, setAccepted] = useState(false)
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [accepting, setAccepting] = useState(false)
 
-  useEffect(() => {
-    fetch(`/api/invitations/${token}`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (res.error) setError(res.error)
-        else setInvitation(res.data)
-      })
-      .catch(() => setError('Error al cargar la invitación'))
-      .finally(() => setLoading(false))
-  }, [token])
-
-  async function acceptInvitation() {
-    setAccepting(true)
+  async function handleAccept() {
+    setLoading(true)
     try {
       const res = await fetch(`/api/invitations/${token}`, { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) {
-        // User might not be logged in
-        if (res.status === 401) {
-          router.push(`/register?inviteToken=${token}`)
-          return
-        }
-        toast({ title: 'Error', description: data.error, variant: 'destructive' })
-        return
+      if (res.ok) {
+        setAccepted(true)
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Error al aceptar la invitacion')
       }
-      toast({ title: '¡Invitación aceptada!', description: `Bienvenido a ${invitation?.organization.name}` })
-      router.push('/dashboard')
     } catch {
-      toast({ title: 'Error inesperado', variant: 'destructive' })
-    } finally {
-      setAccepting(false)
+      setError('Error de conexion')
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <div className="text-zinc-500">Cargando invitación...</div>
-      </div>
-    )
+    setLoading(false)
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-2.5 mb-8">
-          <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center">
-            <Zap className="h-6 w-6 text-white" />
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="h-14 w-14 rounded-2xl bg-blue-600 flex items-center justify-center mx-auto mb-6">
+            <Zap className="h-8 w-8 text-white" />
           </div>
-          <span className="text-2xl font-bold text-white">AgencyAI</span>
-        </div>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8">
-          {error ? (
-            <div className="text-center">
-              <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 border border-red-500/20 mb-4">
-                <AlertTriangle className="h-7 w-7 text-red-400" />
+          {accepted ? (
+            <>
+              <div className="h-12 w-12 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
+                <Check className="h-6 w-6 text-green-600" />
               </div>
-              <h2 className="text-lg font-semibold text-white mb-2">Invitación no válida</h2>
-              <p className="text-sm text-zinc-400 mb-6">{error}</p>
-              <Link href="/login" className="text-sm text-indigo-400 hover:text-indigo-300">
-                Ir al inicio de sesión
+              <h1 className="text-xl font-bold text-slate-900 mb-2">Invitacion aceptada</h1>
+              <p className="text-sm text-slate-500 mb-6">Ya sos parte del workspace. Inicia sesion para empezar.</p>
+              <Link href="/sign-in" className="inline-block bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors">
+                Iniciar sesion
               </Link>
-            </div>
-          ) : invitation ? (
-            <div className="text-center">
-              <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-indigo-500/10 border border-indigo-500/20 mb-4">
-                <Building2 className="h-7 w-7 text-indigo-400" />
-              </div>
-              <h2 className="text-xl font-bold text-white mb-2">Te invitaron a unirte</h2>
-              <p className="text-zinc-400 mb-1">
-                Fuiste invitado a{' '}
-                <span className="text-white font-medium">{invitation.organization.name}</span>
-              </p>
-              <p className="text-sm text-zinc-500 mb-6">
-                Rol: <span className="text-zinc-300 capitalize">{invitation.role}</span> ·
-                Para: <span className="text-zinc-300">{invitation.email}</span>
-              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-xl font-bold text-slate-900 mb-2">Te invitaron a un workspace</h1>
+              <p className="text-sm text-slate-500 mb-6">Acepta la invitacion para unirte al equipo en AgencyAI.</p>
 
-              <div className="space-y-3">
-                <button
-                  onClick={acceptInvitation}
-                  disabled={accepting}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
-                >
-                  {accepting ? 'Aceptando...' : (
-                    <><Check className="h-4 w-4" /> Aceptar invitación</>
-                  )}
-                </button>
-                <p className="text-xs text-zinc-600">
-                  ¿No tenés cuenta?{' '}
-                  <Link href={`/register?inviteToken=${token}`} className="text-indigo-400 hover:text-indigo-300">
-                    Registrarte primero
-                  </Link>
-                </p>
-              </div>
-            </div>
-          ) : null}
+              {error && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3 mb-4">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
+              <button onClick={handleAccept} disabled={loading} className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {loading ? 'Aceptando...' : 'Aceptar invitacion'}
+              </button>
+
+              <p className="text-xs text-slate-400 mt-4">
+                No tenes cuenta? <Link href={`/sign-up?invite=${token}`} className="text-blue-600 hover:text-blue-700">Registrate primero</Link>
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -2,91 +2,57 @@
 
 import { AgentWidget } from './AgentWidget'
 
-/**
- * Pre-configured AgentWidget instances for each module.
- * Add the appropriate component to each page:
- *
- *   Dashboard page  → <DashboardAgent />
- *   Clients page    → <ClientsAgent />
- *   Tasks page      → <TasksAgent />
- *   Projects page   → <ProjectsAgent />
- *   Reports page    → <ReportsAgent />
- *
- * Example usage in a page:
- *
- *   import { DashboardAgent } from '@/components/ai/AgentWidgetPresets'
- *
- *   export default function DashboardPage() {
- *     return (
- *       <div>
- *         { ... existing page content ... }
- *         <DashboardAgent />
- *       </div>
- *     )
- *   }
- */
-
 export function DashboardAgent() {
   return (
-    <AgentWidget
-      moduleName="dashboard"
-      suggestions={[
-        'Resumen del dia',
-        'Que tareas son urgentes?',
-        'Estado del equipo',
-      ]}
-    />
+    <AgentWidget config={{
+      name: 'Agente Operacional',
+      description: 'Te ayudo a priorizar tu dia y detectar problemas urgentes',
+      module: 'dashboard',
+      suggestions: ['Que es lo mas urgente hoy?', 'Que clientes necesitan atencion?', 'Resumime el estado general de la agencia'],
+    }} />
   )
 }
 
 export function ClientsAgent() {
   return (
-    <AgentWidget
-      moduleName="clients"
-      suggestions={[
-        'Analizar cartera de clientes',
-        'Sugerir estrategia de retencion',
-        'Resumen de clientes activos',
-      ]}
-    />
+    <AgentWidget config={{
+      name: 'Agente CRM',
+      description: 'Te ayudo a gestionar relaciones y mejorar retencion',
+      module: 'clients',
+      suggestions: ['Como mejoro la retencion de clientes?', 'Que informacion debo registrar de cada cliente?', 'Como calculo bien el valor de un cliente?'],
+    }} />
   )
 }
 
 export function TasksAgent() {
   return (
-    <AgentWidget
-      moduleName="tasks"
-      suggestions={[
-        'Priorizar mis tareas',
-        'Que esta bloqueado?',
-        'Sugerir distribucion de trabajo',
-      ]}
-    />
+    <AgentWidget config={{
+      name: 'Agente de Productividad',
+      description: 'Te ayudo a priorizar y organizar el trabajo del equipo',
+      module: 'tasks',
+      suggestions: ['Como priorizo las tareas de hoy?', 'Como delego mejor en mi equipo?', 'Que tareas deberia eliminar o posponer?'],
+    }} />
   )
 }
 
 export function ProjectsAgent() {
   return (
-    <AgentWidget
-      moduleName="projects"
-      suggestions={[
-        'Estado general de proyectos',
-        'Algun proyecto en riesgo?',
-        'Sugerir timeline',
-      ]}
-    />
+    <AgentWidget config={{
+      name: 'Agente de Proyectos',
+      description: 'Te ayudo a detectar riesgos y sugerir acciones',
+      module: 'projects',
+      suggestions: ['Como estructuro bien los microobjetivos?', 'Que hago si un proyecto se atrasa?', 'Como mejoro la comunicacion con el cliente sobre el proyecto?'],
+    }} />
   )
 }
 
 export function ReportsAgent() {
   return (
-    <AgentWidget
-      moduleName="reports"
-      suggestions={[
-        'Generar resumen ejecutivo',
-        'Analizar tendencias',
-        'Sugerir mejoras',
-      ]}
-    />
+    <AgentWidget config={{
+      name: 'Agente de Reportes',
+      description: 'Te ayudo a crear reportes profesionales que impresionen',
+      module: 'reports',
+      suggestions: ['Que deberia incluir en un reporte mensual?', 'Como muestro resultados cuando no fueron los esperados?', 'Ayudame a escribir un resumen ejecutivo'],
+    }} />
   )
 }

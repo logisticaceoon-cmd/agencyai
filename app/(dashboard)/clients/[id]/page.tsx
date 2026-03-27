@@ -17,9 +17,10 @@ import {
   ClipboardList,
   StickyNote,
   Briefcase,
+  Percent,
 } from 'lucide-react'
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 
 function getInitials(name: string) {
   return name
@@ -60,7 +61,7 @@ const statusColor: Record<string, string> = {
   scaling: 'bg-purple-50 text-purple-700 border-purple-200',
 }
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// -- Types --------------------------------------------------------------------
 
 interface ClientDetail {
   id: string
@@ -81,6 +82,8 @@ interface ClientDetail {
   serviceType: string | null
   contractStart: string | null
   contractEnd: string | null
+  pays_percentage: boolean
+  percentage_value: number | null
   accountManager: { id: string; fullName: string } | null
   tasks: Array<{
     id: string
@@ -116,7 +119,7 @@ function formatDate(d: string) {
   })
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+// -- Component ----------------------------------------------------------------
 
 export default function ClientDetailPage() {
   const params = useParams()
@@ -195,11 +198,19 @@ export default function ClientDetailPage() {
             </div>
           </div>
         </div>
-        <span
-          className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium ${statusColor[client.status] || statusColor.inactive}`}
-        >
-          {statusLabel[client.status] || client.status}
-        </span>
+        <div className="flex items-center gap-2">
+          {client.pays_percentage && client.percentage_value != null && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-sm font-medium text-purple-700">
+              <Percent className="h-3.5 w-3.5" />
+              Comision: {client.percentage_value}%
+            </span>
+          )}
+          <span
+            className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium ${statusColor[client.status] || statusColor.inactive}`}
+          >
+            {statusLabel[client.status] || client.status}
+          </span>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -214,7 +225,7 @@ export default function ClientDetailPage() {
             <Tabs.Trigger
               key={tab.value}
               value={tab.value}
-              className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-colors data-[state=active]:border-[#2563eb] data-[state=active]:text-[#2563eb]"
+              className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-colors data-[state=active]:border-blue-600 data-[state=active]:text-blue-600"
             >
               <tab.icon className="h-4 w-4" />
               {tab.label}
@@ -251,7 +262,7 @@ export default function ClientDetailPage() {
                       <p className="text-xs text-slate-500">Email</p>
                       <a
                         href={`mailto:${client.email}`}
-                        className="text-sm text-[#2563eb] hover:underline"
+                        className="text-sm text-blue-600 hover:underline"
                       >
                         {client.email}
                       </a>
@@ -276,7 +287,7 @@ export default function ClientDetailPage() {
                         href={client.website}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-[#2563eb] hover:underline"
+                        className="text-sm text-blue-600 hover:underline"
                       >
                         {client.website}
                       </a>
@@ -310,6 +321,20 @@ export default function ClientDetailPage() {
                         ${Number(client.monthlyFee).toLocaleString()}{' '}
                         <span className="text-sm font-normal text-slate-500">
                           {client.currency}/mes
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {client.pays_percentage && client.percentage_value != null && (
+                  <div className="flex items-start gap-3">
+                    <Percent className="h-4 w-4 text-purple-500 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Pago por porcentaje</p>
+                      <p className="text-lg font-semibold text-purple-700">
+                        {client.percentage_value}%{' '}
+                        <span className="text-sm font-normal text-slate-500">
+                          de comision
                         </span>
                       </p>
                     </div>

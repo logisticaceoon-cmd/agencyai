@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import * as Dialog from '@radix-ui/react-dialog'
@@ -21,9 +21,10 @@ import {
   Mail,
   Building2,
   Loader2,
+  Percent,
 } from 'lucide-react'
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------------
 
 function getInitials(name: string) {
   return name
@@ -46,7 +47,7 @@ function getColor(name: string) {
   return colors[name.length % colors.length]
 }
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// -- Types --------------------------------------------------------------------
 
 interface Client {
   id: string
@@ -59,11 +60,13 @@ interface Client {
   status: string
   notes: string | null
   monthlyFee: string | null
+  pays_percentage: boolean
+  percentage_value: number | null
   accountManager: { id: string; fullName: string } | null
   _count: { tasks: number; reports: number; projects: number }
 }
 
-// ── Validation ───────────────────────────────────────────────────────────────
+// -- Validation ---------------------------------------------------------------
 
 const clientSchema = z.object({
   name: z.string().min(1, 'El nombre es obligatorio'),
@@ -75,11 +78,13 @@ const clientSchema = z.object({
   status: z.enum(['active', 'inactive', 'onboarding', 'paused']).optional(),
   monthlyFee: z.union([z.number().min(0), z.nan()]).optional(),
   notes: z.string().optional(),
+  pays_percentage: z.boolean(),
+  percentage_value: z.number().min(0).max(100).optional().nullable(),
 })
 
 type ClientFormData = z.infer<typeof clientSchema>
 
-// ── Status helpers ───────────────────────────────────────────────────────────
+// -- Status helpers -----------------------------------------------------------
 
 const statusLabel: Record<string, string> = {
   active: 'Activo',
@@ -114,7 +119,7 @@ const industries = [
   'Otro',
 ]
 
-// ── Component ────────────────────────────────────────────────────────────────
+// -- Component ----------------------------------------------------------------
 
 export default function ClientsPage() {
   const { user } = useCurrentUser()
@@ -129,21 +134,27 @@ export default function ClientsPage() {
 
   const canManage = user?.role === 'CEO' || user?.role === 'Manager'
 
-  // ── Form ─────────────────────────────────────────────────────────────────
+  // -- Form -------------------------------------------------------------------
 
   const {
     register,
     handleSubmit,
     reset,
+    control,
+    watch,
     formState: { errors },
   } = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
       status: 'active',
+      pays_percentage: false,
+      percentage_value: null,
     },
   })
 
-  // ── Data fetching ────────────────────────────────────────────────────────
+  const watchPaysPercentage = watch('pays_percentage')
+
+  // -- Data fetching ----------------------------------------------------------
 
   const loadClients = useCallback(async () => {
     setLoading(true)
@@ -165,7 +176,7 @@ export default function ClientsPage() {
     loadClients()
   }, [loadClients])
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
+  // -- Handlers ---------------------------------------------------------------
 
   function openCreateDialog() {
     setEditingClient(null)
@@ -179,6 +190,8 @@ export default function ClientsPage() {
       status: 'active',
       monthlyFee: undefined,
       notes: '',
+      pays_percentage: false,
+      percentage_value: null,
     })
     setDialogOpen(true)
   }
@@ -195,20 +208,23 @@ export default function ClientsPage() {
       status: (client.status as ClientFormData['status']) || 'active',
       monthlyFee: client.monthlyFee ? Number(client.monthlyFee) : undefined,
       notes: client.notes || '',
+      pays_percentage: client.pays_percentage || false,
+      percentage_value: client.percentage_value ?? null,
     })
     setDialogOpen(true)
   }
 
-  async function onSubmit(data: ClientFormData) {
+  async function onSubmit(formData: ClientFormData) {
     setSubmitting(true)
     try {
       const payload = {
-        ...data,
-        email: data.email || undefined,
+        ...formData,
+        email: formData.email || undefined,
         monthlyFee:
-          data.monthlyFee !== undefined && !isNaN(data.monthlyFee)
-            ? data.monthlyFee
+          formData.monthlyFee !== undefined && !isNaN(formData.monthlyFee)
+            ? formData.monthlyFee
             : undefined,
+        percentage_value: formData.pays_percentage ? formData.percentage_value : null,
       }
 
       if (editingClient) {
@@ -249,11 +265,11 @@ export default function ClientsPage() {
     }
   }
 
-  // ── Filtered clients ────────────────────────────────────────────────────
+  // -- Filtered clients -------------------------------------------------------
 
   const filteredClients = clients
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // -- Render -----------------------------------------------------------------
 
   return (
     <div className="space-y-6">
@@ -268,7 +284,7 @@ export default function ClientsPage() {
         {canManage && (
           <button
             onClick={openCreateDialog}
-            className="flex items-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Nuevo cliente
@@ -419,11 +435,19 @@ export default function ClientsPage() {
                 )}
 
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-                  <span
-                    className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusColor[client.status] || statusColor.inactive}`}
-                  >
-                    {statusLabel[client.status] || client.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusColor[client.status] || statusColor.inactive}`}
+                    >
+                      {statusLabel[client.status] || client.status}
+                    </span>
+                    {client.pays_percentage && client.percentage_value != null && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+                        <Percent className="h-3 w-3" />
+                        Comision: {client.percentage_value}%
+                      </span>
+                    )}
+                  </div>
                   {client.monthlyFee && (
                     <span className="text-sm font-semibold text-slate-700 flex items-center gap-1">
                       <DollarSign className="h-3.5 w-3.5 text-slate-400" />
@@ -562,7 +586,7 @@ export default function ClientsPage() {
               {/* Monthly value */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Valor mensual (USD)
+                  Valor mensual
                 </label>
                 <input
                   type="number"
@@ -571,6 +595,58 @@ export default function ClientsPage() {
                   className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   placeholder="0.00"
                 />
+              </div>
+
+              {/* Pays percentage toggle */}
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-slate-700">
+                    Este cliente paga por porcentaje?
+                  </label>
+                  <Controller
+                    name="pays_percentage"
+                    control={control}
+                    render={({ field }) => (
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={field.value}
+                        onClick={() => field.onChange(!field.value)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                          field.value ? 'bg-blue-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            field.value ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    )}
+                  />
+                </div>
+
+                {watchPaysPercentage && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Porcentaje acordado (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.1"
+                      {...register('percentage_value', { valueAsNumber: true })}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      placeholder="15"
+                    />
+                    {errors.percentage_value && (
+                      <p className="mt-1 text-xs text-red-500">
+                        {errors.percentage_value.message}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Notes */}
@@ -599,7 +675,7 @@ export default function ClientsPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex items-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
                   {submitting && (
                     <Loader2 className="h-4 w-4 animate-spin" />
