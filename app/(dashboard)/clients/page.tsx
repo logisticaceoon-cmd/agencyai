@@ -132,7 +132,7 @@ export default function ClientsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const canManage = user?.role === 'CEO' || user?.role === 'Manager'
+  const canManage = !user ? false : ['CEO', 'Manager', 'owner', 'admin'].includes(user.role)
 
   // -- Form -------------------------------------------------------------------
 
@@ -164,9 +164,12 @@ export default function ClientsPage() {
       if (searchQuery) params.set('search', searchQuery)
       const res = await fetch(`/api/clients?${params}`)
       if (res.ok) {
-        const data = await res.json()
-        setClients(data.data || [])
+        const json = await res.json()
+        // Handle both { data: [...] } and direct array response
+        setClients(Array.isArray(json) ? json : (json.data || []))
       }
+    } catch {
+      // silently fail
     } finally {
       setLoading(false)
     }

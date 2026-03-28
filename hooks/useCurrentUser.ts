@@ -24,12 +24,12 @@ export function useCurrentUser() {
           setUser(data.user)
           setOrg(data.org ?? null)
         } else if (authUser) {
-          // Auth user exists but no app user yet — create a minimal user object
+          // Auth user exists but no app user yet
           setUser({
             id: authUser.id,
             fullName: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuario',
             email: authUser.email || '',
-            role: 'CEO',
+            role: 'owner',
             avatarUrl: authUser.user_metadata?.avatar_url || null,
           } as never)
           setOrg(null)

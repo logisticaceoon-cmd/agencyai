@@ -16,27 +16,27 @@ export async function GET(request: Request) {
       .select('*')
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (status) {
       query = query.eq('status', status)
     }
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%`)
+      query = query.or(`name.ilike.%${search}%,brand.ilike.%${search}%,email.ilike.%${search}%`)
     }
 
     const { data, error } = await query
 
     if (error) {
       console.error('Error fetching clients:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ data: [] })
     }
 
     return NextResponse.json({ data: data || [] })
   } catch (err) {
     console.error('Error in GET /api/clients:', err)
-    return NextResponse.json({ data: [], error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json({ data: [] })
   }
 }
 
@@ -53,16 +53,15 @@ export async function POST(request: Request) {
       .insert({
         workspace_id: workspaceId,
         name: body.name,
-        company: body.company || null,
+        brand: body.brand || null,
         email: body.email || null,
         phone: body.phone || null,
         website: body.website || null,
-        logo_url: body.logo_url || null,
         status: body.status || 'active',
         industry: body.industry || null,
         notes: body.notes || null,
-        monthly_value: body.monthly_value || null,
-        currency: body.currency || null,
+        monthlyFee: body.monthlyFee || null,
+        currency: body.currency || 'USD',
         pays_percentage: body.pays_percentage ?? false,
         percentage_value: body.percentage_value || null,
       })

@@ -51,7 +51,14 @@
       "Bash(node -e \":*)",
       "Bash(node scripts/fix-rls-cycle.mjs)",
       "Bash(node scripts/diagnose.mjs)",
-      "Bash(node scripts/fix-all-rls.mjs)"
+      "Bash(node scripts/fix-all-rls.mjs)",
+      "Bash(curl -s https://agencyai-iota.vercel.app/api/auth/me)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://agencyai-iota.vercel.app/api/notifications)",
+      "Bash(curl -s https://agencyai-iota.vercel.app/api/notifications)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://agencyai-iota.vercel.app/api/dashboard/stats)",
+      "Bash(curl -s https://agencyai-iota.vercel.app/api/dashboard/stats)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://agencyai-iota.vercel.app/api/clients)",
+      "Bash(curl -s https://agencyai-iota.vercel.app/api/clients)"
     ]
   }
 }
