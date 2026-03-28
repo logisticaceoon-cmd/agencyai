@@ -185,10 +185,10 @@ export default function SettingsPage() {
             const isOwner = member.user.id === org.ownerId
             return (
               <div key={member.id} className="flex items-center gap-4 px-5 py-3">
-                <Avatar name={member.user.fullName} avatarUrl={member.user.avatarUrl} size="sm" />
+                <Avatar name={member.user?.fullName || 'Miembro'} avatarUrl={member.user?.avatarUrl} size="sm" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-white">{member.user.fullName}</p>
+                    <p className="text-sm font-medium text-white">{member.user?.fullName || 'Miembro'}</p>
                     {isOwner && <span className="text-[10px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded-full">Owner</span>}
                   </div>
                   <p className="text-xs text-zinc-500">{member.user.email}</p>

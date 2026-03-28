@@ -1058,7 +1058,7 @@ export default function ProjectDetailPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Responsable</label>
                   <p className="text-sm text-slate-600 px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                    {project.manager.fullName}
+                    {project.manager?.fullName || 'Sin asignar'}
                   </p>
                 </div>
               )}

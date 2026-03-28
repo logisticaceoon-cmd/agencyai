@@ -65,7 +65,12 @@
       "Bash(curl -s -w \"\\\\nHTTP %{http_code}\" https://agencyai-iota.vercel.app/api/dashboard/stats)",
       "Bash(for f:*)",
       "Bash(do echo:*)",
-      "Read(//c/Users/Rafael B/agencyai/**)"
+      "Read(//c/Users/Rafael B/agencyai/**)",
+      "Bash(sed -i \"s/task\\\\.validatedBy\\\\.fullName/task.validatedBy?.fullName || ''Usuario''/g\" \"app/\\(dashboard\\)/tasks/[id]/page.tsx\")",
+      "Bash(sed -i \"s/c\\\\.author\\\\.fullName/c.author?.fullName || ''Usuario''/g\" \"app/\\(dashboard\\)/tasks/[id]/page.tsx\")",
+      "Bash(sed -i \"s/c\\\\.author\\\\.avatarUrl/c.author?.avatarUrl/g\" \"app/\\(dashboard\\)/tasks/[id]/page.tsx\")",
+      "Bash(sed -i \"s/task\\\\.createdBy\\\\.fullName/task.createdBy?.fullName || ''Usuario''/g\" \"app/\\(dashboard\\)/tasks/[id]/page.tsx\")",
+      "Bash(sed -i \"s/task\\\\.createdBy\\\\.avatarUrl/task.createdBy?.avatarUrl/g\" \"app/\\(dashboard\\)/tasks/[id]/page.tsx\")"
     ]
   }
 }

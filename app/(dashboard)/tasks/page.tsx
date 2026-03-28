@@ -991,7 +991,7 @@ function TaskFormModal({
                   <option value="">Sin asignar</option>
                   {members.map((m) => (
                     <option key={m.userId} value={m.userId}>
-                      {m.user.fullName}
+                      {m.user?.fullName || 'Miembro'}
                     </option>
                   ))}
                 </select>

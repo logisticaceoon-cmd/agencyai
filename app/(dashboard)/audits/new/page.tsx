@@ -132,7 +132,7 @@ export default function NewAuditPage() {
                   {form.auditedUsers.includes(u.id) && <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">{u.fullName}</p>
+                  <p className="text-sm font-medium text-white">{u.fullName || (u as unknown as {email?: string}).email || 'Miembro'}</p>
                   {u.department && <p className="text-xs text-zinc-500">{u.department}</p>}
                 </div>
               </button>

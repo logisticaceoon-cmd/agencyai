@@ -175,7 +175,7 @@ export default function ReportDetailPage() {
           {report.validatedBy && (
             <div className={`rounded-xl border p-4 ${report.status === 'validated' ? 'border-green-500/30 bg-green-500/5' : report.status === 'rejected' ? 'border-red-500/30 bg-red-500/5' : 'border-yellow-500/30 bg-yellow-500/5'}`}>
               <p className="text-sm font-medium text-zinc-300">
-                {report.status === 'validated' ? '✅' : report.status === 'rejected' ? '❌' : '⚠️'} {report.status === 'validated' ? 'Validado' : report.status === 'rejected' ? 'Rechazado' : 'En revisión'} por {report.validatedBy.fullName}
+                {report.status === 'validated' ? '✅' : report.status === 'rejected' ? '❌' : '⚠️'} {report.status === 'validated' ? 'Validado' : report.status === 'rejected' ? 'Rechazado' : 'En revisión'} por {report.validatedBy?.fullName || 'Usuario'}
                 {report.validatedAt && ` — ${formatDateTime(report.validatedAt)}`}
               </p>
               {report.validationComments && <p className="text-sm text-zinc-400 mt-1">{report.validationComments}</p>}
@@ -189,10 +189,10 @@ export default function ReportDetailPage() {
             <div className="space-y-3 mb-4">
               {report.comments.map((c) => (
                 <div key={c.id} className="flex gap-3">
-                  <Avatar name={c.author.fullName} avatarUrl={c.author.avatarUrl} size="sm" />
+                  <Avatar name={c.author?.fullName || 'Usuario'} avatarUrl={c.author?.avatarUrl} size="sm" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">{c.author.fullName}</span>
+                      <span className="text-sm font-medium text-white">{c.author?.fullName || 'Usuario'}</span>
                       <span className="text-xs text-zinc-500">{timeAgo(c.createdAt)}</span>
                     </div>
                     <p className="text-sm text-zinc-300 mt-0.5">{c.text}</p>
@@ -212,9 +212,9 @@ export default function ReportDetailPage() {
             <div>
               <p className="text-xs text-zinc-500 mb-1">Enviado por</p>
               <div className="flex items-center gap-2">
-                <Avatar name={report.submittedBy.fullName} avatarUrl={report.submittedBy.avatarUrl} size="sm" />
+                <Avatar name={report.submittedBy?.fullName || 'Usuario'} avatarUrl={report.submittedBy?.avatarUrl} size="sm" />
                 <div>
-                  <p className="text-sm text-white">{report.submittedBy.fullName}</p>
+                  <p className="text-sm text-white">{report.submittedBy?.fullName || 'Usuario'}</p>
                   {report.submittedBy.department && <p className="text-xs text-zinc-500">{report.submittedBy.department}</p>}
                 </div>
               </div>

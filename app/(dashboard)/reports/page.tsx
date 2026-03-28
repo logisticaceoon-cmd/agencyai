@@ -124,7 +124,7 @@ export default function ReportsPage() {
     const q = searchQuery.toLowerCase()
     return (
       r.title.toLowerCase().includes(q) ||
-      r.submittedBy.fullName.toLowerCase().includes(q) ||
+      (r.submittedBy?.fullName || '').toLowerCase().includes(q) ||
       (r.client?.name || '').toLowerCase().includes(q)
     )
   })
@@ -251,7 +251,7 @@ export default function ReportsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5 text-slate-600">
                       <User className="h-3.5 w-3.5 text-slate-400" />
-                      <span>{report.submittedBy.fullName}</span>
+                      <span>{report.submittedBy?.fullName || 'Sin asignar'}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">

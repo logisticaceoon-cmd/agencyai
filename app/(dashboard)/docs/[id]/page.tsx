@@ -133,7 +133,7 @@ export default function DocDetailPage() {
       </div>
 
       <div className="flex items-center justify-between text-xs text-zinc-600">
-        <span>Creado por {doc.author.fullName} · {formatDateTime(doc.createdAt)}</span>
+        <span>Creado por {doc.author?.fullName || 'Usuario'} · {formatDateTime(doc.createdAt)}</span>
         <span>Última actualización: {formatDateTime(doc.updatedAt)}</span>
       </div>
 

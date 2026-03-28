@@ -220,7 +220,7 @@ export default function TaskDetailPage() {
               task.status === 'completed' ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'
             }`}>
               <p className="text-sm font-medium text-zinc-300">
-                {task.status === 'completed' ? '✅ Validado' : '❌ Rechazado'} por {task.validatedBy.fullName}
+                {task.status === 'completed' ? '✅ Validado' : '❌ Rechazado'} por {task.validatedBy?.fullName || 'Usuario'}
                 {task.validatedAt && ` el ${formatDateTime(task.validatedAt)}`}
               </p>
               {task.validationNotes && (
@@ -238,10 +238,10 @@ export default function TaskDetailPage() {
             <div className="space-y-3 mb-4">
               {task.comments.map((c) => (
                 <div key={c.id} className="flex gap-3">
-                  <Avatar name={c.author.fullName} avatarUrl={c.author.avatarUrl} size="sm" />
+                  <Avatar name={c.author?.fullName || 'Usuario'} avatarUrl={c.author?.avatarUrl} size="sm" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">{c.author.fullName}</span>
+                      <span className="text-sm font-medium text-white">{c.author?.fullName || 'Usuario'}</span>
                       <span className="text-xs text-zinc-500">{timeAgo(c.createdAt)}</span>
                     </div>
                     <p className="text-sm text-zinc-300 mt-0.5">{c.text}</p>
@@ -275,8 +275,8 @@ export default function TaskDetailPage() {
             <div>
               <p className="text-xs text-zinc-500 mb-1">Creado por</p>
               <div className="flex items-center gap-2">
-                <Avatar name={task.createdBy.fullName} avatarUrl={task.createdBy.avatarUrl} size="sm" />
-                <span className="text-sm text-white">{task.createdBy.fullName}</span>
+                <Avatar name={task.createdBy?.fullName || 'Usuario'} avatarUrl={task.createdBy?.avatarUrl} size="sm" />
+                <span className="text-sm text-white">{task.createdBy?.fullName || 'Usuario'}</span>
               </div>
             </div>
             <div>
@@ -327,7 +327,7 @@ export default function TaskDetailPage() {
               <div className="space-y-2">
                 {task.activityLog.slice(0, 8).map((log) => (
                   <div key={log.id} className="text-xs text-zinc-400">
-                    <span className="text-zinc-300">{log.user.fullName}</span>{' '}
+                    <span className="text-zinc-300">{log.user?.fullName || 'Usuario'}</span>{' '}
                     {log.description || log.actionType}{' '}
                     <span className="text-zinc-600">· {timeAgo(log.createdAt)}</span>
                   </div>

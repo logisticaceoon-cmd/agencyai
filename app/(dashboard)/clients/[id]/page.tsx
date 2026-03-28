@@ -371,7 +371,7 @@ export default function ClientDetailPage() {
                     <div>
                       <p className="text-xs text-slate-500">Account Manager</p>
                       <p className="text-sm text-slate-900">
-                        {client.accountManager.fullName}
+                        {client.accountManager?.fullName || 'Sin asignar'}
                       </p>
                     </div>
                   </div>
@@ -401,7 +401,7 @@ export default function ClientDetailPage() {
                           {task.title}
                         </p>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          por {task.createdBy.fullName}
+                          por {task.createdBy?.fullName || 'Usuario'}
                           {task.deadline && ` - Vence: ${formatDate(task.deadline)}`}
                         </p>
                       </div>
@@ -474,7 +474,7 @@ export default function ClientDetailPage() {
                         {report.title}
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        por {report.submittedBy.fullName} -{' '}
+                        por {report.submittedBy?.fullName || 'Usuario'} -{' '}
                         {formatDate(report.createdAt)}
                       </p>
                     </div>

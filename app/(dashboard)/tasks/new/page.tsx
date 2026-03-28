@@ -228,7 +228,7 @@ export default function NewTaskPage() {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">{u.fullName}</p>
+                  <p className="text-sm font-medium text-white">{u.fullName || 'Miembro'}</p>
                   {u.department && <p className="text-xs text-zinc-500">{u.department}</p>}
                 </div>
               </button>

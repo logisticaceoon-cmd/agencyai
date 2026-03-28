@@ -97,7 +97,7 @@ export default function DocsPage() {
                 </div>
               )}
               <div className="flex items-center justify-between text-xs text-zinc-600">
-                <span>{doc.author.fullName}</span>
+                <span>{doc.author?.fullName || 'Usuario'}</span>
                 <span>{formatDate(doc.updatedAt)}</span>
               </div>
             </Link>
