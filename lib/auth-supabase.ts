@@ -1,9 +1,8 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export interface AuthContext {
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createAdminClient>
   userId: string
   email: string
   fullName: string
@@ -13,61 +12,33 @@ export interface AuthContext {
 
 /**
  * Get authenticated user + workspace context.
- * Uses the anon client for auth (respects cookies/session),
- * and a service role query for workspace lookup (bypasses RLS).
+ * Uses anon client for auth (reads cookies/session).
+ * Returns admin client for data queries (bypasses RLS).
  */
 export async function getAuthContext(): Promise<AuthContext | NextResponse> {
-  const cookieStore = await cookies()
+  // Anon client reads cookies to get the user session
+  const anonClient = await createClient()
+  const { data: { user }, error: authError } = await anonClient.auth.getUser()
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {}
-        },
-      },
-    }
-  )
-
-  // Get authenticated user
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
   }
 
-  // Use service role client to bypass RLS for workspace lookup
-  const serviceClient = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() { return [] },
-        setAll() {},
-      },
-    }
-  )
+  // Admin client for all data queries (bypasses RLS)
+  const adminClient = createAdminClient()
 
   // Check workspace_members first
-  const { data: member } = await serviceClient
+  const { data: member } = await adminClient
     .from('workspace_members')
     .select('workspace_id, role, name')
     .eq('user_id', user.id)
     .eq('status', 'active')
     .limit(1)
-    .single()
+    .maybeSingle()
 
   if (member) {
     return {
-      supabase,
+      supabase: adminClient,
       userId: user.id,
       email: user.email || '',
       fullName: member.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',
@@ -77,16 +48,16 @@ export async function getAuthContext(): Promise<AuthContext | NextResponse> {
   }
 
   // Check if user owns a workspace
-  const { data: ownedWorkspace } = await serviceClient
+  const { data: ownedWorkspace } = await adminClient
     .from('workspaces')
     .select('id')
     .eq('owner_id', user.id)
     .limit(1)
-    .single()
+    .maybeSingle()
 
   if (ownedWorkspace) {
     return {
-      supabase,
+      supabase: adminClient,
       userId: user.id,
       email: user.email || '',
       fullName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',

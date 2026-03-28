@@ -1,110 +1,90 @@
 import { NextResponse } from 'next/server'
-import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export async function GET() {
   try {
-    const auth = await getAuthContext()
+    const supabase = await createClient()
+    const { data: { user }, error } = await supabase.auth.getUser()
 
-    // If auth failed with 403 (no workspace), return basic user info
-    if (isAuthError(auth)) {
-      // Try to get just the user without workspace
-      const { createServerClient } = await import('@supabase/ssr')
-      const { cookies } = await import('next/headers')
-      const cookieStore = await cookies()
-
-      const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          cookies: {
-            getAll() { return cookieStore.getAll() },
-            setAll(cookiesToSet) {
-              try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch {}
-            },
-          },
-        }
-      )
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-      }
-
-      return NextResponse.json({
-        user: {
-          id: user.id,
-          email: user.email,
-          fullName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',
-          avatarUrl: user.user_metadata?.avatar_url || null,
-          role: 'member',
-        },
-        org: null,
-      })
+    if (error || !user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     }
 
-    const { userId, email, fullName, workspaceId, role, supabase } = auth
+    const admin = createAdminClient()
 
-    // Get workspace info using service role
-    const serviceClient = (await import('@supabase/ssr')).createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          getAll() { return [] },
-          setAll() {},
-        },
-      }
-    )
+    // Find workspace - check owner first, then members
+    let workspaceId: string | null = null
+    let role = 'member'
+    let fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario'
 
-    const { data: workspace } = await serviceClient
+    const { data: ownedWs } = await admin
       .from('workspaces')
-      .select('id, name, slug, plan, currency, agency_type')
-      .eq('id', workspaceId)
-      .single()
+      .select('id')
+      .eq('owner_id', user.id)
+      .maybeSingle()
 
-    // Get member count
-    const { count: memberCount } = await serviceClient
-      .from('workspace_members')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .eq('status', 'active')
+    if (ownedWs) {
+      workspaceId = ownedWs.id
+      role = 'owner'
+    } else {
+      const { data: member } = await admin
+        .from('workspace_members')
+        .select('workspace_id, role, name')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle()
 
-    // Get client count
-    const { count: clientCount } = await serviceClient
-      .from('clients')
-      .select('id', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .is('deleted_at', null)
+      if (member) {
+        workspaceId = member.workspace_id
+        role = member.role || 'member'
+        fullName = member.name || fullName
+      }
+    }
+
+    let org = null
+    if (workspaceId) {
+      const { data: workspace } = await admin
+        .from('workspaces')
+        .select('id, name, slug, plan, currency, agency_type')
+        .eq('id', workspaceId)
+        .single()
+
+      if (workspace) {
+        org = {
+          id: workspace.id,
+          name: workspace.name,
+          slug: workspace.slug,
+          plan: workspace.plan || 'free',
+          maxUsers: 100,
+          maxClients: 100,
+        }
+      }
+    }
 
     return NextResponse.json({
       user: {
-        id: userId,
-        email,
+        id: user.id,
+        email: user.email,
         fullName,
-        avatarUrl: null,
+        avatarUrl: user.user_metadata?.avatar_url || null,
         role,
       },
-      org: workspace ? {
-        id: workspace.id,
-        name: workspace.name,
-        slug: workspace.slug,
-        plan: workspace.plan || 'free',
-        maxUsers: 100,
-        maxClients: 100,
-        memberCount: memberCount || 0,
-        clientCount: clientCount || 0,
-      } : null,
+      org,
     })
-  } catch (error) {
-    console.error('Error in GET /api/auth/me:', error)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  } catch (err) {
+    console.error('Error in GET /api/auth/me:', err)
+    return NextResponse.json({
+      error: 'Error interno',
+      details: err instanceof Error ? err.message : String(err),
+    }, { status: 500 })
   }
 }
 
 export async function PATCH() {
   try {
-    const auth = await getAuthContext()
-    if (isAuthError(auth)) return auth
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })

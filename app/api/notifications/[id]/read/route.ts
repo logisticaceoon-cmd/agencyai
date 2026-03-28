@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export async function PATCH(
   request: Request,
@@ -8,20 +7,18 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-
-    await prisma.notification.updateMany({
-      where: { id, userId: dbUser.id },
-      data: { isRead: true, readAt: new Date() },
-    })
+    const admin = createAdminClient()
+    await admin
+      .from('notifications')
+      .update({ isRead: true, readAt: new Date().toISOString() })
+      .eq('id', id)
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
