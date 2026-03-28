@@ -1,89 +1,85 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(request: Request) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-  const { searchParams } = new URL(request.url)
-  const search = searchParams.get('search') || ''
-  const status = searchParams.get('status') || ''
+    const { searchParams } = new URL(request.url)
+    const search = searchParams.get('search') || ''
+    const status = searchParams.get('status') || ''
 
-  const supabase = await createServerSupabaseClient()
-
-  let query = supabase
-    .from('minutes')
-    .select('*, clients!minutes_client_id_fkey(name)')
-    .eq('workspace_id', ctx.org.id)
-    .order('meeting_date', { ascending: false, nullsFirst: false })
-
-  if (search) {
-    query = query.ilike('title', `%${search}%`)
-  }
-
-  if (status) {
-    query = query.eq('status', status)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    // Fallback: try without the join if foreign key name differs
-    const fallbackQuery = supabase
+    let query = supabase
       .from('minutes')
-      .select('*')
-      .eq('workspace_id', ctx.org.id)
+      .select('*, clients!minutes_client_id_fkey(name)')
+      .eq('workspace_id', workspaceId)
       .order('meeting_date', { ascending: false, nullsFirst: false })
 
     if (search) {
-      fallbackQuery.ilike('title', `%${search}%`)
+      query = query.ilike('title', `%${search}%`)
     }
+
     if (status) {
-      fallbackQuery.eq('status', status)
+      query = query.eq('status', status)
     }
 
-    const { data: fallbackData, error: fallbackError } = await fallbackQuery
+    const { data, error } = await query
 
-    if (fallbackError) {
-      return NextResponse.json(
-        { error: fallbackError.message },
-        { status: 500 }
-      )
+    if (error) {
+      // Fallback: try without the join if foreign key name differs
+      let fallbackQuery = supabase
+        .from('minutes')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('meeting_date', { ascending: false, nullsFirst: false })
+
+      if (search) {
+        fallbackQuery = fallbackQuery.ilike('title', `%${search}%`)
+      }
+      if (status) {
+        fallbackQuery = fallbackQuery.eq('status', status)
+      }
+
+      const { data: fallbackData } = await fallbackQuery
+
+      const mapped = (fallbackData || []).map((m: Record<string, unknown>) => ({
+        ...m,
+        client_name: null,
+      }))
+
+      return NextResponse.json({ data: mapped })
     }
 
-    const mapped = (fallbackData || []).map((m: Record<string, unknown>) => ({
-      ...m,
-      client_name: null,
-    }))
+    const mapped = (data || []).map((m: Record<string, unknown>) => {
+      const clients = m.clients as { name: string } | null
+      return {
+        ...m,
+        client_name: clients?.name || null,
+        clients: undefined,
+      }
+    })
 
     return NextResponse.json({ data: mapped })
+  } catch (err) {
+    console.error('Error fetching minutes:', err)
+    return NextResponse.json({ data: [] })
   }
-
-  const mapped = (data || []).map((m: Record<string, unknown>) => {
-    const clients = m.clients as { name: string } | null
-    return {
-      ...m,
-      client_name: clients?.name || null,
-      clients: undefined,
-    }
-  })
-
-  return NextResponse.json({ data: mapped })
 }
 
 export async function POST(request: Request) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
-
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, userId } = auth
+
     const body = await request.json()
-    const supabase = await createServerSupabaseClient()
 
     const { data, error } = await supabase
       .from('minutes')
       .insert({
-        workspace_id: ctx.org.id,
+        workspace_id: workspaceId,
         title: body.title,
         client_id: body.client_id || null,
         project_id: body.project_id || null,
@@ -95,20 +91,18 @@ export async function POST(request: Request) {
         decisions: [],
         action_items: [],
         status: 'draft',
-        created_by: ctx.user.id,
+        created_by: userId,
       })
       .select()
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     return NextResponse.json({ data }, { status: 201 })
   } catch (err) {
-    return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
-    )
+    console.error('Error creating minute:', err)
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 }

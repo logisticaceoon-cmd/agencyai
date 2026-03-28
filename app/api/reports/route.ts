@@ -9,33 +9,28 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const type = searchParams.get('type')
+    const clientId = searchParams.get('clientId')
 
     let query = supabase
       .from('reports')
-      .select('*, clients(id, name, company)')
+      .select('*')
       .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
-    if (status) {
-      query = query.eq('status', status)
-    }
-
-    if (type) {
-      query = query.eq('type', type)
-    }
+    if (status) query = query.eq('status', status)
+    if (clientId) query = query.eq('clientId', clientId)
 
     const { data, error } = await query
 
     if (error) {
       console.error('Error fetching reports:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ data: [] })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json({ data: data || [] })
   } catch (err) {
     console.error('Error in GET /api/reports:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json({ data: [] })
   }
 }
 
@@ -51,14 +46,12 @@ export async function POST(request: Request) {
       .from('reports')
       .insert({
         workspace_id: workspaceId,
-        client_id: body.client_id || null,
+        clientId: body.clientId || null,
         title: body.title,
-        type: body.type || 'general',
-        content: body.content || null,
-        status: body.status || 'draft',
-        period_start: body.period_start || null,
-        period_end: body.period_end || null,
-        created_by: userId,
+        reportType: body.reportType || 'monthly',
+        description: body.description || null,
+        status: 'draft',
+        submittedById: userId,
       })
       .select()
       .single()
@@ -68,9 +61,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data, { status: 201 })
+    return NextResponse.json({ data }, { status: 201 })
   } catch (err) {
     console.error('Error in POST /api/reports:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

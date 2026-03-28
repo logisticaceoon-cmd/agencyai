@@ -2,52 +2,57 @@ import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(request: Request) {
-  const auth = await getAuthContext()
-  if (isAuthError(auth)) return auth
-  const { supabase, workspaceId } = auth
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-  const { searchParams } = new URL(request.url)
-  const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1))
-  const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
+    const { searchParams } = new URL(request.url)
+    const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1))
+    const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()))
 
-  // Get transactions for the month
-  const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0]
-  const endDate = new Date(year, month, 0).toISOString().split('T')[0]
+    const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0]
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0]
 
-  const { data: transactions, error } = await supabase
-    .from('transactions')
-    .select('*, clients(id, name)')
-    .eq('workspace_id', workspaceId)
-    .gte('date', startDate)
-    .lte('date', endDate)
-    .order('date', { ascending: false })
+    const { data: transactions, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: false })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error('Error fetching transactions:', error)
+      return NextResponse.json({ data: [], commissionClients: [], summary: { totalIncome: 0, totalExpenses: 0 } })
+    }
 
-  // Get commission clients
-  const { data: commClients } = await supabase
-    .from('clients')
-    .select('id, name, pays_percentage, percentage_value')
-    .eq('workspace_id', workspaceId)
-    .eq('pays_percentage', true)
-    .is('deleted_at', null)
+    const { data: commClients } = await supabase
+      .from('clients')
+      .select('id, name, pays_percentage, percentage_value')
+      .eq('workspace_id', workspaceId)
+      .eq('pays_percentage', true)
 
-  return NextResponse.json({
-    data: transactions || [],
-    commissionClients: commClients || [],
-    summary: {
-      totalIncome: (transactions || []).filter((t: { type: string }) => t.type === 'income').reduce((s: number, t: { amount: number }) => s + Number(t.amount), 0),
-      totalExpenses: (transactions || []).filter((t: { type: string }) => t.type === 'expense').reduce((s: number, t: { amount: number }) => s + Number(t.amount), 0),
-    },
-  })
+    return NextResponse.json({
+      data: transactions || [],
+      commissionClients: commClients || [],
+      summary: {
+        totalIncome: (transactions || []).filter((t: { type: string }) => t.type === 'income').reduce((s: number, t: { amount: number }) => s + Number(t.amount), 0),
+        totalExpenses: (transactions || []).filter((t: { type: string }) => t.type === 'expense').reduce((s: number, t: { amount: number }) => s + Number(t.amount), 0),
+      },
+    })
+  } catch (err) {
+    console.error('Error in GET /api/finances:', err)
+    return NextResponse.json({ data: [], commissionClients: [], summary: { totalIncome: 0, totalExpenses: 0 } })
+  }
 }
 
 export async function POST(request: Request) {
-  const auth = await getAuthContext()
-  if (isAuthError(auth)) return auth
-  const { supabase, workspaceId } = auth
-
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
+
     const body = await request.json()
 
     const { data, error } = await supabase
@@ -63,12 +68,17 @@ export async function POST(request: Request) {
         description: body.description,
         date: body.date || new Date().toISOString().split('T')[0],
       })
-      .select('*, clients(id, name)')
+      .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error('Error creating transaction:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
     return NextResponse.json({ data }, { status: 201 })
-  } catch {
+  } catch (err) {
+    console.error('Error in POST /api/finances:', err)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

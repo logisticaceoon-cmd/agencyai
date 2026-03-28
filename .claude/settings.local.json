@@ -58,7 +58,14 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://agencyai-iota.vercel.app/api/dashboard/stats)",
       "Bash(curl -s https://agencyai-iota.vercel.app/api/dashboard/stats)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://agencyai-iota.vercel.app/api/clients)",
-      "Bash(curl -s https://agencyai-iota.vercel.app/api/clients)"
+      "Bash(curl -s https://agencyai-iota.vercel.app/api/clients)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\" https://agencyai-iota.vercel.app/api/auth/me)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\" https://agencyai-iota.vercel.app/api/clients)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\" https://agencyai-iota.vercel.app/api/notifications)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\" https://agencyai-iota.vercel.app/api/dashboard/stats)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/Rafael B/agencyai/**)"
     ]
   }
 }

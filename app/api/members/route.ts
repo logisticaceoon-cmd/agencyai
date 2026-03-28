@@ -5,9 +5,15 @@ export async function GET() {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    return NextResponse.json({ data: [] })
-  } catch (err) {
-    console.error('Error fetching alerts:', err)
+    const { supabase, workspaceId } = auth
+
+    const { data } = await supabase
+      .from('workspace_members')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+
+    return NextResponse.json({ data: data || [] })
+  } catch {
     return NextResponse.json({ data: [] })
   }
 }
