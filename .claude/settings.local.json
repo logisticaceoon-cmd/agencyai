@@ -49,7 +49,9 @@
       "Bash(node scripts/apply-rls-policies.mjs)",
       "Bash(node scripts/migrate-orgs-to-workspaces.mjs)",
       "Bash(node -e \":*)",
-      "Bash(node scripts/fix-rls-cycle.mjs)"
+      "Bash(node scripts/fix-rls-cycle.mjs)",
+      "Bash(node scripts/diagnose.mjs)",
+      "Bash(node scripts/fix-all-rls.mjs)"
     ]
   }
 }

@@ -153,10 +153,12 @@ export default function OnboardingPage() {
     setLoading(true)
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-      if (!user) {
-        console.error('No authenticated user found')
+      if (!user || userError) {
+        console.error('No authenticated user found:', userError)
+        alert('Error: No hay sesion activa. Por favor inicia sesion nuevamente.')
+        router.push('/sign-in')
         setLoading(false)
         return
       }
@@ -166,25 +168,28 @@ export default function OnboardingPage() {
         .from('workspaces')
         .select('id')
         .eq('owner_id', user.id)
-        .limit(1)
-        .single()
+        .maybeSingle()
 
       if (existing) {
         localStorage.setItem('agencyai_workspace_id', existing.id)
       } else {
         // Create workspace
+        const slug = (data.workspaceName || user.email?.split('@')[0] || 'agency')
+          .toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').substring(0, 50) + '-' + Date.now()
+
         const { data: workspace, error } = await supabase.from('workspaces').insert({
-          name: data.workspaceName,
-          slug: data.workspaceName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-          currency: data.currency,
-          timezone: data.timezone,
-          agency_type: data.agencyType,
+          name: data.workspaceName || user.email?.split('@')[0] + ' Agency',
+          slug,
+          currency: data.currency || 'USD',
+          timezone: data.timezone || 'America/Argentina/Buenos_Aires',
+          agency_type: data.agencyType || 'marketing',
           plan: 'free',
           owner_id: user.id,
         }).select().single()
 
         if (error) {
-          console.error('Error creating workspace:', error)
+          console.error('Error creating workspace:', JSON.stringify(error))
+          alert('Error al crear workspace: ' + error.message)
           setLoading(false)
           return
         }
