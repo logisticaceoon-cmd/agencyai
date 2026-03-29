@@ -35,6 +35,12 @@ export default function ObjectivesPage() {
   const [year, setYear] = useState(new Date().getFullYear())
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [formTitle, setFormTitle] = useState('')
+  const [formDesc, setFormDesc] = useState('')
+  const [formType, setFormType] = useState('agency')
+  const [formClientId, setFormClientId] = useState('')
+  const [pendingKRs, setPendingKRs] = useState<{title: string; target_value: string; unit: string}[]>([])
   const [showKRForm, setShowKRForm] = useState<string | null>(null)
   const [showUpdateKR, setShowUpdateKR] = useState<string | null>(null)
   const [krValue, setKRValue] = useState('')
@@ -56,17 +62,29 @@ export default function ObjectivesPage() {
   async function handleCreateObj(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setSaving(true)
-    const fd = new FormData(e.currentTarget)
-    await fetch('/api/objectives', {
+    const res = await fetch('/api/objectives', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        title: fd.get('title'), description: fd.get('description'),
-        type: fd.get('type'), client_id: fd.get('client_id') || undefined,
+        title: formTitle, description: formDesc,
+        type: formType, client_id: formClientId || undefined,
         quarter, year,
       }),
     })
-    setSaving(false); setShowForm(false); fetchData()
+    if (res.ok && pendingKRs.length > 0) {
+      const obj = await res.json()
+      const objId = obj.data?.id
+      if (objId) {
+        for (const kr of pendingKRs) {
+          await fetch(`/api/objectives/${objId}/key-results`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: kr.title, target_value: parseFloat(kr.target_value) || 0, unit: kr.unit, metric_type: 'number' }),
+          })
+        }
+      }
+    }
+    setSaving(false); setShowForm(false); setShowTemplates(false); fetchData()
   }
 
   async function handleCreateKR(e: React.FormEvent<HTMLFormElement>, objId: string) {
@@ -133,26 +151,68 @@ export default function ObjectivesPage() {
           <select value={year} onChange={e => setYear(parseInt(e.target.value))} className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
             {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
-          <button onClick={() => setShowForm(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700">
+          <button onClick={() => setShowTemplates(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700">
             <Plus className="h-4 w-4" /> Nuevo objetivo
           </button>
         </div>
       </div>
 
+      {showTemplates && !showForm && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-900">Objetivos sugeridos</h3>
+            <button onClick={() => setShowTemplates(false)}><X className="h-4 w-4 text-slate-400" /></button>
+          </div>
+          <p className="text-sm text-slate-500">Elegi un template o crea un objetivo personalizado</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            {[
+              { icon: '🚀', title: 'Crecer la comunidad', krs: [{title:'Alcanzar X seguidores',target_value:'1000',unit:'seguidores'},{title:'Publicar X veces/semana',target_value:'5',unit:'posts'},{title:'Lograr X% engagement',target_value:'5',unit:'%'}] },
+              { icon: '📈', title: 'Aumentar ventas con contenido', krs: [{title:'Generar X leads',target_value:'100',unit:'leads'},{title:'Lograr X conversiones',target_value:'50',unit:'ventas'},{title:'Alcanzar X ROAS',target_value:'3',unit:'x'}] },
+              { icon: '🎯', title: 'Posicionar la marca', krs: [{title:'Lograr X menciones',target_value:'20',unit:'menciones'},{title:'X colaboraciones',target_value:'5',unit:'collabs'},{title:'X apariciones en medios',target_value:'3',unit:'medios'}] },
+              { icon: '⚡', title: 'Optimizar la produccion', krs: [{title:'Reducir tiempo de produccion a X dias',target_value:'3',unit:'dias'},{title:'Crear X piezas/mes',target_value:'20',unit:'piezas'},{title:'Aprobar en primera revision X%',target_value:'80',unit:'%'}] },
+            ].map((t, i) => (
+              <button key={i} onClick={() => { setFormTitle(t.title); setFormDesc(''); setPendingKRs(t.krs); setShowForm(true) }} className="text-left p-4 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition-all">
+                <span className="text-2xl">{t.icon}</span>
+                <p className="text-sm font-semibold text-slate-900 mt-2">{t.title}</p>
+                <p className="text-xs text-slate-400 mt-1">{t.krs.length} key results</p>
+              </button>
+            ))}
+            <button onClick={() => { setFormTitle(''); setFormDesc(''); setPendingKRs([]); setShowForm(true) }} className="text-left p-4 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 transition-colors">
+              <span className="text-2xl">✏️</span>
+              <p className="text-sm font-semibold text-slate-900 mt-2">Personalizado</p>
+              <p className="text-xs text-slate-400 mt-1">Sin KRs pre-cargados</p>
+            </button>
+          </div>
+        </div>
+      )}
+
       {showForm && (
         <form onSubmit={handleCreateObj} className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-900">Nuevo objetivo — {quarter} {year}</h3>
-            <button type="button" onClick={() => setShowForm(false)}><X className="h-4 w-4 text-slate-400" /></button>
+            <button type="button" onClick={() => { setShowForm(false); setShowTemplates(false) }}><X className="h-4 w-4 text-slate-400" /></button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><label className="text-xs text-slate-500 mb-1 block font-medium">Titulo *</label><input name="title" required className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" /></div>
+            <div><label className="text-xs text-slate-500 mb-1 block font-medium">Titulo *</label><input value={formTitle} onChange={e => setFormTitle(e.target.value)} required className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-xs text-slate-500 mb-1 block font-medium">Tipo</label><select name="type" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="agency">Agencia</option><option value="client">Cliente</option></select></div>
-              <div><label className="text-xs text-slate-500 mb-1 block font-medium">Cliente</label><select name="client_id" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="">Sin cliente</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              <div><label className="text-xs text-slate-500 mb-1 block font-medium">Tipo</label><select value={formType} onChange={e => setFormType(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="agency">Agencia</option><option value="client">Cliente</option></select></div>
+              <div><label className="text-xs text-slate-500 mb-1 block font-medium">Cliente</label><select value={formClientId} onChange={e => setFormClientId(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="">Sin cliente</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
             </div>
           </div>
-          <div><label className="text-xs text-slate-500 mb-1 block font-medium">Descripcion</label><textarea name="description" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm h-20 resize-none" /></div>
+          <div><label className="text-xs text-slate-500 mb-1 block font-medium">Descripcion</label><textarea value={formDesc} onChange={e => setFormDesc(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm h-20 resize-none" /></div>
+          {pendingKRs.length > 0 && (
+            <div className="space-y-2 border-t border-slate-100 pt-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase">Key Results pre-cargados (editables)</p>
+              {pendingKRs.map((kr, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input value={kr.title} onChange={e => { const n = [...pendingKRs]; n[i].title = e.target.value; setPendingKRs(n) }} className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm" />
+                  <input type="number" value={kr.target_value} onChange={e => { const n = [...pendingKRs]; n[i].target_value = e.target.value; setPendingKRs(n) }} className="w-20 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-center" />
+                  <span className="text-xs text-slate-400 w-16">{kr.unit}</span>
+                  <button type="button" onClick={() => setPendingKRs(pendingKRs.filter((_, j) => j !== i))}><X className="h-3.5 w-3.5 text-slate-400" /></button>
+                </div>
+              ))}
+            </div>
+          )}
           <button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50">Crear objetivo</button>
         </form>
       )}

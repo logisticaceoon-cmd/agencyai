@@ -14,10 +14,9 @@ export async function GET(
     // Fetch project with client info
     const { data: project, error } = await supabase
       .from('projects')
-      .select('*, clients(id, name, company, email, logo_url)')
+      .select('*')
       .eq('id', id)
       .eq('workspace_id', workspaceId)
-      .is('deleted_at', null)
       .single()
 
     if (error || !project) {
@@ -28,10 +27,9 @@ export async function GET(
     const { data: tasks } = await supabase
       .from('tasks')
       .select('*')
-      .eq('project_id', id)
+      .eq('projectId', id)
       .eq('workspace_id', workspaceId)
-      .is('deleted_at', null)
-      .order('position', { ascending: true })
+      .order('createdAt', { ascending: true })
 
     // Fetch milestones
     const { data: milestones } = await supabase

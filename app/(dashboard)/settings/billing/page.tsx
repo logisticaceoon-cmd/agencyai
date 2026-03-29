@@ -11,7 +11,11 @@ const PLAN_PRICES: Record<string, number> = { free: 0, starter: 12, pro: 29, age
 export default function BillingPage() {
   const { workspace } = useWorkspace()
   const [loading, setLoading] = useState(false)
-  const isMock = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mock') === 'true'
+  const [isMock, setIsMock] = useState(false)
+
+  useEffect(() => {
+    setIsMock(new URLSearchParams(window.location.search).get('mock') === 'true')
+  }, [])
 
   const plan = workspace?.plan || 'free'
   const expiresAt = workspace?.plan_expires_at ? new Date(workspace.plan_expires_at).toLocaleDateString('es-ES') : null

@@ -1,42 +1,88 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const { data: report, error } = await supabase
+      .from('reports')
+      .select('*')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .single()
 
-    const report = await prisma.report.findUnique({
-      where: { id },
-      include: {
-        submittedBy: true,
-        client: true,
-        task: { select: { id: true, title: true } },
-        validatedBy: { select: { id: true, fullName: true } },
-        comments: {
-          include: { author: { select: { id: true, fullName: true, avatarUrl: true } } },
-          orderBy: { createdAt: 'asc' },
-        },
-      },
-    })
-
-    if (!report) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-    if (dbUser.role === 'Team' && report.submittedById !== dbUser.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (error || !report) {
+      return NextResponse.json({ error: 'Reporte no encontrado' }, { status: 404 })
     }
 
     return NextResponse.json({ data: report })
-  } catch (error) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    console.error('Error in GET /api/reports/[id]:', err)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
+    const { id } = await params
+
+    const body = await request.json()
+
+    const { data, error } = await supabase
+      .from('reports')
+      .update(body)
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
+
+    if (error || !data) {
+      return NextResponse.json({ error: 'Reporte no encontrado' }, { status: 404 })
+    }
+
+    return NextResponse.json({ data })
+  } catch (err) {
+    console.error('Error in PUT /api/reports/[id]:', err)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
+    const { id } = await params
+
+    const { error } = await supabase
+      .from('reports')
+      .delete()
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('Error in DELETE /api/reports/[id]:', err)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

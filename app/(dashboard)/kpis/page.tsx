@@ -28,10 +28,31 @@ export default function KPIsPage() {
   const [loading, setLoading] = useState(true)
   const [filterClient, setFilterClient] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [wizardStep, setWizardStep] = useState(1)
+  const [wizardData, setWizardData] = useState({ name: '', description: '', unit: 'numero', target_value: '', color: '#2563eb', client_id: '', current_value: '', frequency: 'monthly' })
   const [showRecordForm, setShowRecordForm] = useState<string | null>(null)
   const [recordValue, setRecordValue] = useState('')
   const [recordNotes, setRecordNotes] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const KPI_TEMPLATES = [
+    { icon: '📱', name: 'Alcance total', description: 'Personas unicas que vieron tu contenido', unit: 'personas', target: '10000' },
+    { icon: '❤️', name: 'Tasa de engagement', description: 'Likes + comentarios + compartidos / alcance x 100', unit: 'porcentaje', target: '5' },
+    { icon: '👥', name: 'Nuevos seguidores', description: 'Crecimiento de la comunidad por periodo', unit: 'numero', target: '500' },
+    { icon: '🎥', name: 'Reproducciones de video', description: 'Total de views en Reels, TikTok o YouTube', unit: 'numero', target: '50000' },
+    { icon: '💰', name: 'Conversiones / Ventas', description: 'Ventas o leads generados desde contenido', unit: 'numero', target: '50' },
+  ]
+
+  function selectTemplate(t: typeof KPI_TEMPLATES[0] | null) {
+    if (t) {
+      setWizardData(prev => ({ ...prev, name: t.name, description: t.description, unit: t.unit, target_value: t.target }))
+    } else {
+      setWizardData(prev => ({ ...prev, name: '', description: '', unit: 'numero', target_value: '' }))
+    }
+    setWizardStep(2)
+  }
+
+  function openWizard() { setShowForm(true); setWizardStep(1) }
 
   const fetchKpis = useCallback(async () => {
     setLoading(true)
@@ -46,22 +67,23 @@ export default function KPIsPage() {
 
   useEffect(() => { fetchKpis() }, [fetchKpis])
 
-  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
+  async function handleCreate() {
     setSaving(true)
-    const fd = new FormData(e.currentTarget)
     await fetch('/api/kpis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: fd.get('name'), description: fd.get('description'),
-        client_id: fd.get('client_id') || undefined, unit: fd.get('unit'),
-        target_value: parseFloat(fd.get('target_value') as string),
-        frequency: fd.get('frequency'), category: fd.get('category'),
-        color: fd.get('color'),
+        name: wizardData.name, description: wizardData.description,
+        client_id: wizardData.client_id || undefined, unit: wizardData.unit,
+        target_value: parseFloat(wizardData.target_value) || 0,
+        current_value: parseFloat(wizardData.current_value) || 0,
+        frequency: wizardData.frequency, category: 'performance',
+        color: wizardData.color,
       }),
     })
-    setSaving(false); setShowForm(false); fetchKpis()
+    setSaving(false); setShowForm(false)
+    setWizardData({ name: '', description: '', unit: 'numero', target_value: '', color: '#2563eb', client_id: '', current_value: '', frequency: 'monthly' })
+    fetchKpis()
   }
 
   async function handleRecord(kpiId: string) {
@@ -105,34 +127,89 @@ export default function KPIsPage() {
             <option value="">Todos los clientes</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <button onClick={() => setShowForm(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700">
+          <button onClick={openWizard} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700">
             <Plus className="h-4 w-4" /> Nuevo KPI
           </button>
         </div>
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-900">Nuevo KPI</h3>
+        <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold text-slate-900">Nuevo KPI — Paso {wizardStep} de 3</h3>
+              <div className="flex gap-1">{[1,2,3].map(s => <div key={s} className={cn('h-1.5 w-8 rounded-full', s <= wizardStep ? 'bg-blue-600' : 'bg-slate-200')} />)}</div>
+            </div>
             <button type="button" onClick={() => setShowForm(false)}><X className="h-4 w-4 text-slate-400" /></button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div><label className="text-xs text-slate-500 mb-1 block font-medium">Nombre *</label><input name="name" required className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" placeholder="ROAS, CPA..." /></div>
-            <div><label className="text-xs text-slate-500 mb-1 block font-medium">Cliente</label><select name="client_id" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="">Sin cliente</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-            <div><label className="text-xs text-slate-500 mb-1 block font-medium">Unidad</label><select name="unit" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="numero">Numero</option><option value="porcentaje">Porcentaje</option><option value="moneda">Moneda</option><option value="tiempo">Tiempo</option></select></div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div><label className="text-xs text-slate-500 mb-1 block font-medium">Valor objetivo *</label><input name="target_value" type="number" step="0.01" required className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" /></div>
-            <div><label className="text-xs text-slate-500 mb-1 block font-medium">Frecuencia</label><select name="frequency" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="daily">Diaria</option><option value="weekly">Semanal</option><option value="monthly">Mensual</option></select></div>
-            <div><label className="text-xs text-slate-500 mb-1 block font-medium">Categoria</label><select name="category" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm">{CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
-            <div><label className="text-xs text-slate-500 mb-1 block font-medium">Color</label><input name="color" type="color" defaultValue="#2563eb" className="w-full h-10 rounded-lg border border-slate-200 cursor-pointer" /></div>
-          </div>
-          <div><label className="text-xs text-slate-500 mb-1 block font-medium">Descripcion</label><input name="description" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" placeholder="Que mide este KPI..." /></div>
-          <button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin inline mr-2" /> : null} Crear KPI
-          </button>
-        </form>
+
+          {wizardStep === 1 && (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-500">Elegi un tipo de KPI o crea uno personalizado</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {KPI_TEMPLATES.map((t, i) => (
+                  <button key={i} onClick={() => selectTemplate(t)} className="text-left p-4 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
+                    <span className="text-2xl">{t.icon}</span>
+                    <p className="text-sm font-semibold text-slate-900 mt-2">{t.name}</p>
+                    <p className="text-xs text-slate-400 mt-1 line-clamp-2">{t.description}</p>
+                    <p className="text-xs text-blue-600 mt-1 font-medium">Meta: {t.target}/{t.unit === 'porcentaje' ? '%' : 'mes'}</p>
+                  </button>
+                ))}
+                <button onClick={() => selectTemplate(null)} className="text-left p-4 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 transition-colors">
+                  <span className="text-2xl">✏️</span>
+                  <p className="text-sm font-semibold text-slate-900 mt-2">KPI Personalizado</p>
+                  <p className="text-xs text-slate-400 mt-1">Defini tu propio indicador</p>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {wizardStep === 2 && (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-500">Configura los detalles del KPI</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div><label className="text-xs text-slate-500 mb-1 block font-medium">Nombre *</label><input value={wizardData.name} onChange={e => setWizardData(p => ({...p, name: e.target.value}))} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" /></div>
+                <div><label className="text-xs text-slate-500 mb-1 block font-medium">Cliente</label><select value={wizardData.client_id} onChange={e => setWizardData(p => ({...p, client_id: e.target.value}))} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="">Sin cliente</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+              </div>
+              <div><label className="text-xs text-slate-500 mb-1 block font-medium">Descripcion</label><input value={wizardData.description} onChange={e => setWizardData(p => ({...p, description: e.target.value}))} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" /></div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div><label className="text-xs text-slate-500 mb-1 block font-medium">Valor objetivo *</label><input type="number" step="0.01" value={wizardData.target_value} onChange={e => setWizardData(p => ({...p, target_value: e.target.value}))} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" /></div>
+                <div><label className="text-xs text-slate-500 mb-1 block font-medium">Unidad</label><select value={wizardData.unit} onChange={e => setWizardData(p => ({...p, unit: e.target.value}))} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="numero">Numero</option><option value="porcentaje">Porcentaje</option><option value="personas">Personas</option><option value="moneda">Moneda</option></select></div>
+                <div><label className="text-xs text-slate-500 mb-1 block font-medium">Valor actual</label><input type="number" step="0.01" value={wizardData.current_value} onChange={e => setWizardData(p => ({...p, current_value: e.target.value}))} placeholder="0" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" /></div>
+              </div>
+              <div className="flex justify-between pt-2">
+                <button onClick={() => setWizardStep(1)} className="text-sm text-slate-500 hover:text-slate-700">Atras</button>
+                <button onClick={() => setWizardStep(3)} disabled={!wizardData.name || !wizardData.target_value} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">Siguiente</button>
+              </div>
+            </div>
+          )}
+
+          {wizardStep === 3 && (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-500">Con que frecuencia revisas este KPI?</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { value: 'daily', icon: '📅', label: 'Diaria', desc: 'Ideal para metricas de alto volumen' },
+                  { value: 'weekly', icon: '📆', label: 'Semanal', desc: 'Perfecto para engagement y seguidores' },
+                  { value: 'biweekly', icon: '🗓️', label: 'Quincenal', desc: 'Para metricas de crecimiento moderado' },
+                  { value: 'monthly', icon: '📊', label: 'Mensual', desc: 'Para resultados de conversion y ventas' },
+                ].map(f => (
+                  <button key={f.value} onClick={() => setWizardData(p => ({...p, frequency: f.value}))} className={cn('text-left p-4 rounded-xl border-2 transition-all', wizardData.frequency === f.value ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300')}>
+                    <span className="text-2xl">{f.icon}</span>
+                    <p className="text-sm font-semibold text-slate-900 mt-2">{f.label}</p>
+                    <p className="text-xs text-slate-400 mt-1">{f.desc}</p>
+                  </button>
+                ))}
+              </div>
+              <div className="flex justify-between pt-2">
+                <button onClick={() => setWizardStep(2)} className="text-sm text-slate-500 hover:text-slate-700">Atras</button>
+                <button onClick={handleCreate} disabled={saving} className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin inline mr-2" /> : null} Crear KPI
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {loading ? (

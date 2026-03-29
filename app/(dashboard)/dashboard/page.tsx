@@ -141,6 +141,13 @@ export default function DashboardPage() {
   const { user } = useCurrentUser()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [greeting, setGreeting] = useState('')
+  const [dateString, setDateString] = useState('')
+
+  useEffect(() => {
+    setGreeting(getGreeting())
+    setDateString(getCurrentDateTimeString())
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -164,11 +171,11 @@ export default function DashboardPage() {
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900">
-          {getGreeting()}
+          {greeting}
           {firstName ? `, ${firstName}` : ''}
         </h1>
         <p className="mt-1 text-sm text-slate-500 capitalize">
-          {getCurrentDateTimeString()}
+          {dateString}
         </p>
       </div>
 

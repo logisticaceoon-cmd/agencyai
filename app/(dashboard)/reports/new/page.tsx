@@ -888,7 +888,7 @@ export default function NewReportPage() {
 
         <div className="mt-12 pt-4 border-t border-gray-300 text-xs text-gray-400 flex justify-between">
           <span>Generado por AgencyAI</span>
-          <span>{new Date().toLocaleDateString('es-AR')}</span>
+          <span>Fecha de generacion</span>
         </div>
       </div>
     </>
