@@ -23,7 +23,7 @@ export async function GET(
       return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json({ data })
   } catch (err) {
     console.error('Error in GET /api/clients/[id]:', err)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })

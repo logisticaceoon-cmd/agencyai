@@ -16,6 +16,7 @@ import {
   Calendar,
   Users,
 } from 'lucide-react'
+import { InfoBanner } from '@/components/shared/InfoBanner'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -240,6 +241,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-6">
+      <InfoBanner id="projects" title="Gestion de Proyectos" description="Administra los proyectos de tu agencia. Crea proyectos, asigna clientes y hace seguimiento del progreso." />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

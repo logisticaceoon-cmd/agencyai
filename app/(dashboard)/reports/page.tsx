@@ -18,6 +18,7 @@ import {
   Calendar,
   User,
 } from 'lucide-react'
+import { InfoBanner } from '@/components/shared/InfoBanner'
 
 interface Report {
   id: string
@@ -131,6 +132,7 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
+      <InfoBanner id="reports" title="Reportes" description="Crea y gestiona reportes para tus clientes. Genera informes mensuales de rendimiento." />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

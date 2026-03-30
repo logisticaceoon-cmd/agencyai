@@ -13,6 +13,7 @@ import {
 import { cn, formatDate } from '@/lib/utils'
 import * as Dialog from '@radix-ui/react-dialog'
 import Link from 'next/link'
+import { InfoBanner } from '@/components/shared/InfoBanner'
 
 interface Minute {
   id: string
@@ -159,6 +160,7 @@ export default function MinutesPage() {
 
   return (
     <div className="space-y-6">
+      <InfoBanner id="minutes" title="Minutas de Reuniones" description="Registra las minutas de tus reuniones con clientes. Cada minuta se vincula a un cliente para llevar historial." />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

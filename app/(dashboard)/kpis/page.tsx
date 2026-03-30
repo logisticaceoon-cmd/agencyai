@@ -5,6 +5,7 @@ import { BarChart2, Plus, X, TrendingUp, TrendingDown, AlertTriangle, Loader2 } 
 import { cn } from '@/lib/utils'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { AgentWidget } from '@/components/ai/AgentWidget'
+import { InfoBanner } from '@/components/shared/InfoBanner'
 
 interface KPIRecord { id: string; value: number; period_start: string; period_end: string; notes: string; recorded_at: string }
 interface KPI {
@@ -117,6 +118,7 @@ export default function KPIsPage() {
 
   return (
     <div className="space-y-6">
+      <InfoBanner id="kpis" title="KPIs y Metricas" description="Define y trackea indicadores clave de rendimiento para cada cliente." />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">KPIs y Metricas</h1>

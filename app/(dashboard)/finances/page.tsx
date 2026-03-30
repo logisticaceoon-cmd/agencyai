@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import * as Tabs from '@radix-ui/react-tabs'
 import { AgentWidget } from '@/components/ai/AgentWidget'
+import { InfoBanner } from '@/components/shared/InfoBanner'
 
 interface Transaction {
   id: string; type: string; category: string | null; description: string
@@ -209,6 +210,7 @@ export default function FinancesPage() {
 
   return (
     <div className="space-y-6">
+      <InfoBanner id="finances" title="Finanzas" description="Controla ingresos, gastos, facturas y comisiones. Analiza la rentabilidad por cliente." />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Finanzas</h1>

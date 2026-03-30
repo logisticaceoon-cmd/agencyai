@@ -28,6 +28,7 @@ import {
   DragOverlay,
   type DragStartEvent,
 } from '@dnd-kit/core'
+import { InfoBanner } from '@/components/shared/InfoBanner'
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -312,6 +313,7 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-6">
+      <InfoBanner id="tasks" title="Tablero de Tareas" description="Organiza las tareas en columnas tipo Kanban. Arrastra tareas entre columnas para cambiar su estado." />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

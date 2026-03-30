@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useForm, Controller } from 'react-hook-form'
@@ -23,6 +23,7 @@ import {
   Loader2,
   Percent,
 } from 'lucide-react'
+import { InfoBanner } from '@/components/shared/InfoBanner'
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -80,6 +81,8 @@ const clientSchema = z.object({
   notes: z.string().optional(),
   pays_percentage: z.boolean(),
   percentage_value: z.number().min(0).max(100).optional().nullable(),
+  contract: z.string().optional(),
+  contractStart: z.string().optional(),
 })
 
 type ClientFormData = z.infer<typeof clientSchema>
@@ -130,6 +133,7 @@ export default function ClientsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleteInput, setDeleteInput] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const canManage = !user ? false : ['CEO', 'Manager', 'owner', 'admin'].includes(user.role)
@@ -149,6 +153,8 @@ export default function ClientsPage() {
       status: 'active',
       pays_percentage: false,
       percentage_value: null,
+      contract: '',
+      contractStart: '',
     },
   })
 
@@ -179,6 +185,24 @@ export default function ClientsPage() {
     loadClients()
   }, [loadClients])
 
+  // -- Group clients by industry ----------------------------------------------
+
+  const groupedClients = useMemo(() => {
+    const groups: Record<string, Client[]> = {}
+    for (const client of clients) {
+      const key = client.industry || 'Sin categoria'
+      if (!groups[key]) groups[key] = []
+      groups[key].push(client)
+    }
+    // Sort: known industries first alphabetically, "Sin categoria" last
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      if (a === 'Sin categoria') return 1
+      if (b === 'Sin categoria') return -1
+      return a.localeCompare(b)
+    })
+    return sortedKeys.map((key) => ({ industry: key, clients: groups[key] }))
+  }, [clients])
+
   // -- Handlers ---------------------------------------------------------------
 
   function openCreateDialog() {
@@ -195,6 +219,8 @@ export default function ClientsPage() {
       notes: '',
       pays_percentage: false,
       percentage_value: null,
+      contract: '',
+      contractStart: '',
     })
     setDialogOpen(true)
   }
@@ -213,6 +239,8 @@ export default function ClientsPage() {
       notes: client.notes || '',
       pays_percentage: client.pays_percentage || false,
       percentage_value: client.percentage_value ?? null,
+      contract: (client as any).contract || '',
+      contractStart: (client as any).contractStart || '',
     })
     setDialogOpen(true)
   }
@@ -221,13 +249,22 @@ export default function ClientsPage() {
     setSubmitting(true)
     try {
       const payload = {
-        ...formData,
+        name: formData.name,
+        brand: formData.brand,
         email: formData.email || undefined,
+        phone: formData.phone,
+        website: formData.website,
+        industry: formData.industry,
+        status: formData.status,
         monthlyFee:
           formData.monthlyFee !== undefined && !isNaN(formData.monthlyFee)
             ? formData.monthlyFee
             : undefined,
+        notes: formData.notes,
+        pays_percentage: formData.pays_percentage,
         percentage_value: formData.pays_percentage ? formData.percentage_value : null,
+        contract: formData.contract,
+        contractStart: formData.contractStart || undefined,
       }
 
       if (editingClient) {
@@ -261,12 +298,21 @@ export default function ClientsPage() {
       const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' })
       if (res.ok) {
         setDeleteConfirm(null)
+        setDeleteInput('')
         loadClients()
       }
     } catch {
       // silently fail
     }
   }
+
+  // -- Get client name for delete dialog --------------------------------------
+
+  const deleteClientName = useMemo(() => {
+    if (!deleteConfirm) return ''
+    const c = clients.find((cl) => cl.id === deleteConfirm)
+    return c ? c.name : ''
+  }, [deleteConfirm, clients])
 
   // -- Filtered clients -------------------------------------------------------
 
@@ -276,6 +322,7 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-6">
+      <InfoBanner id="clients" title="Gestion de Clientes" description="Aqui podes administrar todos los clientes de tu agencia. Crea, edita y organiza tu cartera de clientes por industria." />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -324,24 +371,19 @@ export default function ClientsPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
             <div
               key={i}
-              className="animate-pulse rounded-xl border border-slate-200 bg-white p-5 space-y-3"
+              className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 flex items-center gap-4"
             >
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-slate-200" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-2/3 rounded bg-slate-200" />
-                  <div className="h-3 w-1/2 rounded bg-slate-100" />
-                </div>
+              <div className="h-10 w-10 rounded-full bg-slate-200 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-1/3 rounded bg-slate-200" />
+                <div className="h-3 w-1/4 rounded bg-slate-100" />
               </div>
-              <div className="h-3 w-full rounded bg-slate-100" />
-              <div className="flex gap-2">
-                <div className="h-6 w-16 rounded-full bg-slate-100" />
-                <div className="h-6 w-20 rounded-full bg-slate-100" />
-              </div>
+              <div className="h-6 w-16 rounded-full bg-slate-100" />
+              <div className="h-4 w-20 rounded bg-slate-100" />
             </div>
           ))}
         </div>
@@ -358,107 +400,134 @@ export default function ClientsPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredClients.map((client) => (
-            <div
-              key={client.id}
-              className="group relative rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-slate-300 transition-all"
-            >
-              {/* Context menu */}
-              {canManage && (
-                <div className="absolute top-3 right-3">
-                  <DropdownMenu.Root>
-                    <DropdownMenu.Trigger asChild>
-                      <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors focus:outline-none">
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-                    </DropdownMenu.Trigger>
-                    <DropdownMenu.Portal>
-                      <DropdownMenu.Content
-                        className="min-w-[160px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg z-50"
-                        sideOffset={5}
-                        align="end"
-                      >
-                        <DropdownMenu.Item
-                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 cursor-pointer outline-none"
-                          onSelect={() => openEditDialog(client)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Editar
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Item asChild>
-                          <Link
-                            href={`/clients/${client.id}`}
-                            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 cursor-pointer outline-none"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            Ver detalle
-                          </Link>
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Separator className="my-1 h-px bg-slate-200" />
-                        <DropdownMenu.Item
-                          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer outline-none"
-                          onSelect={() => setDeleteConfirm(client.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Eliminar
-                        </DropdownMenu.Item>
-                      </DropdownMenu.Content>
-                    </DropdownMenu.Portal>
-                  </DropdownMenu.Root>
-                </div>
-              )}
+        <div className="space-y-8">
+          {groupedClients.map((group) => (
+            <div key={group.industry}>
+              {/* Industry section header */}
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+                  {group.industry}
+                </h2>
+                <span className="text-xs text-slate-400 font-medium">
+                  ({group.clients.length})
+                </span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
 
-              {/* Card body */}
-              <Link href={`/clients/${client.id}`} className="block">
-                <div className="flex items-center gap-3 mb-3">
+              {/* Client rows */}
+              <div className="space-y-2">
+                {group.clients.map((client) => (
                   <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white ${getColor(client.name)}`}
+                    key={client.id}
+                    className="group relative flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all"
                   >
-                    {getInitials(client.name)}
-                  </div>
-                  <div className="min-w-0 flex-1 pr-6">
-                    <h3 className="text-sm font-semibold text-slate-900 truncate">
-                      {client.name}
-                    </h3>
-                    {client.brand && (
-                      <p className="text-xs text-slate-500 truncate flex items-center gap-1">
-                        <Building2 className="h-3 w-3" />
-                        {client.brand}
-                      </p>
+                    {/* Avatar */}
+                    <Link href={`/clients/${client.id}`} className="shrink-0">
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white ${getColor(client.name)}`}
+                      >
+                        {getInitials(client.name)}
+                      </div>
+                    </Link>
+
+                    {/* Name / Brand / Email */}
+                    <Link href={`/clients/${client.id}`} className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-slate-900 truncate">
+                          {client.name}
+                        </h3>
+                        {client.brand && (
+                          <span className="text-xs text-slate-500 truncate flex items-center gap-1">
+                            <Building2 className="h-3 w-3 shrink-0" />
+                            {client.brand}
+                          </span>
+                        )}
+                      </div>
+                      {client.email && (
+                        <p className="text-xs text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                          <Mail className="h-3 w-3 shrink-0" />
+                          {client.email}
+                        </p>
+                      )}
+                    </Link>
+
+                    {/* Percentage badge */}
+                    {client.pays_percentage && client.percentage_value != null && (
+                      <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700 shrink-0">
+                        <Percent className="h-3 w-3" />
+                        {client.percentage_value}%
+                      </span>
                     )}
-                  </div>
-                </div>
 
-                {client.email && (
-                  <p className="text-xs text-slate-500 truncate flex items-center gap-1.5 mb-2">
-                    <Mail className="h-3 w-3 shrink-0" />
-                    {client.email}
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-                  <div className="flex items-center gap-2">
+                    {/* Status badge */}
                     <span
-                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusColor[client.status] || statusColor.inactive}`}
+                      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium shrink-0 ${statusColor[client.status] || statusColor.inactive}`}
                     >
                       {statusLabel[client.status] || client.status}
                     </span>
-                    {client.pays_percentage && client.percentage_value != null && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
-                        <Percent className="h-3 w-3" />
-                        Comision: {client.percentage_value}%
-                      </span>
+
+                    {/* Monthly fee */}
+                    <div className="w-28 text-right shrink-0">
+                      {client.monthlyFee ? (
+                        <span className="text-sm font-semibold text-slate-700 flex items-center justify-end gap-1">
+                          <DollarSign className="h-3.5 w-3.5 text-slate-400" />
+                          {Number(client.monthlyFee).toLocaleString()}/mes
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">--</span>
+                      )}
+                    </div>
+
+                    {/* Context menu */}
+                    {canManage && (
+                      <div className="shrink-0">
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors focus:outline-none">
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content
+                              className="min-w-[160px] rounded-lg border border-slate-200 bg-white p-1 shadow-lg z-50"
+                              sideOffset={5}
+                              align="end"
+                            >
+                              <DropdownMenu.Item
+                                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 cursor-pointer outline-none"
+                                onSelect={() => openEditDialog(client)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Editar
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item asChild>
+                                <Link
+                                  href={`/clients/${client.id}`}
+                                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 cursor-pointer outline-none"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  Ver detalle
+                                </Link>
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Separator className="my-1 h-px bg-slate-200" />
+                              <DropdownMenu.Item
+                                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer outline-none"
+                                onSelect={() => {
+                                  setDeleteInput('')
+                                  setDeleteConfirm(client.id)
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Eliminar
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                      </div>
                     )}
                   </div>
-                  {client.monthlyFee && (
-                    <span className="text-sm font-semibold text-slate-700 flex items-center gap-1">
-                      <DollarSign className="h-3.5 w-3.5 text-slate-400" />
-                      {Number(client.monthlyFee).toLocaleString()}/mes
-                    </span>
-                  )}
-                </div>
-              </Link>
+                ))}
+              </div>
             </div>
           ))}
         </div>
@@ -665,6 +734,31 @@ export default function ClientsPage() {
                 />
               </div>
 
+              {/* Contrato */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Contrato
+                </label>
+                <textarea
+                  {...register('contract')}
+                  rows={2}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                  placeholder="Detalles del contrato..."
+                />
+              </div>
+
+              {/* Fecha inicio */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Fecha inicio
+                </label>
+                <input
+                  type="date"
+                  {...register('contractStart')}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+              </div>
+
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-2">
                 <Dialog.Close asChild>
@@ -695,7 +789,10 @@ export default function ClientsPage() {
       <Dialog.Root
         open={deleteConfirm !== null}
         onOpenChange={(open) => {
-          if (!open) setDeleteConfirm(null)
+          if (!open) {
+            setDeleteConfirm(null)
+            setDeleteInput('')
+          }
         }}
       >
         <Dialog.Portal>
@@ -705,19 +802,32 @@ export default function ClientsPage() {
               Eliminar cliente
             </Dialog.Title>
             <Dialog.Description className="mt-2 text-sm text-slate-500">
-              Esta accion marcara al cliente como inactivo. Los datos asociados
-              se mantendran en el sistema.
+              Para confirmar la eliminacion de <span className="font-semibold text-slate-700">{deleteClientName}</span>, escribi <span className="font-mono font-bold text-red-600">ELIMINAR</span>
             </Dialog.Description>
+            <div className="mt-4">
+              <input
+                type="text"
+                value={deleteInput}
+                onChange={(e) => setDeleteInput(e.target.value)}
+                placeholder="Escribi ELIMINAR para confirmar"
+                className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                autoFocus
+              />
+            </div>
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => setDeleteConfirm(null)}
+                onClick={() => {
+                  setDeleteConfirm(null)
+                  setDeleteInput('')
+                }}
                 className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+                disabled={deleteInput !== 'ELIMINAR'}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Eliminar
               </button>

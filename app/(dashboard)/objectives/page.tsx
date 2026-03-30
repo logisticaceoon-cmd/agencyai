@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Target, Plus, X, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { InfoBanner } from '@/components/shared/InfoBanner'
 
 interface KeyResult {
   id: string; title: string; description: string; metric_type: string
@@ -134,6 +135,7 @@ export default function ObjectivesPage() {
 
   return (
     <div className="space-y-6">
+      <InfoBanner id="objectives" title="Objetivos y OKRs" description="Establece objetivos trimestrales con key results medibles para tu agencia y clientes." />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Objetivos y OKRs</h1>
