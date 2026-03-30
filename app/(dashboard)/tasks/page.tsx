@@ -27,6 +27,7 @@ import {
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
+  useDroppable,
 } from '@dnd-kit/core'
 import { InfoBanner } from '@/components/shared/InfoBanner'
 import {
@@ -675,10 +676,7 @@ function KanbanColumn({
   onCardClick: (task: Task) => void
   onAdd: () => void
 }) {
-  const { setNodeRef } = useSortable({
-    id,
-    data: { type: 'column' },
-  })
+  const { setNodeRef } = useDroppable({ id })
 
   const columnHeaderColor: Record<string, string> = {
     pending: 'bg-slate-400',
@@ -750,8 +748,9 @@ function KanbanCard({
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const assigneeName = task.assignedTo.length > 0 ? getMemberName(task.assignedTo[0]) : null
-  const assigneeAvatar = task.assignedTo.length > 0 ? getMemberAvatar(task.assignedTo[0]) : null
+  const assigned = task.assignedTo || []
+  const assigneeName = assigned.length > 0 ? getMemberName(assigned[0]) : null
+  const assigneeAvatar = assigned.length > 0 ? getMemberAvatar(assigned[0]) : null
 
   return (
     <div

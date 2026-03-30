@@ -384,13 +384,13 @@ export default function ClientDetailPage() {
               <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">
                 Tareas recientes
               </h2>
-              {client.tasks.length === 0 ? (
+              {(client.tasks || []).length === 0 ? (
                 <p className="text-sm text-slate-500 py-4 text-center">
                   No hay tareas asignadas a este cliente
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {client.tasks.slice(0, 5).map((task) => (
+                  {(client.tasks || []).slice(0, 5).map((task) => (
                     <Link
                       key={task.id}
                       href={`/tasks/${task.id}`}
@@ -452,9 +452,9 @@ export default function ClientDetailPage() {
         <Tabs.Content value="reportes" className="pt-6">
           <div className="rounded-xl border border-slate-200 bg-white p-6">
             <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">
-              Reportes del cliente ({client.reports.length})
+              Reportes del cliente ({(client.reports || []).length})
             </h2>
-            {client.reports.length === 0 ? (
+            {(client.reports || []).length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <FileText className="h-10 w-10 text-slate-300 mb-3" />
                 <p className="text-sm text-slate-500">
@@ -463,7 +463,7 @@ export default function ClientDetailPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {client.reports.map((report) => (
+                {(client.reports || []).map((report) => (
                   <Link
                     key={report.id}
                     href={`/reports/${report.id}`}

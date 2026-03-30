@@ -51,7 +51,7 @@ export async function POST(request: Request) {
         projectId: body.projectId || body.project_id || null,
         title: body.title,
         description: body.description || null,
-        status: body.status || 'todo',
+        status: body.status || 'pending',
         priority: body.priority || 'medium',
         deadline: body.deadline || body.due_date || null,
         createdById: userId,

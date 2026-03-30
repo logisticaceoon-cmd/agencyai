@@ -99,6 +99,8 @@ export default function ProjectsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [checklist, setChecklist] = useState<{ text: string; done: boolean }[]>([])
+  const [newCheckItem, setNewCheckItem] = useState('')
 
   // Filters
   const [filterClient, setFilterClient] = useState('')
@@ -166,6 +168,8 @@ export default function ProjectsPage() {
 
   function openCreateDialog() {
     setEditingProject(null)
+    setChecklist([])
+    setNewCheckItem('')
     reset({
       name: '',
       description: '',
@@ -209,6 +213,7 @@ export default function ProjectsPage() {
         budget: data.budget ? parseFloat(data.budget) : undefined,
         ownerId: data.ownerId || undefined,
         priority: data.priority || undefined,
+        checklist: checklist.length > 0 ? JSON.stringify(checklist) : undefined,
       }
 
       if (editingProject) {
@@ -568,6 +573,32 @@ export default function ProjectsPage() {
                     className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </div>
+              </div>
+
+              {/* Checklist del proyecto */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Checklist del proyecto
+                </label>
+                <p className="text-xs text-slate-400 mb-2">Agrega los entregables o pasos clave para medir el avance</p>
+                <div className="space-y-2 mb-2">
+                  {checklist.map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 group">
+                      <input type="checkbox" checked={item.done} onChange={() => { const n = [...checklist]; n[i].done = !n[i].done; setChecklist(n) }} className="h-4 w-4 rounded border-slate-300 text-blue-600" />
+                      <span className={cn('text-sm flex-1', item.done && 'line-through text-slate-400')}>{item.text}</span>
+                      <button type="button" onClick={() => setChecklist(checklist.filter((_, j) => j !== i))} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input value={newCheckItem} onChange={e => setNewCheckItem(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (newCheckItem.trim()) { setChecklist([...checklist, { text: newCheckItem.trim(), done: false }]); setNewCheckItem('') } } }} placeholder="Agregar paso o entregable..." className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none" />
+                  <button type="button" onClick={() => { if (newCheckItem.trim()) { setChecklist([...checklist, { text: newCheckItem.trim(), done: false }]); setNewCheckItem('') } }} className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600 hover:bg-slate-200">Agregar</button>
+                </div>
+                {checklist.length > 0 && (
+                  <p className="text-xs text-slate-400 mt-2">Progreso: {checklist.filter(i => i.done).length}/{checklist.length} completados ({checklist.length > 0 ? Math.round((checklist.filter(i => i.done).length / checklist.length) * 100) : 0}%)</p>
+                )}
               </div>
 
               {/* Color */}
