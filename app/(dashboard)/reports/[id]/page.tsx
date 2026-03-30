@@ -119,14 +119,14 @@ export default function ReportDetailPage() {
             <p className="text-zinc-300 whitespace-pre-wrap">{report.description}</p>
           </div>
 
-          {report.fileUrls.length > 0 && (
+          {(report.fileUrls || []).length > 0 && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
               <h2 className="text-sm font-semibold text-zinc-400 mb-3 uppercase tracking-wider flex items-center gap-2">
                 <Paperclip className="h-4 w-4" />
-                Archivos adjuntos ({report.fileUrls.length})
+                Archivos adjuntos ({(report.fileUrls || []).length})
               </h2>
               <div className="space-y-2">
-                {report.fileUrls.map((url, i) => (
+                {(report.fileUrls || []).map((url: string, i: number) => (
                   <a
                     key={i}
                     href={url}
@@ -184,10 +184,10 @@ export default function ReportDetailPage() {
 
           <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
             <h2 className="text-sm font-semibold text-zinc-400 mb-4 uppercase tracking-wider flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" /> Comentarios ({report.comments.length})
+              <MessageSquare className="h-4 w-4" /> Comentarios ({(report.comments || []).length})
             </h2>
             <div className="space-y-3 mb-4">
-              {report.comments.map((c) => (
+              {(report.comments || []).map((c) => (
                 <div key={c.id} className="flex gap-3">
                   <Avatar name={c.author?.fullName || 'Usuario'} avatarUrl={c.author?.avatarUrl} size="sm" />
                   <div className="flex-1">
@@ -215,7 +215,7 @@ export default function ReportDetailPage() {
                 <Avatar name={report.submittedBy?.fullName || 'Usuario'} avatarUrl={report.submittedBy?.avatarUrl} size="sm" />
                 <div>
                   <p className="text-sm text-white">{report.submittedBy?.fullName || 'Usuario'}</p>
-                  {report.submittedBy.department && <p className="text-xs text-zinc-500">{report.submittedBy.department}</p>}
+                  {report.submittedBy?.department && <p className="text-xs text-zinc-500">{report.submittedBy.department}</p>}
                 </div>
               </div>
             </div>
@@ -235,11 +235,11 @@ export default function ReportDetailPage() {
                 <Link href={`/tasks/${report.task.id}`} className="text-sm text-indigo-400 hover:text-indigo-300">{report.task.title}</Link>
               </div>
             )}
-            {report.tags.length > 0 && (
+            {(report.tags || []).length > 0 && (
               <div>
                 <p className="text-xs text-zinc-500 mb-1">Tags</p>
                 <div className="flex flex-wrap gap-1">
-                  {report.tags.map((tag) => (
+                  {(report.tags || []).map((tag: string) => (
                     <span key={tag} className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">{tag}</span>
                   ))}
                 </div>
