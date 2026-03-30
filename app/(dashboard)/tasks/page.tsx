@@ -81,8 +81,8 @@ interface Member {
 const KANBAN_COLUMNS = [
   { key: 'pending', label: 'Por hacer' },
   { key: 'in_progress', label: 'En progreso' },
-  { key: 'review', label: 'En revision' },
   { key: 'completed', label: 'Completado' },
+  { key: 'rejected', label: 'Rechazado' },
 ] as const
 
 type KanbanStatus = (typeof KANBAN_COLUMNS)[number]['key']
@@ -90,7 +90,6 @@ type KanbanStatus = (typeof KANBAN_COLUMNS)[number]['key']
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Por hacer',
   in_progress: 'En progreso',
-  review: 'En revision',
   completed: 'Completado',
   rejected: 'Rechazado',
 }
@@ -105,7 +104,6 @@ const PRIORITY_LABELS: Record<string, string> = {
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-slate-100 text-slate-600',
   in_progress: 'bg-blue-50 text-blue-600',
-  review: 'bg-amber-50 text-amber-600',
   completed: 'bg-green-50 text-green-600',
   rejected: 'bg-red-50 text-red-600',
 }
@@ -130,7 +128,7 @@ const taskFormSchema = z.object({
   title: z.string().min(1, 'El titulo es obligatorio'),
   description: z.string().optional(),
   projectId: z.string().optional(),
-  status: z.enum(['pending', 'in_progress', 'review', 'completed', 'rejected']),
+  status: z.enum(['pending', 'in_progress', 'completed', 'rejected']),
   priority: z.enum(['critical', 'high', 'medium', 'low']),
   assignedTo: z.string().optional(),
   deadline: z.string().optional(),
@@ -581,10 +579,7 @@ function KanbanView({
   const columnTasks = useMemo(() => {
     const grouped: Record<string, Task[]> = {}
     for (const col of KANBAN_COLUMNS) {
-      grouped[col.key] = tasks.filter((t) => {
-        if (col.key === 'review') return t.status === 'review'
-        return t.status === col.key
-      })
+      grouped[col.key] = tasks.filter((t) => t.status === col.key)
     }
     return grouped
   }, [tasks])
@@ -681,8 +676,8 @@ function KanbanColumn({
   const columnHeaderColor: Record<string, string> = {
     pending: 'bg-slate-400',
     in_progress: 'bg-blue-500',
-    review: 'bg-amber-500',
     completed: 'bg-green-500',
+    rejected: 'bg-red-500',
   }
 
   return (
