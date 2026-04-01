@@ -88,38 +88,38 @@ export default function RecordingsPage() {
 
       {/* Create form */}
       {showForm && (
-        <form onSubmit={handleCreate} className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
+        <form onSubmit={handleCreate} className="rounded-xl border border-[var(--border-base)] bg-white p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Título *</label>
-              <input name="title" required className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="Reunión con cliente..." />
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Título *</label>
+              <input name="title" required className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Reunión con cliente..." />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Cliente</label>
-              <select name="clientId" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white">
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Cliente</label>
+              <select name="clientId" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white">
                 <option value="">Sin cliente</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">URL de la grabación</label>
-              <input name="url" type="url" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="https://..." />
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">URL de la grabación</label>
+              <input name="url" type="url" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="https://..." />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Plataforma</label>
-              <select name="platform" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white">
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Plataforma</label>
+              <select name="platform" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white">
                 <option value="">Seleccionar</option>
                 {PLATFORMS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Duración (minutos)</label>
-              <input name="duration" type="number" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="60" />
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Duración (minutos)</label>
+              <input name="duration" type="number" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="60" />
             </div>
           </div>
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Transcripción</label>
-            <textarea name="transcription" rows={4} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="Pega la transcripción aquí..." />
+            <label className="text-xs text-[var(--text-muted)] mb-1 block">Transcripción</label>
+            <textarea name="transcription" rows={4} className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Pega la transcripción aquí..." />
           </div>
           <button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">
             Guardar grabación
@@ -129,17 +129,17 @@ export default function RecordingsPage() {
 
       {/* Recordings List */}
       {loading ? (
-        <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-20 bg-zinc-800 rounded-xl animate-pulse" />)}</div>
+        <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-20 bg-slate-100 rounded-xl animate-pulse" />)}</div>
       ) : recordings.length === 0 ? (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-12 text-center">
-          <Video className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
+        <div className="rounded-xl border border-[var(--border-base)] bg-white p-12 text-center">
+          <Video className="h-12 w-12 text-[var(--text-secondary)] mx-auto mb-4" />
           <h3 className="text-lg font-medium text-white mb-2">No hay grabaciones aún</h3>
-          <p className="text-sm text-zinc-400">Sube grabaciones de reuniones y añade transcripciones para extraer tareas.</p>
+          <p className="text-sm text-[var(--text-muted)]">Sube grabaciones de reuniones y añade transcripciones para extraer tareas.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {recordings.map(rec => (
-            <div key={rec.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
+            <div key={rec.id} className="rounded-xl border border-[var(--border-base)] bg-white p-5 space-y-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="rounded-lg bg-purple-500/10 p-2">
@@ -147,15 +147,15 @@ export default function RecordingsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-white">{rec.title}</p>
-                    {rec.client && <p className="text-xs text-zinc-500">{rec.client.name}</p>}
+                    {rec.client && <p className="text-xs text-[var(--text-secondary)]">{rec.client.name}</p>}
                   </div>
                 </div>
                 {rec.platform && (
-                  <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full capitalize">{rec.platform}</span>
+                  <span className="text-xs bg-slate-100 text-[var(--text-muted)] px-2 py-0.5 rounded-full capitalize">{rec.platform}</span>
                 )}
               </div>
 
-              <div className="flex items-center gap-3 text-xs text-zinc-500">
+              <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
                 {rec.duration && (
                   <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {rec.duration} min</span>
                 )}
@@ -169,14 +169,14 @@ export default function RecordingsPage() {
                   </a>
                 )}
                 {rec.transcription && (
-                  <button onClick={() => setShowTranscription(showTranscription === rec.id ? null : rec.id)} className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-300">
+                  <button onClick={() => setShowTranscription(showTranscription === rec.id ? null : rec.id)} className="flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-slate-700">
                     <FileText className="h-3 w-3" /> Transcripción
                   </button>
                 )}
               </div>
 
               {showTranscription === rec.id && rec.transcription && (
-                <div className="bg-zinc-800 rounded-lg p-3 text-xs text-zinc-300 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                <div className="bg-slate-100 rounded-lg p-3 text-xs text-slate-700 max-h-40 overflow-y-auto whitespace-pre-wrap">
                   {rec.transcription}
                 </div>
               )}

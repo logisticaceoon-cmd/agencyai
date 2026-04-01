@@ -42,7 +42,6 @@ function RegisterForm() {
         }
         toast({ title: 'Cuenta creada exitosamente' })
 
-        // If there's an invite token, accept it after registration
         if (inviteToken) {
           router.push(`/invite/${inviteToken}`)
         } else {
@@ -58,50 +57,50 @@ function RegisterForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[var(--bg-subtle)] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
-            <div className="h-10 w-10 rounded-xl bg-indigo-600 flex items-center justify-center">
-              <Zap className="h-6 w-6 text-white" />
+            <div className="h-10 w-10 rounded-[var(--radius-md)] bg-[var(--blue)] flex items-center justify-center">
+              <Zap className="h-6 w-6 text-white" strokeWidth={1.5} />
             </div>
-            <span className="text-2xl font-bold text-white">AgencyAI</span>
+            <span className="text-2xl font-bold text-[var(--text-primary)]">AgencyAI</span>
           </div>
-          <p className="text-zinc-400">
-            {inviteToken ? 'Creá tu cuenta para aceptar la invitación' : 'Empezá gratis hoy'}
+          <p className="text-[var(--text-muted)]">
+            {inviteToken ? 'Crea tu cuenta para aceptar la invitacion' : 'Empeza gratis hoy'}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8 backdrop-blur-sm">
-          <h2 className="text-xl font-semibold text-white mb-6">Crear cuenta</h2>
+        <div className="rounded-[var(--radius-xl)] border border-[var(--border-base)] bg-white p-8 shadow-[var(--shadow-lg)]">
+          <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-6">Crear cuenta</h2>
 
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1.5">Nombre completo</label>
+              <label className="block text-[13px] font-medium text-[var(--text-secondary)] mb-1.5">Nombre completo</label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
-                placeholder="María García"
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+                placeholder="Maria Garcia"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border-base)] bg-white px-4 py-2.5 text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-[var(--blue)] focus:outline-none focus:shadow-[var(--shadow-focus)] transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1.5">Email</label>
+              <label className="block text-[13px] font-medium text-[var(--text-secondary)] mb-1.5">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="tu@agencia.com"
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+                className="w-full rounded-[var(--radius-md)] border border-[var(--border-base)] bg-white px-4 py-2.5 text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-[var(--blue)] focus:outline-none focus:shadow-[var(--shadow-focus)] transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1.5">Contraseña</label>
+              <label className="block text-[13px] font-medium text-[var(--text-secondary)] mb-1.5">Contrasena</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -109,15 +108,15 @@ function RegisterForm() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  placeholder="Mínimo 8 caracteres"
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 pr-10 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+                  placeholder="Minimo 8 caracteres"
+                  className="w-full rounded-[var(--radius-md)] border border-[var(--border-base)] bg-white px-4 py-2.5 pr-10 text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-[var(--blue)] focus:outline-none focus:shadow-[var(--shadow-focus)] transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? <EyeOff size={16} strokeWidth={1.5} /> : <Eye size={16} strokeWidth={1.5} />}
                 </button>
               </div>
             </div>
@@ -125,21 +124,21 @@ function RegisterForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
+              className="w-full rounded-[var(--radius-md)] bg-[var(--blue)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2 shadow-[0_1px_2px_rgba(37,99,235,0.3)]"
             >
               {loading ? 'Creando cuenta...' : 'Crear cuenta gratis'}
             </button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-zinc-500">
-            ¿Ya tenés cuenta?{' '}
-            <Link href="/login" className="text-indigo-400 hover:text-indigo-300 transition-colors">
-              Iniciar sesión
+          <p className="mt-4 text-center text-sm text-[var(--text-muted)]">
+            Ya tenes cuenta?{' '}
+            <Link href="/login" className="text-[var(--blue)] hover:text-[#1d4ed8] font-medium transition-colors">
+              Iniciar sesion
             </Link>
           </p>
         </div>
-        <p className="mt-4 text-center text-xs text-zinc-600">
-          Sin tarjeta de crédito · Plan Free para siempre
+        <p className="mt-4 text-center text-xs text-[var(--text-muted)]">
+          Sin tarjeta de credito · Plan Free para siempre
         </p>
       </div>
     </div>

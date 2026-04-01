@@ -119,7 +119,7 @@ export default function SettingsPage() {
     return (
       <div className="space-y-6">
         <PageHeader title="Workspace" description="Configuración de tu organización" />
-        <div className="h-48 rounded-xl border border-zinc-800 bg-zinc-900 animate-pulse" />
+        <div className="h-48 rounded-xl border border-[var(--border-base)] bg-white animate-pulse" />
       </div>
     )
   }
@@ -128,8 +128,8 @@ export default function SettingsPage() {
     return (
       <div className="space-y-6">
         <PageHeader title="Workspace" description="Configuración de tu organización" />
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center">
-          <p className="text-zinc-400">No se encontró organización. <a href="/onboarding" className="text-indigo-400">Configurar workspace</a></p>
+        <div className="rounded-xl border border-[var(--border-base)] bg-white p-8 text-center">
+          <p className="text-[var(--text-muted)]">No se encontró organización. <a href="/onboarding" className="text-indigo-400">Configurar workspace</a></p>
         </div>
       </div>
     )
@@ -140,29 +140,29 @@ export default function SettingsPage() {
       <PageHeader title="Workspace" description="Configuración de tu organización" />
 
       {/* Org overview */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+      <div className="rounded-xl border border-[var(--border-base)] bg-white p-5">
         <div className="flex items-start gap-4">
           <div className="h-12 w-12 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
             <Building2 className="h-6 w-6 text-indigo-400" />
           </div>
           <div className="flex-1">
-            <h2 className="text-lg font-semibold text-white">{org.name}</h2>
-            <p className="text-sm text-zinc-500">agencyai.com/{org.slug}</p>
+            <h2 className="text-lg font-semibold text-slate-900">{org.name}</h2>
+            <p className="text-sm text-[var(--text-secondary)]">agencyai.com/{org.slug}</p>
             <div className="flex items-center gap-3 mt-2">
               <span className={cn(
                 'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize',
-                org.plan === 'free' ? 'border-zinc-700 text-zinc-400' : 'border-indigo-500/30 text-indigo-300 bg-indigo-500/10'
+                org.plan === 'free' ? 'border-[var(--border-base)] text-[var(--text-muted)]' : 'border-indigo-500/30 text-indigo-300 bg-indigo-500/10'
               )}>
                 Plan {currentPlan.name}
               </span>
-              <span className="text-xs text-zinc-500">
+              <span className="text-xs text-[var(--text-secondary)]">
                 {org.members.length}/{org.maxUsers} usuarios ·{' '}
                 {org._count.clients}/{org.maxClients} clientes
               </span>
             </div>
           </div>
           <div className="text-right text-sm">
-            <p className="text-zinc-400">{currentPlan.price === 0 ? 'Gratis' : `$${currentPlan.price}/mes`}</p>
+            <p className="text-[var(--text-muted)]">{currentPlan.price === 0 ? 'Gratis' : `$${currentPlan.price}/mes`}</p>
             <a href="#plans" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
               Cambiar plan →
             </a>
@@ -171,14 +171,14 @@ export default function SettingsPage() {
       </div>
 
       {/* Members */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+      <div className="rounded-xl border border-[var(--border-base)] bg-white overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-base)]">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-indigo-400" />
-            <h3 className="font-semibold text-white">Equipo ({org.members.length}/{org.maxUsers})</h3>
+            <h3 className="font-semibold text-slate-900">Equipo ({org.members.length}/{org.maxUsers})</h3>
           </div>
         </div>
-        <div className="divide-y divide-zinc-800">
+        <div className="divide-y divide-slate-200">
           {org.members.map((member) => {
             const RoleIcon = roleIcons[member.role as keyof typeof roleIcons] ?? UserIcon
             const roleColor = roleColors[member.role as keyof typeof roleColors] ?? ''
@@ -188,10 +188,10 @@ export default function SettingsPage() {
                 <Avatar name={member.user?.fullName || 'Miembro'} avatarUrl={member.user?.avatarUrl} size="sm" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-white">{member.user?.fullName || 'Miembro'}</p>
+                    <p className="text-sm font-medium text-slate-900">{member.user?.fullName || 'Miembro'}</p>
                     {isOwner && <span className="text-[10px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 rounded-full">Owner</span>}
                   </div>
-                  <p className="text-xs text-zinc-500">{member.user.email}</p>
+                  <p className="text-xs text-[var(--text-secondary)]">{member.user.email}</p>
                 </div>
                 <span className={cn('flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize', roleColor)}>
                   <RoleIcon className="h-3 w-3" />
@@ -205,10 +205,10 @@ export default function SettingsPage() {
 
       {/* Invite */}
       {org.members.length < org.maxUsers ? (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <div className="rounded-xl border border-[var(--border-base)] bg-white p-5">
           <div className="flex items-center gap-2 mb-4">
             <Mail className="h-4 w-4 text-indigo-400" />
-            <h3 className="font-semibold text-white">Invitar miembro</h3>
+            <h3 className="font-semibold text-slate-900">Invitar miembro</h3>
           </div>
           <form onSubmit={sendInvite} className="flex gap-3">
             <input
@@ -217,12 +217,12 @@ export default function SettingsPage() {
               onChange={(e) => setInviteEmail(e.target.value)}
               required
               placeholder="email@ejemplo.com"
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none transition-colors"
+              className="flex-1 rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-sm text-slate-900 placeholder-[var(--text-muted)] focus:border-indigo-500 focus:outline-none transition-colors"
             />
             <select
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value as 'admin' | 'trafficker' | 'client')}
-              className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none transition-colors"
+              className="rounded-lg border border-[var(--border-base)] bg-slate-100 px-3 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none transition-colors"
             >
               <option value="trafficker">Trafficker</option>
               <option value="admin">Admin</option>
@@ -241,10 +241,10 @@ export default function SettingsPage() {
           {newInviteUrl && (
             <div className="mt-3 flex items-center gap-2 rounded-lg border border-green-500/20 bg-green-500/5 px-4 py-2.5">
               <ExternalLink className="h-4 w-4 text-green-400 flex-shrink-0" />
-              <p className="text-xs text-zinc-300 truncate flex-1">{newInviteUrl}</p>
+              <p className="text-xs text-slate-700 truncate flex-1">{newInviteUrl}</p>
               <button
                 onClick={() => copyToClipboard(newInviteUrl, 'new')}
-                className="text-zinc-400 hover:text-green-400 transition-colors flex-shrink-0"
+                className="text-[var(--text-muted)] hover:text-green-400 transition-colors flex-shrink-0"
               >
                 {copiedToken === 'new' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               </button>
@@ -252,9 +252,9 @@ export default function SettingsPage() {
           )}
         </div>
       ) : (
-        <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5 text-center">
-          <p className="text-sm text-zinc-400">
-            Llegaste al límite de usuarios del plan <span className="text-white">{currentPlan.name}</span>.
+        <div className="rounded-xl border border-[var(--border-base)] bg-white p-5 text-center">
+          <p className="text-sm text-[var(--text-muted)]">
+            Llegaste al límite de usuarios del plan <span className="text-slate-900">{currentPlan.name}</span>.
           </p>
           <a href="#plans" className="text-sm text-indigo-400 hover:text-indigo-300 mt-1 block">
             Actualizar plan para agregar más miembros →
@@ -264,23 +264,23 @@ export default function SettingsPage() {
 
       {/* Pending invitations */}
       {invitations.length > 0 && (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-zinc-800">
+        <div className="rounded-xl border border-[var(--border-base)] bg-white overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-[var(--border-base)]">
             <RefreshCw className="h-4 w-4 text-yellow-400" />
-            <h3 className="font-semibold text-white">Invitaciones pendientes ({invitations.length})</h3>
+            <h3 className="font-semibold text-slate-900">Invitaciones pendientes ({invitations.length})</h3>
           </div>
-          <div className="divide-y divide-zinc-800">
+          <div className="divide-y divide-slate-200">
             {invitations.map((inv) => {
               const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/invite/${inv.token}`
               return (
                 <div key={inv.id} className="flex items-center gap-4 px-5 py-3">
                   <div className="flex-1">
-                    <p className="text-sm text-white">{inv.email}</p>
-                    <p className="text-xs text-zinc-500 capitalize">{inv.role}</p>
+                    <p className="text-sm text-slate-900">{inv.email}</p>
+                    <p className="text-xs text-[var(--text-secondary)] capitalize">{inv.role}</p>
                   </div>
                   <button
                     onClick={() => copyToClipboard(inviteUrl, inv.id)}
-                    className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800 transition-colors"
+                    className="flex items-center gap-1.5 rounded-lg border border-[var(--border-base)] px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-slate-100 transition-colors"
                   >
                     {copiedToken === inv.id ? (
                       <><Check className="h-3.5 w-3.5 text-green-400" /> Copiado</>
@@ -296,10 +296,10 @@ export default function SettingsPage() {
       )}
 
       {/* Plans */}
-      <div id="plans" className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+      <div id="plans" className="rounded-xl border border-[var(--border-base)] bg-white p-5">
         <div className="flex items-center gap-2 mb-5">
           <Crown className="h-4 w-4 text-yellow-400" />
-          <h3 className="font-semibold text-white">Planes disponibles</h3>
+          <h3 className="font-semibold text-slate-900">Planes disponibles</h3>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {PLANS.map((plan) => (
@@ -309,14 +309,14 @@ export default function SettingsPage() {
                 'rounded-xl border p-4 text-center transition-all',
                 plan.id === org.plan
                   ? 'border-indigo-500 bg-indigo-600/5'
-                  : 'border-zinc-800 bg-zinc-900/50'
+                  : 'border-[var(--border-base)] bg-slate-50'
               )}
             >
-              <p className="text-sm font-bold text-white mb-1">{plan.name}</p>
-              <p className="text-xs text-zinc-500 mb-2">
+              <p className="text-sm font-bold text-slate-900 mb-1">{plan.name}</p>
+              <p className="text-xs text-[var(--text-secondary)] mb-2">
                 {plan.price === 0 ? 'Gratis' : `$${plan.price}/mes`}
               </p>
-              <p className="text-[10px] text-zinc-600">
+              <p className="text-[10px] text-[var(--text-secondary)]">
                 {plan.maxUsers}u · {plan.maxClients}c
               </p>
               {plan.id === org.plan && (
@@ -325,7 +325,7 @@ export default function SettingsPage() {
             </div>
           ))}
         </div>
-        <p className="text-xs text-zinc-600 mt-3 text-center">
+        <p className="text-xs text-[var(--text-secondary)] mt-3 text-center">
           Para cambiar de plan, contactanos en soporte@agencyai.com
         </p>
       </div>

@@ -50,6 +50,14 @@ const PLAN_LABEL: Record<OrgPlan, string> = {
   scale: 'Scale',
 }
 
+const PLAN_STYLE: Record<OrgPlan, string> = {
+  free: 'bg-slate-100 text-slate-500',
+  starter: 'bg-blue-50 text-blue-600',
+  pro: 'bg-indigo-50 text-indigo-600',
+  agency: 'bg-purple-50 text-purple-600',
+  scale: 'bg-amber-50 text-amber-600',
+}
+
 type NavItem = {
   href: string
   label: string
@@ -115,7 +123,7 @@ export function Sidebar() {
   async function handleLogout() {
     const supabase = (await import('@/lib/supabase')).createClient()
     await supabase.auth.signOut()
-    toast({ title: 'Sesión cerrada' })
+    toast({ title: 'Sesion cerrada' })
     router.push('/sign-in')
     router.refresh()
   }
@@ -130,21 +138,17 @@ export function Sidebar() {
   const displayEmail = user?.email || ''
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-slate-200 bg-[#f8fafc] flex-shrink-0">
+    <aside className="flex h-full w-64 flex-col bg-[var(--bg-subtle)] border-r border-[var(--border-base)] flex-shrink-0">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-5 py-4 border-b border-slate-200 bg-white">
-        <div className="h-7 w-7 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
-          <Zap className="h-4 w-4 text-white" />
+      <div className="flex items-center gap-2.5 px-5 h-14 border-b border-[var(--border-base)]">
+        <div className="h-[36px] w-[36px] rounded-[var(--radius-md)] bg-[var(--blue)] flex items-center justify-center flex-shrink-0">
+          <Zap className="h-[18px] w-[18px] text-white" strokeWidth={1.5} />
         </div>
-        <span className="text-base font-bold text-slate-900">AgencyAI</span>
+        <span className="text-[15px] font-bold text-[var(--text-primary)]">AgencyAI</span>
         {org && (
           <span className={cn(
-            'ml-auto text-[10px] font-semibold rounded-full px-1.5 py-0.5 flex-shrink-0',
-            orgPlan === 'free' ? 'bg-slate-100 text-slate-500' :
-            orgPlan === 'starter' ? 'bg-blue-50 text-blue-600' :
-            orgPlan === 'pro' ? 'bg-indigo-50 text-indigo-600' :
-            orgPlan === 'agency' ? 'bg-purple-50 text-purple-600' :
-            'bg-amber-50 text-amber-600'
+            'ml-auto text-[10px] font-semibold rounded-full px-2 py-0.5 flex-shrink-0',
+            PLAN_STYLE[orgPlan]
           )}>
             {PLAN_LABEL[orgPlan]}
           </span>
@@ -152,11 +156,11 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         {navGroups.map((group) => (
           <div key={group.label ?? 'main'} className="mb-1">
             {group.label && (
-              <p className="px-3 pt-3 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase" style={{ letterSpacing: '0.08em' }}>
                 {group.label}
               </p>
             )}
@@ -170,11 +174,11 @@ export function Sidebar() {
                     key={item.href}
                     href="/settings"
                     title={`Requiere plan ${PLAN_LABEL[item.minPlan!]} — Actualizar plan`}
-                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-slate-400 transition-colors group"
+                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-muted)] opacity-50 hover:opacity-70 transition-all group"
                   >
-                    <item.icon className="h-4 w-4 flex-shrink-0 opacity-40" />
-                    <span className="flex-1 opacity-40">{item.label}</span>
-                    <Lock className="h-3 w-3 flex-shrink-0 opacity-50" />
+                    <item.icon size={16} strokeWidth={1.5} className="flex-shrink-0" />
+                    <span className="flex-1">{item.label}</span>
+                    <Lock size={12} strokeWidth={1.5} className="flex-shrink-0" />
                   </Link>
                 )
               }
@@ -184,16 +188,16 @@ export function Sidebar() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative',
+                    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150 relative',
                     active
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                      ? 'bg-[var(--blue-light)] text-[var(--blue)] font-semibold'
+                      : 'text-[var(--text-secondary)] font-medium hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]'
                   )}
                 >
                   {active && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] bg-blue-600 rounded-r" />
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[60%] bg-[var(--blue)] rounded-r" />
                   )}
-                  <item.icon className="h-4 w-4 flex-shrink-0" />
+                  <item.icon size={16} strokeWidth={1.5} className="flex-shrink-0" />
                   {item.label}
                 </Link>
               )
@@ -203,7 +207,7 @@ export function Sidebar() {
 
         {isAdmin && (
           <div>
-            <p className="px-3 pt-3 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+            <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase" style={{ letterSpacing: '0.08em' }}>
               Admin
             </p>
             {adminItems.map((item) => (
@@ -211,16 +215,16 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative',
+                  'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150 relative',
                   isActive(item.href)
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                    ? 'bg-[var(--blue-light)] text-[var(--blue)] font-semibold'
+                    : 'text-[var(--text-secondary)] font-medium hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]'
                 )}
               >
                 {isActive(item.href) && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] bg-blue-600 rounded-r" />
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[60%] bg-[var(--blue)] rounded-r" />
                 )}
-                <item.icon className="h-4 w-4 flex-shrink-0" />
+                <item.icon size={16} strokeWidth={1.5} className="flex-shrink-0" />
                 {item.label}
               </Link>
             ))}
@@ -229,18 +233,18 @@ export function Sidebar() {
       </nav>
 
       {/* User profile section */}
-      <div className="border-t border-slate-200 p-3">
+      <div className="border-t border-[var(--border-base)] p-3">
         {user ? (
           <div className="flex items-center gap-2.5">
             <Avatar name={displayName} avatarUrl={user.avatarUrl} size="sm" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-slate-900 truncate">{displayName}</p>
-              <p className="text-[10px] text-slate-400 truncate">{displayEmail}</p>
+              <p className="text-xs font-medium text-[var(--text-primary)] truncate">{displayName}</p>
+              <p className="text-[10px] text-[var(--text-muted)] truncate">{displayEmail}</p>
             </div>
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
-                <button className="text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0 p-1 rounded hover:bg-slate-100">
-                  <ChevronDown className="h-4 w-4" />
+                <button className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors flex-shrink-0 p-1 rounded hover:bg-[var(--bg-muted)]">
+                  <ChevronDown size={16} strokeWidth={1.5} />
                 </button>
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
@@ -248,34 +252,34 @@ export function Sidebar() {
                   align="end"
                   side="top"
                   sideOffset={8}
-                  className="z-50 min-w-[200px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg animate-scale-in"
+                  className="z-50 min-w-[200px] rounded-[var(--radius-lg)] border border-[var(--border-base)] bg-white p-1.5 shadow-lg animate-scale-in"
                 >
                   <DropdownMenu.Item asChild>
-                    <Link href="/settings/account" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer outline-none">
-                      <User className="h-4 w-4" /> Mi cuenta
+                    <Link href="/settings/account" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer outline-none">
+                      <User size={16} strokeWidth={1.5} /> Mi cuenta
                     </Link>
                   </DropdownMenu.Item>
                   <DropdownMenu.Item asChild>
-                    <Link href="/settings/workspace" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer outline-none">
-                      <Building2 className="h-4 w-4" /> Workspace
+                    <Link href="/settings/workspace" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer outline-none">
+                      <Building2 size={16} strokeWidth={1.5} /> Workspace
                     </Link>
                   </DropdownMenu.Item>
                   <DropdownMenu.Item asChild>
-                    <Link href="/settings/billing" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer outline-none">
-                      <CreditCard className="h-4 w-4" /> Plan y facturación
+                    <Link href="/settings/billing" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer outline-none">
+                      <CreditCard size={16} strokeWidth={1.5} /> Plan y facturacion
                     </Link>
                   </DropdownMenu.Item>
                   <DropdownMenu.Item asChild>
-                    <a href="mailto:soporte@agencyai.com" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer outline-none">
-                      <HelpCircle className="h-4 w-4" /> Ayuda
+                    <a href="mailto:soporte@agencyai.com" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer outline-none">
+                      <HelpCircle size={16} strokeWidth={1.5} /> Ayuda
                     </a>
                   </DropdownMenu.Item>
-                  <DropdownMenu.Separator className="my-1 h-px bg-slate-100" />
+                  <DropdownMenu.Separator className="my-1 h-px bg-[var(--bg-muted)]" />
                   <DropdownMenu.Item
                     onSelect={handleLogout}
-                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer outline-none"
+                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[var(--red)] hover:bg-[var(--red-light)] cursor-pointer outline-none"
                   >
-                    <LogOut className="h-4 w-4" /> Cerrar sesión
+                    <LogOut size={16} strokeWidth={1.5} /> Cerrar sesion
                   </DropdownMenu.Item>
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>

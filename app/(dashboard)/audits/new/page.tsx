@@ -97,67 +97,67 @@ export default function NewAuditPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/audits" className="text-zinc-400 hover:text-white"><ArrowLeft className="h-5 w-5" /></Link>
-        <h1 className="text-2xl font-bold text-white">Nueva auditoría</h1>
+        <Link href="/audits" className="text-[var(--text-muted)] hover:text-slate-900"><ArrowLeft className="h-5 w-5" /></Link>
+        <h1 className="text-2xl font-bold text-slate-900">Nueva auditoría</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
+        <div className="rounded-xl border border-[var(--border-base)] bg-white p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Título *</label>
-            <input required value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="Ej: Auditoría de procesos de cambio — Marzo 2025" className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none" />
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Título *</label>
+            <input required value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="Ej: Auditoría de procesos de cambio — Marzo 2025" className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 placeholder-[var(--text-muted)] focus:border-indigo-500 focus:outline-none" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Proceso a auditar *</label>
-            <input required value={form.processName} onChange={(e) => setForm((p) => ({ ...p, processName: e.target.value }))} placeholder="Ej: Gestión de cambios en producción" className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none" />
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Proceso a auditar *</label>
+            <input required value={form.processName} onChange={(e) => setForm((p) => ({ ...p, processName: e.target.value }))} placeholder="Ej: Gestión de cambios en producción" className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 placeholder-[var(--text-muted)] focus:border-indigo-500 focus:outline-none" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1.5">Período desde *</label>
-              <input required type="date" value={form.auditFrom} onChange={(e) => setForm((p) => ({ ...p, auditFrom: e.target.value }))} className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none" />
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Período desde *</label>
+              <input required type="date" value={form.auditFrom} onChange={(e) => setForm((p) => ({ ...p, auditFrom: e.target.value }))} className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 focus:border-indigo-500 focus:outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1.5">Período hasta *</label>
-              <input required type="date" value={form.auditTo} onChange={(e) => setForm((p) => ({ ...p, auditTo: e.target.value }))} className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none" />
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Período hasta *</label>
+              <input required type="date" value={form.auditTo} onChange={(e) => setForm((p) => ({ ...p, auditTo: e.target.value }))} className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 focus:border-indigo-500 focus:outline-none" />
             </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Personas a auditar * ({form.auditedUsers.length})</h2>
+        <div className="rounded-xl border border-[var(--border-base)] bg-white p-6 space-y-3">
+          <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Personas a auditar * ({form.auditedUsers.length})</h2>
           <div className="grid grid-cols-2 gap-2">
             {users.map((u) => (
-              <button key={u.id} type="button" onClick={() => toggleUser(u.id)} className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${form.auditedUsers.includes(u.id) ? 'border-indigo-500 bg-indigo-600/10' : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'}`}>
-                <div className={`h-5 w-5 rounded border flex items-center justify-center flex-shrink-0 ${form.auditedUsers.includes(u.id) ? 'bg-indigo-600 border-indigo-600' : 'border-zinc-600'}`}>
+              <button key={u.id} type="button" onClick={() => toggleUser(u.id)} className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${form.auditedUsers.includes(u.id) ? 'border-indigo-500 bg-indigo-600/10' : 'border-[var(--border-base)] bg-slate-100 hover:border-[var(--border-strong)]'}`}>
+                <div className={`h-5 w-5 rounded border flex items-center justify-center flex-shrink-0 ${form.auditedUsers.includes(u.id) ? 'bg-indigo-600 border-indigo-600' : 'border-[var(--border-strong)]'}`}>
                   {form.auditedUsers.includes(u.id) && <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">{u.fullName || (u as unknown as {email?: string}).email || 'Miembro'}</p>
-                  {u.department && <p className="text-xs text-zinc-500">{u.department}</p>}
+                  <p className="text-sm font-medium text-slate-900">{u.fullName || (u as unknown as {email?: string}).email || 'Miembro'}</p>
+                  {u.department && <p className="text-xs text-[var(--text-secondary)]">{u.department}</p>}
                 </div>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Checklist de verificación ({checklistItems.length} ítems)</h2>
+        <div className="rounded-xl border border-[var(--border-base)] bg-white p-6 space-y-3">
+          <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Checklist de verificación ({checklistItems.length} ítems)</h2>
           <div className="space-y-2">
             {checklistItems.map((item, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg bg-zinc-800 px-4 py-2.5">
-                <span className="text-sm text-zinc-300">✓ {item}</span>
-                <button type="button" onClick={() => setChecklistItems((prev) => prev.filter((_, idx) => idx !== i))} className="text-zinc-600 hover:text-red-400 transition-colors"><X className="h-4 w-4" /></button>
+              <div key={i} className="flex items-center justify-between rounded-lg bg-slate-100 px-4 py-2.5">
+                <span className="text-sm text-slate-700">✓ {item}</span>
+                <button type="button" onClick={() => setChecklistItems((prev) => prev.filter((_, idx) => idx !== i))} className="text-[var(--text-secondary)] hover:text-red-400 transition-colors"><X className="h-4 w-4" /></button>
               </div>
             ))}
           </div>
           <div className="flex gap-2">
-            <input value={newItem} onChange={(e) => setNewItem(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem())} placeholder="Agregar ítem al checklist..." className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none" />
-            <button type="button" onClick={addItem} className="rounded-lg bg-zinc-700 px-4 py-2 text-sm text-white hover:bg-zinc-600 transition-colors"><Plus className="h-4 w-4" /></button>
+            <input value={newItem} onChange={(e) => setNewItem(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addItem())} placeholder="Agregar ítem al checklist..." className="flex-1 rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2 text-sm text-slate-900 placeholder-[var(--text-muted)] focus:border-indigo-500 focus:outline-none" />
+            <button type="button" onClick={addItem} className="rounded-lg bg-slate-200 px-4 py-2 text-sm text-slate-900 hover:bg-slate-300 transition-colors"><Plus className="h-4 w-4" /></button>
           </div>
         </div>
 
         <div className="flex gap-3 justify-end">
-          <Link href="/audits" className="rounded-lg border border-zinc-700 px-5 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">Cancelar</Link>
+          <Link href="/audits" className="rounded-lg border border-[var(--border-base)] px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">Cancelar</Link>
           <button type="submit" disabled={loading} className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors">{loading ? 'Creando...' : 'Crear auditoría'}</button>
         </div>
       </form>

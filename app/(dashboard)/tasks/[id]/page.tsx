@@ -119,11 +119,11 @@ export default function TaskDetailPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/tasks" className="text-zinc-400 hover:text-white">
+        <Link href="/tasks" className="text-[var(--text-muted)] hover:text-slate-900">
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-xl font-bold text-white">{task.title}</h1>
+          <h1 className="text-xl font-bold text-slate-900">{task.title}</h1>
           <StatusBadge status={task.status} />
           <StatusBadge status={task.priority} />
         </div>
@@ -133,18 +133,18 @@ export default function TaskDetailPage() {
         {/* Main */}
         <div className="lg:col-span-2 space-y-5">
           {/* Description */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-            <h2 className="text-sm font-semibold text-zinc-400 mb-3 uppercase tracking-wider">Descripción</h2>
-            <p className="text-zinc-300 whitespace-pre-wrap">{task.description || 'Sin descripción'}</p>
+          <div className="rounded-xl border border-[var(--border-base)] bg-white p-5">
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] mb-3 uppercase tracking-wider">Descripción</h2>
+            <p className="text-slate-700 whitespace-pre-wrap">{task.description || 'Sin descripción'}</p>
           </div>
 
           {/* Progress */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+          <div className="rounded-xl border border-[var(--border-base)] bg-white p-5">
             <div className="flex justify-between mb-2">
-              <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Progreso</h2>
-              <span className="text-sm font-bold text-white">{task.progressPercent}%</span>
+              <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Progreso</h2>
+              <span className="text-sm font-bold text-slate-900">{task.progressPercent}%</span>
             </div>
-            <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
               <div
                 className="h-full rounded-full bg-indigo-500 transition-all"
                 style={{ width: `${task.progressPercent}%` }}
@@ -154,8 +154,8 @@ export default function TaskDetailPage() {
 
           {/* CEO Validation */}
           {isCEO && task.status !== 'rejected' && task.status !== 'completed' && (
-            <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5">
-              <h2 className="text-sm font-semibold text-zinc-400 mb-3 uppercase tracking-wider">Validación</h2>
+            <div className="rounded-xl border border-[var(--border-base)] bg-white p-5">
+              <h2 className="text-sm font-semibold text-[var(--text-muted)] mb-3 uppercase tracking-wider">Validación</h2>
               {!showValidationForm ? (
                 <div className="flex gap-2">
                   <button
@@ -185,7 +185,7 @@ export default function TaskDetailPage() {
                     value={validationNotes}
                     onChange={(e) => setValidationNotes(e.target.value)}
                     placeholder="Notas de validación (opcional)..."
-                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none resize-none text-sm"
+                    className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 placeholder-[var(--text-muted)] focus:border-indigo-500 focus:outline-none resize-none text-sm"
                   />
                   <div className="flex gap-2">
                     <button
@@ -204,7 +204,7 @@ export default function TaskDetailPage() {
                     </button>
                     <button
                       onClick={() => setShowValidationForm(false)}
-                      className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 transition-colors"
+                      className="rounded-lg border border-[var(--border-base)] px-4 py-2 text-sm text-[var(--text-muted)] hover:bg-slate-100 transition-colors"
                     >
                       Cancelar
                     </button>
@@ -219,19 +219,19 @@ export default function TaskDetailPage() {
             <div className={`rounded-xl border p-4 ${
               task.status === 'completed' ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'
             }`}>
-              <p className="text-sm font-medium text-zinc-300">
+              <p className="text-sm font-medium text-slate-700">
                 {task.status === 'completed' ? '✅ Validado' : '❌ Rechazado'} por {task.validatedBy?.fullName || 'Usuario'}
                 {task.validatedAt && ` el ${formatDateTime(task.validatedAt)}`}
               </p>
               {task.validationNotes && (
-                <p className="text-sm text-zinc-400 mt-1">{task.validationNotes}</p>
+                <p className="text-sm text-[var(--text-muted)] mt-1">{task.validationNotes}</p>
               )}
             </div>
           )}
 
           {/* Comments */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-            <h2 className="text-sm font-semibold text-zinc-400 mb-4 uppercase tracking-wider flex items-center gap-2">
+          <div className="rounded-xl border border-[var(--border-base)] bg-white p-5">
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] mb-4 uppercase tracking-wider flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
               Comentarios ({task.comments.length})
             </h2>
@@ -241,10 +241,10 @@ export default function TaskDetailPage() {
                   <Avatar name={c.author?.fullName || 'Usuario'} avatarUrl={c.author?.avatarUrl} size="sm" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white">{c.author?.fullName || 'Usuario'}</span>
-                      <span className="text-xs text-zinc-500">{timeAgo(c.createdAt)}</span>
+                      <span className="text-sm font-medium text-slate-900">{c.author?.fullName || 'Usuario'}</span>
+                      <span className="text-xs text-[var(--text-secondary)]">{timeAgo(c.createdAt)}</span>
                     </div>
-                    <p className="text-sm text-zinc-300 mt-0.5">{c.text}</p>
+                    <p className="text-sm text-slate-700 mt-0.5">{c.text}</p>
                   </div>
                 </div>
               ))}
@@ -256,7 +256,7 @@ export default function TaskDetailPage() {
                 onChange={(e) => setComment(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && submitComment()}
                 placeholder="Escribí un comentario..."
-                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none"
+                className="flex-1 rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2 text-sm text-slate-900 placeholder-[var(--text-muted)] focus:border-indigo-500 focus:outline-none"
               />
               <button
                 onClick={submitComment}
@@ -271,30 +271,30 @@ export default function TaskDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-4">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-4">
+          <div className="rounded-xl border border-[var(--border-base)] bg-white p-5 space-y-4">
             <div>
-              <p className="text-xs text-zinc-500 mb-1">Creado por</p>
+              <p className="text-xs text-[var(--text-secondary)] mb-1">Creado por</p>
               <div className="flex items-center gap-2">
                 <Avatar name={task.createdBy?.fullName || 'Usuario'} avatarUrl={task.createdBy?.avatarUrl} size="sm" />
-                <span className="text-sm text-white">{task.createdBy?.fullName || 'Usuario'}</span>
+                <span className="text-sm text-slate-900">{task.createdBy?.fullName || 'Usuario'}</span>
               </div>
             </div>
             <div>
-              <p className="text-xs text-zinc-500 mb-1">Deadline</p>
+              <p className="text-xs text-[var(--text-secondary)] mb-1">Deadline</p>
               <DeadlineCountdown deadline={task.deadline} />
               {task.deadline && (
-                <p className="text-xs text-zinc-600 mt-0.5">{formatDateTime(task.deadline)}</p>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">{formatDateTime(task.deadline)}</p>
               )}
             </div>
             {task.estimatedHours && (
               <div>
-                <p className="text-xs text-zinc-500 mb-1">Tiempo estimado</p>
-                <p className="text-sm text-white">{task.estimatedHours}h</p>
+                <p className="text-xs text-[var(--text-secondary)] mb-1">Tiempo estimado</p>
+                <p className="text-sm text-slate-900">{task.estimatedHours}h</p>
               </div>
             )}
             {task.client && (
               <div>
-                <p className="text-xs text-zinc-500 mb-1">Cliente</p>
+                <p className="text-xs text-[var(--text-secondary)] mb-1">Cliente</p>
                 <Link href={`/clients/${task.client.id}`} className="text-sm text-indigo-400 hover:text-indigo-300">
                   {task.client.name}
                 </Link>
@@ -302,7 +302,7 @@ export default function TaskDetailPage() {
             )}
             {task.sopLink && (
               <div>
-                <p className="text-xs text-zinc-500 mb-1">SOP</p>
+                <p className="text-xs text-[var(--text-secondary)] mb-1">SOP</p>
                 <a
                   href={task.sopLink}
                   target="_blank"
@@ -315,21 +315,21 @@ export default function TaskDetailPage() {
               </div>
             )}
             <div>
-              <p className="text-xs text-zinc-500 mb-1">Creada</p>
-              <p className="text-sm text-zinc-400">{formatDateTime(task.createdAt)}</p>
+              <p className="text-xs text-[var(--text-secondary)] mb-1">Creada</p>
+              <p className="text-sm text-[var(--text-muted)]">{formatDateTime(task.createdAt)}</p>
             </div>
           </div>
 
           {/* Activity Log */}
           {task.activityLog.length > 0 && (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-              <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Actividad</h3>
+            <div className="rounded-xl border border-[var(--border-base)] bg-white p-5">
+              <h3 className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">Actividad</h3>
               <div className="space-y-2">
                 {task.activityLog.slice(0, 8).map((log) => (
-                  <div key={log.id} className="text-xs text-zinc-400">
-                    <span className="text-zinc-300">{log.user?.fullName || 'Usuario'}</span>{' '}
+                  <div key={log.id} className="text-xs text-[var(--text-muted)]">
+                    <span className="text-slate-700">{log.user?.fullName || 'Usuario'}</span>{' '}
                     {log.description || log.actionType}{' '}
-                    <span className="text-zinc-600">· {timeAgo(log.createdAt)}</span>
+                    <span className="text-[var(--text-secondary)]">· {timeAgo(log.createdAt)}</span>
                   </div>
                 ))}
               </div>

@@ -67,27 +67,27 @@ export default function AuditsPage() {
       ) : audits.length === 0 ? (
         <EmptyState icon={Search} title="No hay auditorías" description="Creá la primera auditoría de proceso" />
       ) : (
-        <div className="rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="rounded-xl border border-[var(--border-base)] overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-3 uppercase tracking-wider">Auditoría</th>
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-3 uppercase tracking-wider">Período</th>
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-3 uppercase tracking-wider">Estado</th>
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-3 uppercase tracking-wider">Score</th>
-                <th className="text-left text-xs font-medium text-zinc-500 px-4 py-3 uppercase tracking-wider">Resultado</th>
+              <tr className="border-b border-[var(--border-base)] bg-slate-50">
+                <th className="text-left text-xs font-medium text-[var(--text-secondary)] px-4 py-3 uppercase tracking-wider">Auditoría</th>
+                <th className="text-left text-xs font-medium text-[var(--text-secondary)] px-4 py-3 uppercase tracking-wider">Período</th>
+                <th className="text-left text-xs font-medium text-[var(--text-secondary)] px-4 py-3 uppercase tracking-wider">Estado</th>
+                <th className="text-left text-xs font-medium text-[var(--text-secondary)] px-4 py-3 uppercase tracking-wider">Score</th>
+                <th className="text-left text-xs font-medium text-[var(--text-secondary)] px-4 py-3 uppercase tracking-wider">Resultado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800 bg-zinc-900">
+            <tbody className="divide-y divide-slate-200 bg-white">
               {audits.map((audit) => (
-                <tr key={audit.id} className="hover:bg-zinc-800/50 transition-colors">
+                <tr key={audit.id} className="hover:bg-slate-100 transition-colors">
                   <td className="px-4 py-3">
                     <Link href={`/audits/${audit.id}`} className="font-medium text-white hover:text-indigo-300">
                       {audit.title}
                     </Link>
-                    <p className="text-xs text-zinc-500">{audit.processName}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">{audit.processName}</p>
                   </td>
-                  <td className="px-4 py-3 text-sm text-zinc-400">
+                  <td className="px-4 py-3 text-sm text-[var(--text-muted)]">
                     {formatDate(audit.auditFrom)} → {formatDate(audit.auditTo)}
                   </td>
                   <td className="px-4 py-3"><StatusBadge status={audit.status} /></td>

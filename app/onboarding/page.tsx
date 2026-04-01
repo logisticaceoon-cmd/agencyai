@@ -275,7 +275,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[var(--bg-subtle)] flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2.5 mb-6">

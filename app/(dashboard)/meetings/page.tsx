@@ -93,52 +93,52 @@ export default function MeetingsPage() {
 
       {/* Create Form */}
       {showForm && (
-        <form onSubmit={handleCreate} className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
+        <form onSubmit={handleCreate} className="rounded-xl border border-[var(--border-base)] bg-white p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Título *</label>
-              <input name="title" required className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="Reunión semanal..." />
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Título *</label>
+              <input name="title" required className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Reunión semanal..." />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Cliente</label>
-              <select name="clientId" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white">
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Cliente</label>
+              <select name="clientId" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white">
                 <option value="">Sin cliente</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Fecha *</label>
-              <input name="date" type="datetime-local" required className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" />
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Fecha *</label>
+              <input name="date" type="datetime-local" required className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Asistentes (separados por coma)</label>
-              <input name="attendees" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="Juan, María, Carlos..." />
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Asistentes (separados por coma)</label>
+              <input name="attendees" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Juan, María, Carlos..." />
             </div>
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Resumen</label>
-            <textarea name="summary" rows={3} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="Resumen de la reunión..." />
+            <label className="text-xs text-[var(--text-muted)] mb-1 block">Resumen</label>
+            <textarea name="summary" rows={3} className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Resumen de la reunión..." />
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Decisiones</label>
-            <textarea name="decisions" rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="Decisiones tomadas..." />
+            <label className="text-xs text-[var(--text-muted)] mb-1 block">Decisiones</label>
+            <textarea name="decisions" rows={2} className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Decisiones tomadas..." />
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Tareas acordadas (una por línea → se crean automáticamente)</label>
-            <textarea name="agreedTasks" rows={3} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="Crear landing page&#10;Revisar campañas Meta&#10;Enviar reporte mensual" />
+            <label className="text-xs text-[var(--text-muted)] mb-1 block">Tareas acordadas (una por línea → se crean automáticamente)</label>
+            <textarea name="agreedTasks" rows={3} className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Crear landing page&#10;Revisar campañas Meta&#10;Enviar reporte mensual" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Próxima reunión</label>
-              <input name="nextMeetingDate" type="datetime-local" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" />
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Próxima reunión</label>
+              <input name="nextMeetingDate" type="datetime-local" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Notas adicionales</label>
-              <input name="notes" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="Notas..." />
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Notas adicionales</label>
+              <input name="notes" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Notas..." />
             </div>
           </div>
 
@@ -151,21 +151,21 @@ export default function MeetingsPage() {
       {/* Meetings List */}
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-20 bg-zinc-800 rounded-xl animate-pulse" />)}
+          {[1, 2, 3].map(i => <div key={i} className="h-20 bg-slate-100 rounded-xl animate-pulse" />)}
         </div>
       ) : meetings.length === 0 ? (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-12 text-center">
-          <MessageSquare className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
+        <div className="rounded-xl border border-[var(--border-base)] bg-white p-12 text-center">
+          <MessageSquare className="h-12 w-12 text-[var(--text-secondary)] mx-auto mb-4" />
           <h3 className="text-lg font-medium text-white mb-2">No hay minutas aún</h3>
-          <p className="text-sm text-zinc-400">Registra tu primera reunión y convierte acuerdos en tareas automáticamente.</p>
+          <p className="text-sm text-[var(--text-muted)]">Registra tu primera reunión y convierte acuerdos en tareas automáticamente.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {meetings.map(meeting => (
-            <div key={meeting.id} className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
+            <div key={meeting.id} className="rounded-xl border border-[var(--border-base)] bg-white overflow-hidden">
               <button
                 onClick={() => setExpanded(expanded === meeting.id ? null : meeting.id)}
-                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-zinc-800/50 transition-colors text-left"
+                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-100 transition-colors text-left"
               >
                 <div className="rounded-lg bg-indigo-500/10 p-2 flex-shrink-0">
                   <MessageSquare className="h-4 w-4 text-indigo-400" />
@@ -174,10 +174,10 @@ export default function MeetingsPage() {
                   <div className="flex items-center gap-2 mb-0.5">
                     <p className="text-sm font-medium text-white truncate">{meeting.title}</p>
                     {meeting.client && (
-                      <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">{meeting.client.name}</span>
+                      <span className="text-xs bg-slate-100 text-[var(--text-muted)] px-2 py-0.5 rounded-full">{meeting.client.name}</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-zinc-500">
+                  <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
                     <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatDate(meeting.date)}</span>
                     {meeting.attendees.length > 0 && (
                       <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {meeting.attendees.length} asistentes</span>
@@ -187,31 +187,31 @@ export default function MeetingsPage() {
                     )}
                   </div>
                 </div>
-                {expanded === meeting.id ? <ChevronUp className="h-4 w-4 text-zinc-500" /> : <ChevronDown className="h-4 w-4 text-zinc-500" />}
+                {expanded === meeting.id ? <ChevronUp className="h-4 w-4 text-[var(--text-secondary)]" /> : <ChevronDown className="h-4 w-4 text-[var(--text-secondary)]" />}
               </button>
 
               {expanded === meeting.id && (
-                <div className="px-5 pb-5 border-t border-zinc-800 space-y-4 pt-4">
+                <div className="px-5 pb-5 border-t border-[var(--border-base)] space-y-4 pt-4">
                   {meeting.summary && (
                     <div>
-                      <p className="text-xs font-medium text-zinc-400 mb-1">Resumen</p>
-                      <p className="text-sm text-zinc-300 whitespace-pre-wrap">{meeting.summary}</p>
+                      <p className="text-xs font-medium text-[var(--text-muted)] mb-1">Resumen</p>
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{meeting.summary}</p>
                     </div>
                   )}
                   {meeting.decisions && (
                     <div>
-                      <p className="text-xs font-medium text-zinc-400 mb-1">Decisiones</p>
-                      <p className="text-sm text-zinc-300 whitespace-pre-wrap">{meeting.decisions}</p>
+                      <p className="text-xs font-medium text-[var(--text-muted)] mb-1">Decisiones</p>
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{meeting.decisions}</p>
                     </div>
                   )}
                   {meeting.agreedTasks && Array.isArray(meeting.agreedTasks) && (meeting.agreedTasks as { title: string }[]).length > 0 && (
                     <div>
-                      <p className="text-xs font-medium text-zinc-400 mb-2">Tareas acordadas</p>
+                      <p className="text-xs font-medium text-[var(--text-muted)] mb-2">Tareas acordadas</p>
                       <div className="space-y-1">
                         {(meeting.agreedTasks as { title: string }[]).map((t, i) => (
                           <div key={i} className="flex items-center gap-2 text-sm">
                             <ArrowRight className="h-3 w-3 text-indigo-400 flex-shrink-0" />
-                            <span className="text-zinc-300">{t.title}</span>
+                            <span className="text-slate-700">{t.title}</span>
                           </div>
                         ))}
                       </div>
@@ -219,20 +219,20 @@ export default function MeetingsPage() {
                   )}
                   {meeting.attendees.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium text-zinc-400 mb-1">Asistentes</p>
+                      <p className="text-xs font-medium text-[var(--text-muted)] mb-1">Asistentes</p>
                       <div className="flex flex-wrap gap-1">
                         {meeting.attendees.map((a, i) => (
-                          <span key={i} className="text-xs bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full">{a}</span>
+                          <span key={i} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">{a}</span>
                         ))}
                       </div>
                     </div>
                   )}
                   {meeting.nextMeetingDate && (
-                    <p className="text-xs text-zinc-500">
-                      Próxima reunión: <span className="text-zinc-300">{formatDate(meeting.nextMeetingDate)}</span>
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      Próxima reunión: <span className="text-slate-700">{formatDate(meeting.nextMeetingDate)}</span>
                     </p>
                   )}
-                  {meeting.notes && <p className="text-xs text-zinc-500 italic">{meeting.notes}</p>}
+                  {meeting.notes && <p className="text-xs text-[var(--text-secondary)] italic">{meeting.notes}</p>}
                 </div>
               )}
             </div>

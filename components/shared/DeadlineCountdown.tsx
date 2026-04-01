@@ -8,7 +8,7 @@ interface DeadlineCountdownProps {
 }
 
 export function DeadlineCountdown({ deadline, className }: DeadlineCountdownProps) {
-  if (!deadline) return <span className="text-zinc-500 text-xs">Sin deadline</span>
+  if (!deadline) return <span className="text-[var(--text-muted)] text-xs">Sin deadline</span>
 
   const overdue = isOverdue(deadline)
   const text = deadlineCountdown(deadline)
@@ -17,7 +17,7 @@ export function DeadlineCountdown({ deadline, className }: DeadlineCountdownProp
     <span
       className={cn(
         'text-xs font-medium',
-        overdue ? 'text-red-400' : 'text-zinc-400',
+        overdue ? 'text-[var(--red)]' : 'text-[var(--text-muted)]',
         className
       )}
     >

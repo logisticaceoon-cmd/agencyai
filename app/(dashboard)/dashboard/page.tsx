@@ -12,11 +12,10 @@ import {
   Clock,
   ArrowRight,
   Plus,
-  FileText,
   BarChart2,
   Rocket,
-  UserPlus,
-  Settings,
+  TrendingUp,
+  Activity,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -60,8 +59,6 @@ function getCurrentDateTimeString(): string {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   }
   return now.toLocaleDateString('es-ES', options)
 }
@@ -79,24 +76,18 @@ function getDaysRemainingBadge(deadline: string) {
   if (days < 0) {
     return {
       label: `${Math.abs(days)}d vencida`,
-      className: 'bg-red-50 text-red-700 border-red-200',
+      color: 'bg-[var(--red-light)] text-[var(--red)]',
     }
   }
-  if (days === 0) {
+  if (days <= 3) {
     return {
-      label: 'Hoy',
-      className: 'bg-amber-50 text-amber-700 border-amber-200',
-    }
-  }
-  if (days <= 2) {
-    return {
-      label: `${days}d`,
-      className: 'bg-amber-50 text-amber-700 border-amber-200',
+      label: days === 0 ? 'Hoy' : `${days}d`,
+      color: 'bg-[var(--yellow-light)] text-[var(--yellow)]',
     }
   }
   return {
     label: `${days}d`,
-    className: 'bg-green-50 text-green-700 border-green-200',
+    color: 'bg-[var(--green-light)] text-[var(--green)]',
   }
 }
 
@@ -112,7 +103,7 @@ function getInitials(name: string) {
 function getAvatarColor(name: string) {
   const colors = [
     'bg-blue-500',
-    'bg-green-500',
+    'bg-emerald-500',
     'bg-purple-500',
     'bg-amber-500',
     'bg-rose-500',
@@ -129,10 +120,10 @@ const priorityLabel: Record<string, string> = {
 }
 
 const priorityColor: Record<string, string> = {
-  critical: 'bg-red-50 text-red-700 border-red-200',
-  high: 'bg-orange-50 text-orange-700 border-orange-200',
-  medium: 'bg-amber-50 text-amber-700 border-amber-200',
-  low: 'bg-green-50 text-green-700 border-green-200',
+  critical: 'bg-[var(--red-light)] text-[var(--red)]',
+  high: 'bg-orange-50 text-orange-600',
+  medium: 'bg-[var(--yellow-light)] text-[var(--yellow)]',
+  low: 'bg-[var(--green-light)] text-[var(--green)]',
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -170,134 +161,145 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">
           {greeting}
           {firstName ? `, ${firstName}` : ''}
         </h1>
-        <p className="mt-1 text-sm text-slate-500 capitalize">
+        <p className="mt-1 text-sm text-[var(--text-muted)] capitalize">
           {dateString}
         </p>
       </div>
 
       {/* ── First-access checklist ─────────────────────────────────────── */}
       {isFirstAccess && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
+        <div className="rounded-[var(--radius-lg)] border border-blue-200 bg-[var(--blue-light)] p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Rocket className="h-5 w-5 text-blue-600" />
-            <h2 className="text-base font-semibold text-slate-900">
+            <Rocket size={16} strokeWidth={1.5} className="text-[var(--blue)]" />
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">
               Primeros pasos
             </h2>
           </div>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="flex h-5 w-5 items-center justify-center rounded border border-green-300 bg-green-100">
-                <CheckSquare className="h-3.5 w-3.5 text-green-600" />
+                <CheckSquare size={12} strokeWidth={1.5} className="text-[var(--green)]" />
               </div>
-              <span className="text-sm text-slate-500 line-through">
+              <span className="text-sm text-[var(--text-muted)] line-through">
                 Crear tu workspace
               </span>
             </div>
-            <Link
-              href="/clients"
-              className="flex items-center gap-3 group"
-            >
-              <div className="flex h-5 w-5 items-center justify-center rounded border border-slate-300 bg-white" />
-              <span className="text-sm text-slate-700 group-hover:text-blue-600 transition-colors">
+            <Link href="/clients" className="flex items-center gap-3 group">
+              <div className="flex h-5 w-5 items-center justify-center rounded border border-[var(--border-base)] bg-white" />
+              <span className="text-sm text-[var(--text-secondary)] group-hover:text-[var(--blue)] transition-colors">
                 Agregar tu primer cliente
               </span>
-              <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+              <ArrowRight size={14} strokeWidth={1.5} className="text-[var(--text-muted)] group-hover:text-[var(--blue)] transition-colors" />
             </Link>
-            <Link
-              href="/projects"
-              className="flex items-center gap-3 group"
-            >
-              <div className="flex h-5 w-5 items-center justify-center rounded border border-slate-300 bg-white" />
-              <span className="text-sm text-slate-700 group-hover:text-blue-600 transition-colors">
+            <Link href="/projects" className="flex items-center gap-3 group">
+              <div className="flex h-5 w-5 items-center justify-center rounded border border-[var(--border-base)] bg-white" />
+              <span className="text-sm text-[var(--text-secondary)] group-hover:text-[var(--blue)] transition-colors">
                 Crear tu primer proyecto
               </span>
-              <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+              <ArrowRight size={14} strokeWidth={1.5} className="text-[var(--text-muted)] group-hover:text-[var(--blue)] transition-colors" />
             </Link>
-            <Link
-              href="/settings"
-              className="flex items-center gap-3 group"
-            >
-              <div className="flex h-5 w-5 items-center justify-center rounded border border-slate-300 bg-white" />
-              <span className="text-sm text-slate-700 group-hover:text-blue-600 transition-colors">
+            <Link href="/settings" className="flex items-center gap-3 group">
+              <div className="flex h-5 w-5 items-center justify-center rounded border border-[var(--border-base)] bg-white" />
+              <span className="text-sm text-[var(--text-secondary)] group-hover:text-[var(--blue)] transition-colors">
                 Invitar a tu equipo
               </span>
-              <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+              <ArrowRight size={14} strokeWidth={1.5} className="text-[var(--text-muted)] group-hover:text-[var(--blue)] transition-colors" />
             </Link>
           </div>
         </div>
       )}
 
-      {/* ── KPI Cards ──────────────────────────────────────────────────── */}
+      {/* ── Row 1: Metric Cards ───────────────────────────────────────── */}
       {loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="rounded-xl border border-slate-200 bg-white p-4 space-y-3"
-            >
+            <div key={i} className="metric-card space-y-3">
               <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-full bg-slate-200 animate-pulse" />
-                <div className="h-3 w-20 rounded bg-slate-200 animate-pulse" />
+                <div className="h-8 w-8 rounded-[var(--radius-sm)] bg-slate-100 animate-pulse" />
+                <div className="h-3 w-20 rounded bg-slate-100 animate-pulse" />
               </div>
-              <div className="h-7 w-16 rounded bg-slate-200 animate-pulse" />
-              <div className="h-3 w-24 rounded bg-slate-200 animate-pulse" />
+              <div className="h-8 w-16 rounded bg-slate-100 animate-pulse" />
+              <div className="h-3 w-24 rounded bg-slate-100 animate-pulse" />
             </div>
           ))}
         </div>
       ) : stats ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard
+          <MetricCard
             icon={Users}
             label="Clientes activos"
             value={stats.activeClients}
-            subtitle={`de ${stats.totalClients} totales`}
-            iconBg="bg-blue-100"
-            iconColor="text-blue-600"
+            footer={`de ${stats.totalClients} totales`}
+            iconBg="bg-[var(--blue-light)]"
+            iconColor="text-[var(--blue)]"
           />
-          <KpiCard
+          <MetricCard
             icon={FolderKanban}
             label="Proyectos activos"
             value={stats.activeProjects}
-            subtitle="en progreso"
-            iconBg="bg-purple-100"
-            iconColor="text-purple-600"
+            footer="en progreso"
+            iconBg="bg-[var(--purple-light)]"
+            iconColor="text-[var(--purple)]"
           />
-          <KpiCard
+          <MetricCard
             icon={CheckSquare}
             label="Tareas completadas"
             value={stats.tasksCompletedThisWeek}
-            subtitle="esta semana"
-            iconBg="bg-green-100"
-            iconColor="text-green-600"
+            footer="esta semana"
+            iconBg="bg-[var(--green-light)]"
+            iconColor="text-[var(--green)]"
           />
-          <KpiCard
+          <MetricCard
             icon={AlertTriangle}
             label="Tareas vencidas"
             value={stats.tasksOverdue}
-            subtitle={stats.tasksOverdue > 0 ? 'requieren atencion' : 'todo al dia'}
-            subtitleColor={stats.tasksOverdue > 0 ? 'text-red-500' : 'text-green-600'}
-            iconBg="bg-red-100"
-            iconColor="text-red-600"
+            footer={stats.tasksOverdue > 0 ? 'requieren atencion' : 'todo al dia'}
+            footerColor={stats.tasksOverdue > 0 ? 'text-[var(--red)]' : 'text-[var(--green)]'}
+            iconBg="bg-[var(--red-light)]"
+            iconColor="text-[var(--red)]"
           />
         </div>
       ) : null}
 
-      {/* ── Main content grid ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Pending tasks */}
-        <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-5">
+      {/* ── Row 2: Activity + Upcoming Tasks ──────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+        {/* Activity summary — 65% */}
+        <div className="lg:col-span-3 rounded-[var(--radius-lg)] border border-[var(--border-base)] bg-white p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <Clock className="h-4 w-4 text-blue-600" />
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+              <Activity size={16} strokeWidth={1.5} className="text-[var(--blue)]" />
+              Actividad del mes
+            </h2>
+          </div>
+          {loading ? (
+            <div className="h-48 bg-slate-50 rounded-lg animate-pulse" />
+          ) : (
+            <div className="h-48 flex items-center justify-center rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-base)]">
+              <div className="text-center">
+                <BarChart2 size={32} strokeWidth={1} className="text-[var(--text-muted)] mx-auto mb-2" />
+                <p className="text-sm text-[var(--text-muted)]">Grafico de actividad</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">
+                  {stats ? `${stats.tasksCompletedThisWeek} tareas completadas esta semana` : ''}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Upcoming tasks — 35% */}
+        <div className="lg:col-span-2 rounded-[var(--radius-lg)] border border-[var(--border-base)] bg-white p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+              <Clock size={16} strokeWidth={1.5} className="text-[var(--blue)]" />
               Tareas proximas
             </h2>
             <Link
               href="/tasks"
-              className="text-xs text-blue-600 hover:text-blue-700 transition-colors"
+              className="text-xs text-[var(--blue)] hover:text-[#1d4ed8] font-medium transition-colors"
             >
               Ver todas
             </Link>
@@ -305,52 +307,48 @@ export default function DashboardPage() {
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-3 p-3">
-                  <div className="h-4 w-4 rounded bg-slate-200 animate-pulse" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-2/3 rounded bg-slate-200 animate-pulse" />
-                    <div className="h-3 w-1/3 rounded bg-slate-200 animate-pulse" />
+                <div key={i} className="flex items-center gap-3 p-2">
+                  <div className="h-3 w-3 rounded bg-slate-100 animate-pulse" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3.5 w-2/3 rounded bg-slate-100 animate-pulse" />
+                    <div className="h-2.5 w-1/3 rounded bg-slate-100 animate-pulse" />
                   </div>
-                  <div className="h-5 w-14 rounded-full bg-slate-200 animate-pulse" />
+                  <div className="h-5 w-12 rounded-full bg-slate-100 animate-pulse" />
                 </div>
               ))}
             </div>
           ) : stats && stats.pendingTasks.length > 0 ? (
             <div className="space-y-1">
-              {stats.pendingTasks.map((task) => {
+              {stats.pendingTasks.slice(0, 5).map((task) => {
                 const badge = getDaysRemainingBadge(task.deadline)
                 return (
                   <Link
                     key={task.id}
                     href={`/tasks/${task.id}`}
-                    className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-slate-50 transition-colors group"
+                    className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-[var(--bg-subtle)] transition-colors group"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate group-hover:text-blue-600 transition-colors">
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--blue)] transition-colors">
                         {task.title}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {task.client && (
-                          <span className="text-xs text-slate-400">
+                          <span className="text-xs text-[var(--text-muted)]">
                             {task.client.name}
                           </span>
                         )}
-                        <span
-                          className={cn(
-                            'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
-                            priorityColor[task.priority] || priorityColor.medium
-                          )}
-                        >
+                        <span className={cn(
+                          'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                          priorityColor[task.priority] || priorityColor.medium
+                        )}>
                           {priorityLabel[task.priority] || task.priority}
                         </span>
                       </div>
                     </div>
-                    <span
-                      className={cn(
-                        'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium flex-shrink-0 ml-3',
-                        badge.className
-                      )}
-                    >
+                    <span className={cn(
+                      'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold flex-shrink-0 ml-3',
+                      badge.color
+                    )}>
                       {badge.label}
                     </span>
                   </Link>
@@ -359,24 +357,27 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <CheckSquare className="h-8 w-8 text-slate-300 mb-2" />
-              <p className="text-sm text-slate-500">
+              <CheckSquare size={24} strokeWidth={1.5} className="text-[var(--text-muted)] mb-2" />
+              <p className="text-sm text-[var(--text-muted)]">
                 No hay tareas pendientes con fecha limite
               </p>
             </div>
           )}
         </div>
+      </div>
 
+      {/* ── Row 3: Recent Clients + Active Projects ───────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Recent clients */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border-base)] bg-white p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <Users className="h-4 w-4 text-blue-600" />
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+              <Users size={16} strokeWidth={1.5} className="text-[var(--blue)]" />
               Clientes recientes
             </h2>
             <Link
               href="/clients"
-              className="text-xs text-blue-600 hover:text-blue-700 transition-colors"
+              className="text-xs text-[var(--blue)] hover:text-[#1d4ed8] font-medium transition-colors"
             >
               Ver todos
             </Link>
@@ -385,21 +386,21 @@ export default function DashboardPage() {
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-slate-200 animate-pulse" />
+                  <div className="h-9 w-9 rounded-full bg-slate-100 animate-pulse" />
                   <div className="flex-1 space-y-1">
-                    <div className="h-4 w-2/3 rounded bg-slate-200 animate-pulse" />
-                    <div className="h-3 w-1/3 rounded bg-slate-200 animate-pulse" />
+                    <div className="h-3.5 w-2/3 rounded bg-slate-100 animate-pulse" />
+                    <div className="h-2.5 w-1/3 rounded bg-slate-100 animate-pulse" />
                   </div>
                 </div>
               ))}
             </div>
           ) : stats && stats.recentClients.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {stats.recentClients.map((client) => (
                 <Link
                   key={client.id}
                   href={`/clients/${client.id}`}
-                  className="flex items-center gap-3 rounded-lg p-2 hover:bg-slate-50 transition-colors"
+                  className="flex items-center gap-3 rounded-lg p-2.5 hover:bg-[var(--bg-subtle)] transition-colors"
                 >
                   <div
                     className={cn(
@@ -410,106 +411,115 @@ export default function DashboardPage() {
                     {getInitials(client.name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">
+                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                       {client.name}
                     </p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-[var(--text-muted)]">
                       {formatDate(client.createdAt)}
                     </p>
                   </div>
+                  <span className={cn(
+                    'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                    client.status === 'active' ? 'bg-[var(--green-light)] text-[var(--green)]' : 'bg-slate-100 text-slate-500'
+                  )}>
+                    {client.status === 'active' ? 'Activo' : client.status}
+                  </span>
                 </Link>
               ))}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Users className="h-8 w-8 text-slate-300 mb-2" />
-              <p className="text-sm text-slate-500">Sin clientes aun</p>
+              <Users size={24} strokeWidth={1.5} className="text-[var(--text-muted)] mb-2" />
+              <p className="text-sm text-[var(--text-muted)]">Sin clientes aun</p>
               <Link
                 href="/clients"
-                className="mt-2 text-xs text-blue-600 hover:text-blue-700"
+                className="mt-2 text-xs text-[var(--blue)] hover:text-[#1d4ed8] font-medium"
               >
                 Agregar cliente
               </Link>
             </div>
           )}
         </div>
-      </div>
 
-      {/* ── Quick Actions ──────────────────────────────────────────────── */}
-      <div>
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">
-          Accesos rapidos
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <QuickActionCard
-            href="/clients"
-            icon={Users}
-            label="Clientes"
-            description="Gestionar CRM"
-            iconBg="bg-blue-100"
-            iconColor="text-blue-600"
-          />
-          <QuickActionCard
-            href="/projects"
-            icon={FolderKanban}
-            label="Proyectos"
-            description="Ver proyectos"
-            iconBg="bg-purple-100"
-            iconColor="text-purple-600"
-          />
-          <QuickActionCard
-            href="/tasks"
-            icon={CheckSquare}
-            label="Tareas"
-            description="Gestionar tareas"
-            iconBg="bg-green-100"
-            iconColor="text-green-600"
-          />
-          <QuickActionCard
-            href="/reports"
-            icon={BarChart2}
-            label="Reportes"
-            description="Ver reportes"
-            iconBg="bg-amber-100"
-            iconColor="text-amber-600"
-          />
+        {/* Quick Actions */}
+        <div className="rounded-[var(--radius-lg)] border border-[var(--border-base)] bg-white p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+              <TrendingUp size={16} strokeWidth={1.5} className="text-[var(--blue)]" />
+              Accesos rapidos
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <QuickActionCard
+              href="/clients"
+              icon={Users}
+              label="Clientes"
+              description="Gestionar CRM"
+              iconBg="bg-[var(--blue-light)]"
+              iconColor="text-[var(--blue)]"
+            />
+            <QuickActionCard
+              href="/projects"
+              icon={FolderKanban}
+              label="Proyectos"
+              description="Ver proyectos"
+              iconBg="bg-[var(--purple-light)]"
+              iconColor="text-[var(--purple)]"
+            />
+            <QuickActionCard
+              href="/tasks"
+              icon={CheckSquare}
+              label="Tareas"
+              description="Gestionar tareas"
+              iconBg="bg-[var(--green-light)]"
+              iconColor="text-[var(--green)]"
+            />
+            <QuickActionCard
+              href="/reports"
+              icon={BarChart2}
+              label="Reportes"
+              description="Ver reportes"
+              iconBg="bg-[var(--yellow-light)]"
+              iconColor="text-[var(--yellow)]"
+            />
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-// ── KPI Card ─────────────────────────────────────────────────────────────────
+// ── Metric Card ─────────────────────────────────────────────────────────────
 
-function KpiCard({
+function MetricCard({
   icon: Icon,
   label,
   value,
-  subtitle,
+  footer,
   iconBg,
   iconColor,
-  subtitleColor,
+  footerColor,
 }: {
   icon: React.ElementType
   label: string
   value: number
-  subtitle: string
+  footer: string
   iconBg: string
   iconColor: string
-  subtitleColor?: string
+  footerColor?: string
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="flex items-center gap-2.5 mb-3">
-        <div className={cn('flex h-8 w-8 items-center justify-center rounded-full', iconBg)}>
-          <Icon className={cn('h-4 w-4', iconColor)} />
+    <div className="metric-card">
+      <div className="metric-header">
+        <div className={cn('metric-icon', iconBg)}>
+          <Icon size={16} strokeWidth={1.5} className={iconColor} />
         </div>
-        <span className="text-xs font-medium text-slate-500">{label}</span>
+        <span className="metric-label">{label}</span>
       </div>
-      <p className="text-2xl font-bold text-slate-900">{value}</p>
-      <p className={cn('text-xs mt-0.5', subtitleColor ?? 'text-slate-400')}>
-        {subtitle}
-      </p>
+      <div className="metric-value">{value}</div>
+      <div className="metric-footer">
+        <span className={cn('metric-period', footerColor)}>{footer}</span>
+      </div>
     </div>
   )
 }
@@ -534,16 +544,16 @@ function QuickActionCard({
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 hover:border-slate-300 hover:shadow-sm transition-all group"
+      className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border-base)] bg-white p-3.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)] transition-all group"
     >
-      <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', iconBg)}>
-        <Icon className={cn('h-5 w-5', iconColor)} />
+      <div className={cn('flex h-9 w-9 items-center justify-center rounded-[var(--radius-sm)]', iconBg)}>
+        <Icon size={16} strokeWidth={1.5} className={iconColor} />
       </div>
       <div>
-        <p className="text-sm font-medium text-slate-800 group-hover:text-blue-600 transition-colors">
+        <p className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--blue)] transition-colors">
           {label}
         </p>
-        <p className="text-xs text-slate-400">{description}</p>
+        <p className="text-xs text-[var(--text-muted)]">{description}</p>
       </div>
     </Link>
   )

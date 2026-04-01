@@ -103,46 +103,46 @@ export default function NewTaskPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/tasks" className="text-zinc-400 hover:text-white transition-colors">
+        <Link href="/tasks" className="text-[var(--text-muted)] hover:text-slate-900 transition-colors">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="text-2xl font-bold text-white">Nueva tarea</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Nueva tarea</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Información básica</h2>
+        <div className="rounded-xl border border-[var(--border-base)] bg-white p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">Información básica</h2>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Título *</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Título *</label>
             <input
               type="text"
               required
               value={form.title}
               onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
               placeholder="Ej: Crear campaña de email para cliente X"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 placeholder-[var(--text-muted)] focus:border-indigo-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Descripción</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Descripción</label>
             <textarea
               rows={4}
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
               placeholder="Detalles de la tarea, contexto, entregables esperados..."
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none resize-none"
+              className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 placeholder-[var(--text-muted)] focus:border-indigo-500 focus:outline-none resize-none"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1.5">Prioridad</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Prioridad</label>
               <select
                 value={form.priority}
                 onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 focus:border-indigo-500 focus:outline-none"
               >
                 <option value="low">🟢 Baja</option>
                 <option value="medium">🟠 Media</option>
@@ -152,23 +152,23 @@ export default function NewTaskPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1.5">Deadline</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Deadline</label>
               <input
                 type="datetime-local"
                 value={form.deadline}
                 onChange={(e) => setForm((p) => ({ ...p, deadline: e.target.value }))}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 focus:border-indigo-500 focus:outline-none"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1.5">Cliente (opcional)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Cliente (opcional)</label>
               <select
                 value={form.clientId}
                 onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 focus:border-indigo-500 focus:outline-none"
               >
                 <option value="">Sin cliente</option>
                 {clients.map((c) => (
@@ -178,32 +178,32 @@ export default function NewTaskPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-1.5">Horas estimadas</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Horas estimadas</label>
               <input
                 type="number"
                 min="1"
                 value={form.estimatedHours}
                 onChange={(e) => setForm((p) => ({ ...p, estimatedHours: e.target.value }))}
                 placeholder="e.g. 4"
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 placeholder-[var(--text-muted)] focus:border-indigo-500 focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1.5">Link al SOP (opcional)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Link al SOP (opcional)</label>
             <input
               type="url"
               value={form.sopLink}
               onChange={(e) => setForm((p) => ({ ...p, sopLink: e.target.value }))}
               placeholder="https://..."
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 focus:border-indigo-500 focus:outline-none"
+              className="w-full rounded-lg border border-[var(--border-base)] bg-slate-100 px-4 py-2.5 text-slate-900 placeholder-[var(--text-muted)] focus:border-indigo-500 focus:outline-none"
             />
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">
+        <div className="rounded-xl border border-[var(--border-base)] bg-white p-6 space-y-4">
+          <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider">
             Asignar a * ({form.assignedTo.length} seleccionados)
           </h2>
           <div className="grid grid-cols-2 gap-2">
@@ -214,12 +214,12 @@ export default function NewTaskPage() {
                 onClick={() => toggleAssignee(u.id)}
                 className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
                   form.assignedTo.includes(u.id)
-                    ? 'border-indigo-500 bg-indigo-600/10 text-white'
-                    : 'border-zinc-700 bg-zinc-800 text-zinc-400 hover:border-zinc-600'
+                    ? 'border-indigo-500 bg-indigo-600/10 text-slate-900'
+                    : 'border-[var(--border-base)] bg-slate-100 text-[var(--text-muted)] hover:border-[var(--border-strong)]'
                 }`}
               >
                 <div className={`h-5 w-5 rounded border flex items-center justify-center ${
-                  form.assignedTo.includes(u.id) ? 'bg-indigo-600 border-indigo-600' : 'border-zinc-600'
+                  form.assignedTo.includes(u.id) ? 'bg-indigo-600 border-indigo-600' : 'border-[var(--border-strong)]'
                 }`}>
                   {form.assignedTo.includes(u.id) && (
                     <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -228,8 +228,8 @@ export default function NewTaskPage() {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">{u.fullName || 'Miembro'}</p>
-                  {u.department && <p className="text-xs text-zinc-500">{u.department}</p>}
+                  <p className="text-sm font-medium text-slate-900">{u.fullName || 'Miembro'}</p>
+                  {u.department && <p className="text-xs text-[var(--text-secondary)]">{u.department}</p>}
                 </div>
               </button>
             ))}
@@ -239,7 +239,7 @@ export default function NewTaskPage() {
         <div className="flex gap-3 justify-end">
           <Link
             href="/tasks"
-            className="rounded-lg border border-zinc-700 px-5 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 transition-colors"
+            className="rounded-lg border border-[var(--border-base)] px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
           >
             Cancelar
           </Link>

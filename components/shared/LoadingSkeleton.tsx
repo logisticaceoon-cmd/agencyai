@@ -10,7 +10,7 @@ export function Skeleton({ className }: SkeletonProps) {
   return (
     <div
       className={cn(
-        'animate-pulse rounded-md bg-zinc-800',
+        'animate-pulse rounded-md bg-slate-200',
         className
       )}
     />
@@ -19,7 +19,7 @@ export function Skeleton({ className }: SkeletonProps) {
 
 export function CardSkeleton() {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border-base)] bg-white p-5 space-y-3">
       <Skeleton className="h-4 w-1/3" />
       <Skeleton className="h-3 w-2/3" />
       <Skeleton className="h-3 w-1/2" />
@@ -35,7 +35,7 @@ export function TableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div className="space-y-2">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+        <div key={i} className="flex items-center gap-4 rounded-lg border border-[var(--border-base)] bg-white p-4">
           <Skeleton className="h-9 w-9 rounded-full" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-1/3" />

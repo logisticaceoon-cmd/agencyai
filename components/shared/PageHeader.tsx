@@ -13,9 +13,9 @@ export function PageHeader({ title, description, action, className }: PageHeader
   return (
     <div className={cn('flex items-center justify-between mb-6', className)}>
       <div>
-        <h1 className="text-2xl font-bold text-white">{title}</h1>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{title}</h1>
         {description && (
-          <p className="mt-1 text-sm text-zinc-400">{description}</p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">{description}</p>
         )}
       </div>
       {action && <div>{action}</div>}
