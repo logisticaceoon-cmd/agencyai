@@ -1,163 +1,261 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
-const MOCK_RESPONSES: Record<string, string[]> = {
-  dashboard: [
-    'Basado en tu actividad reciente, te recomiendo enfocarte primero en las tareas vencidas. Priorizar lo urgente sobre lo importante es clave para mantener la operacion fluida.',
-    'Veo que tenes varios proyectos activos. Te sugiero hacer una revision rapida de cada uno para identificar cuellos de botella antes de que se conviertan en problemas.',
-    'El estado general de la agencia se ve bien. Asegurate de hacer seguimiento con los clientes que no han tenido actividad reciente.',
-  ],
-  clients: [
-    'Para mejorar la retencion, te recomiendo implementar reuniones de revision mensuales con cada cliente. Esto muestra proactividad y permite detectar problemas temprano.',
-    'Es importante registrar toda la informacion de contacto, objetivos del cliente, presupuesto mensual y los KPIs que mas le importan. Esto te permite personalizar tu servicio.',
-  ],
-  projects: [
-    'Para estructurar bien los microobjetivos, usa la metodologia SMART: especificos, medibles, alcanzables, relevantes y con fecha limite.',
-    'Si un proyecto se atrasa, lo primero es identificar la causa raiz. Luego comunica al cliente con transparencia y presenta un plan de recuperacion concreto.',
-  ],
-  tasks: [
-    'Usa la matriz de Eisenhower: urgente e importante primero, importante pero no urgente despues, urgente pero no importante delega, y ni urgente ni importante elimina.',
-    'Para delegar mejor, asigna tareas con contexto claro: que se espera, para cuando, y que recursos tiene disponible la persona.',
-  ],
-  finances: [
-    'Para mejorar la rentabilidad, analiza que clientes generan mas margen y enfoca tu esfuerzo comercial en perfiles similares.',
-    'El momento ideal para subir precios es cuando ya demostraste resultados concretos. Presenta el aumento junto con un resumen de logros.',
-  ],
-  reports: [
-    'Un buen reporte mensual incluye: resumen ejecutivo, KPIs clave con comparativa vs mes anterior, acciones realizadas, resultados obtenidos y proximos pasos.',
-  ],
-  kpis: [
-    'Los KPIs esenciales dependen del tipo de servicio. Para marketing digital: ROAS, CPA, CTR, tasa de conversion. Para social media: engagement rate, alcance, crecimiento de seguidores.',
-  ],
-}
-
-const ACTION_INSTRUCTION = `
-Si el usuario pide ejecutar una accion (crear tarea, marcar como completada, crear reporte, etc.),
-responde con un JSON especial al FINAL de tu mensaje normal:
-
-[ACTION:{"type":"create_task","data":{"title":"X","priority":"high","dueDate":"2026-04-01"}}]
-o
-[ACTION:{"type":"complete_task","data":{"taskId":"X"}}]
-o
-[ACTION:{"type":"create_report","data":{"clientId":"X","type":"weekly"}}]
-o
-[ACTION:{"type":"schedule_meeting","data":{"title":"X","date":"2026-04-01T10:00:00"}}]
-
-Solo inclui el JSON de accion si el usuario EXPLICITAMENTE pidio ejecutar algo.
-Para consultas informativas, responde normalmente sin JSON.`
-
 export async function POST(request: Request) {
-  const auth = await getAuthContext()
-  if (isAuthError(auth)) return auth
-  const { supabase, workspaceId, userId } = auth
-
   try {
-    const body = await request.json()
-    const { message, messages: chatHistory, module, context } = body
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, userId } = auth
 
-    if (!message) {
+    const body = await request.json()
+    const { messages, message, module } = body
+
+    if (!message && (!messages || messages.length === 0)) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    let response: string
+    // Get AI config for this workspace
+    const { data: aiConfig } = await supabase
+      .from('workspace_ai_config')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .maybeSingle()
 
-    // Try Anthropic API
-    const anthropicKey = process.env.ANTHROPIC_API_KEY
-    const openaiKey = process.env.OPENAI_API_KEY
+    // Get workspace context
+    const workspaceContext = await getWorkspaceContext(supabase, workspaceId)
 
-    if (anthropicKey && anthropicKey !== 'YOUR_KEY' && anthropicKey.startsWith('sk-ant-')) {
-      const systemPrompt = buildSystemPrompt(module, context) + '\n\n' + ACTION_INSTRUCTION
+    const agentName = aiConfig?.agent_name || 'Asistente AgencyAI'
+    const personality = aiConfig?.agent_personality || 'profesional'
 
-      // Use full chat history if provided, otherwise single message
-      const apiMessages = chatHistory && chatHistory.length > 0
-        ? chatHistory
-        : [{ role: 'user' as const, content: message }]
+    const personalityDesc =
+      personality === 'amigable' ? 'cercana y calida' :
+      personality === 'directo' ? 'concisa y al punto' :
+      personality === 'motivacional' ? 'motivadora y energica' :
+      personality === 'analitico' ? 'analitica y basada en datos' :
+      'profesional pero accesible'
 
-      const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages: apiMessages,
-        }),
-      })
+    const now = new Date()
+    const dateStr = now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
 
-      if (anthropicRes.ok) {
-        const data = await anthropicRes.json()
-        response = data.content?.[0]?.text || 'No pude generar una respuesta.'
-      } else {
-        response = getMockResponse(module)
-      }
-    } else if (openaiKey && openaiKey !== 'YOUR_KEY' && openaiKey.startsWith('sk-')) {
-      const systemPrompt = buildSystemPrompt(module, context) + '\n\n' + ACTION_INSTRUCTION
+    const systemPrompt = `Sos ${agentName}, el asistente de IA de una agencia de marketing digital.
+Tu personalidad es: ${personality}. Respondes de forma ${personalityDesc}.
+Hoy es ${dateStr}.
 
-      const apiMessages = chatHistory && chatHistory.length > 0
-        ? [{ role: 'system' as const, content: systemPrompt }, ...chatHistory]
-        : [{ role: 'system' as const, content: systemPrompt }, { role: 'user' as const, content: message }]
+DATOS ACTUALES DE LA AGENCIA:
+- Clientes activos: ${workspaceContext.activeClients}
+- Proyectos activos: ${workspaceContext.activeProjects}
+- Tareas vencidas: ${workspaceContext.overdueTasks}
+${workspaceContext.overdueList.length > 0 ? `- Tareas vencidas: ${workspaceContext.overdueList.map((t: any) => `"${t.title}"`).join(', ')}` : ''}
+- Tareas de hoy: ${workspaceContext.todayTasks}
+${workspaceContext.todayList.length > 0 ? `- Tareas de hoy: ${workspaceContext.todayList.map((t: any) => `"${t.title}"`).join(', ')}` : ''}
+- Ingresos del mes: $${workspaceContext.monthlyIncome.toLocaleString()}
+- Modulo actual: ${module || 'dashboard'}
 
-      const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          max_tokens: 1000,
-          messages: apiMessages,
-        }),
-      })
+CAPACIDADES:
+Podes ejecutar acciones reales. Cuando el usuario pide ejecutar algo, responde normalmente
+Y al final agrega exactamente este formato (sin espacios extra):
+[ACTION:{"type":"TIPO","data":{...}}]
 
-      if (openaiRes.ok) {
-        const data = await openaiRes.json()
-        response = data.choices?.[0]?.message?.content || 'No pude generar una respuesta.'
-      } else {
-        response = getMockResponse(module)
-      }
-    } else {
-      response = getMockResponse(module)
+Tipos de accion disponibles:
+- create_task: {"title":"X","priority":"high|medium|low","dueDate":"YYYY-MM-DD","description":"X"}
+- complete_task: {"taskId":"X"}
+- create_report: {"title":"X","type":"weekly|monthly"}
+- get_tasks: {}
+- get_projects: {}
+
+IMPORTANTE:
+- Se conversacional. Hace UNA pregunta a la vez.
+- No hagas listas enormes sin que te las pidan.
+- Cuando el usuario salude, responde con saludo contextual del dia y UNA pregunta concreta.
+- Si el mensaje empieza con [SISTEMA:] es un trigger automatico, responde como si fuera un saludo inicial.
+- Habla en espanol rioplatense (vos, tenes, etc).
+- Maximo 1-2 emojis por mensaje.`
+
+    // Build API messages
+    const apiMessages = messages && messages.length > 0
+      ? messages
+      : [{ role: 'user' as const, content: message }]
+
+    let responseText = ''
+
+    // Determine provider
+    const anthropicKey = aiConfig?.anthropic_api_key || process.env.ANTHROPIC_API_KEY
+    const openaiKey = aiConfig?.openai_api_key || process.env.OPENAI_API_KEY
+    const provider = aiConfig?.ai_provider || 'anthropic'
+    const hasValidAnthropicKey = anthropicKey && anthropicKey !== 'YOUR_KEY' && anthropicKey.startsWith('sk-ant-')
+    const hasValidOpenaiKey = openaiKey && openaiKey !== 'YOUR_KEY' && openaiKey.startsWith('sk-')
+
+    let usedAI = false
+
+    if (provider === 'openai' && hasValidOpenaiKey) {
+      // OpenAI
+      try {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            max_tokens: 1000,
+            messages: [{ role: 'system', content: systemPrompt }, ...apiMessages],
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          responseText = data.choices?.[0]?.message?.content || ''
+          usedAI = true
+        }
+      } catch { /* fall through */ }
     }
 
-    // Log conversation
-    await supabase.from('ai_conversations').insert({
+    if (!usedAI && hasValidAnthropicKey) {
+      // Anthropic
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': anthropicKey!,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1000,
+            system: systemPrompt,
+            messages: apiMessages,
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          responseText = data.content?.[0]?.text || ''
+          usedAI = true
+        }
+      } catch { /* fall through */ }
+    }
+
+    if (!usedAI && !hasValidAnthropicKey && hasValidOpenaiKey) {
+      // Try OpenAI as fallback
+      try {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            max_tokens: 1000,
+            messages: [{ role: 'system', content: systemPrompt }, ...apiMessages],
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          responseText = data.choices?.[0]?.message?.content || ''
+          usedAI = true
+        }
+      } catch { /* fall through */ }
+    }
+
+    if (!usedAI) {
+      // Smart fallback without AI
+      const lastMsg = message || apiMessages[apiMessages.length - 1]?.content || ''
+      responseText = generateSmartFallback(workspaceContext, lastMsg, agentName)
+    }
+
+    // Parse action from response
+    let action = null
+    let cleanText = responseText
+
+    const actionMatch = responseText.match(/\[ACTION:(\{.*?\})\]/)
+    if (actionMatch) {
+      try {
+        action = JSON.parse(actionMatch[1])
+        cleanText = responseText.replace(/\[ACTION:\{.*?\}\]/, '').trim()
+      } catch { /* ignore malformed JSON */ }
+    }
+
+    // Log conversation (best-effort)
+    supabase.from('ai_conversations').insert({
       workspace_id: workspaceId,
       user_id: userId,
-      module: module || 'general',
-      message,
-      response,
+      module: module || 'dashboard',
+      message: message || apiMessages[apiMessages.length - 1]?.content,
+      response: cleanText,
     }).then(() => {}, () => {})
 
-    return NextResponse.json({ response })
-  } catch {
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    return NextResponse.json({
+      response: cleanText,
+      action,
+      provider: usedAI ? provider : 'fallback',
+      hasAI: usedAI || hasValidAnthropicKey || hasValidOpenaiKey,
+    })
+  } catch (err) {
+    console.error('Error en /api/ai/chat:', err)
+    return NextResponse.json({
+      response: 'Hubo un error al procesar tu mensaje. Intenta de nuevo.',
+      action: null,
+      hasAI: false,
+    })
   }
 }
 
-function getMockResponse(module: string): string {
-  const responses = MOCK_RESPONSES[module] || MOCK_RESPONSES.dashboard
-  return responses[Math.floor(Math.random() * responses.length)]
+async function getWorkspaceContext(supabase: any, workspaceId: string) {
+  const now = new Date()
+  const todayStr = now.toISOString().split('T')[0]
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
+  const [clientsRes, projectsRes, overdueRes, todayRes, incomeRes] = await Promise.all([
+    supabase.from('clients').select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId).eq('status', 'active'),
+    supabase.from('projects').select('id', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId).eq('status', 'active'),
+    supabase.from('tasks').select('id, title')
+      .eq('workspace_id', workspaceId).in('status', ['pending', 'in_progress'])
+      .lt('deadline', todayStr).not('deadline', 'is', null).limit(5),
+    supabase.from('tasks').select('id, title, priority')
+      .eq('workspace_id', workspaceId).in('status', ['pending', 'in_progress'])
+      .gte('deadline', todayStr).lt('deadline', new Date(now.getTime() + 86400000).toISOString().split('T')[0])
+      .limit(5),
+    supabase.from('transactions').select('amount')
+      .eq('workspace_id', workspaceId).eq('type', 'income').gte('date', monthStart),
+  ])
+
+  return {
+    activeClients: clientsRes.count || 0,
+    activeProjects: projectsRes.count || 0,
+    overdueTasks: overdueRes.data?.length || 0,
+    overdueList: overdueRes.data || [],
+    todayTasks: todayRes.data?.length || 0,
+    todayList: todayRes.data || [],
+    monthlyIncome: (incomeRes.data || []).reduce((s: number, t: any) => s + Number(t.amount || 0), 0),
+  }
 }
 
-function buildSystemPrompt(module: string, context: Record<string, unknown> = {}): string {
-  const ctx = Object.entries(context)
-    .map(([k, v]) => `${k}: ${v}`)
-    .join(', ')
+function generateSmartFallback(ctx: any, userMessage: string, agentName: string): string {
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Buenos dias' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
+  const lower = userMessage.toLowerCase()
 
-  const prompts: Record<string, string> = {
-    dashboard: `Sos el asistente operacional de una agencia de marketing digital. Datos actuales: ${ctx}. Ayuda al usuario a priorizar su dia y detectar problemas urgentes. Responde en espanol rioplatense.`,
-    clients: `Sos el agente CRM de una agencia. ${ctx}. Ayuda a gestionar relaciones, detectar oportunidades y mejorar retencion. Responde en espanol rioplatense.`,
-    projects: `Sos el agente de gestion de proyectos. ${ctx}. Ayuda a detectar riesgos y sugerir acciones. Responde en espanol rioplatense.`,
-    tasks: `Sos el agente de productividad. ${ctx}. Ayuda a priorizar y organizar el trabajo del equipo. Responde en espanol rioplatense.`,
-    finances: `Sos el agente financiero de una agencia. ${ctx}. Ayuda a mejorar la rentabilidad y gestionar el flujo de caja. Responde en espanol rioplatense.`,
-    reports: `Sos el agente de reportes. Ayuda a crear reportes profesionales que impresionen a los clientes. Responde en espanol rioplatense.`,
-    kpis: `Sos el agente de metricas y KPIs. Ayuda a definir los indicadores correctos segun el tipo de agencia y cliente. Responde en espanol rioplatense.`,
+  if (lower.includes('[sistema:') || lower.includes('hola') || lower.includes('buenos') || lower.includes('buenas')) {
+    let msg = `${greeting}! Soy ${agentName}. `
+    if (ctx.overdueTasks > 0) {
+      msg += `Tenes ${ctx.overdueTasks} tarea${ctx.overdueTasks > 1 ? 's' : ''} vencida${ctx.overdueTasks > 1 ? 's' : ''} que necesitan atencion. `
+    }
+    if (ctx.todayTasks > 0) {
+      msg += `Hoy vencen ${ctx.todayTasks} tarea${ctx.todayTasks > 1 ? 's' : ''}. `
+    }
+    msg += `Tenes ${ctx.activeClients} clientes y ${ctx.activeProjects} proyectos activos. `
+    msg += '\n\nPara activar mis capacidades completas de IA, configura tu API key en "Agente de IA". Queres que te lleve a la configuracion?'
+    return msg
   }
 
-  return prompts[module] || prompts.dashboard
+  if (lower.includes('tarea') || lower.includes('pendiente') || lower.includes('urgente')) {
+    return `Tenes ${ctx.overdueTasks} tareas vencidas y ${ctx.todayTasks} para hoy. Para respuestas mas detalladas, configura tu API key de Claude o ChatGPT en la seccion "Agente de IA".`
+  }
+
+  if (lower.includes('proyecto')) {
+    return `Tenes ${ctx.activeProjects} proyectos activos. Para un analisis detallado, configura tu API key en "Agente de IA".`
+  }
+
+  if (lower.includes('reporte') || lower.includes('analisis') || lower.includes('mes')) {
+    return `Este mes llevas $${ctx.monthlyIncome.toLocaleString()} en ingresos con ${ctx.activeClients} clientes activos. Para un analisis completo con IA, configura tu API key en "Agente de IA".`
+  }
+
+  return `Entendi tu mensaje. Para respuestas inteligentes y contextuales, configura tu API key de Claude o ChatGPT en la seccion "Agente de IA". Queres ir a configurarla?`
 }
