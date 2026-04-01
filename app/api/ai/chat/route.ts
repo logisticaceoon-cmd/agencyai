@@ -10,34 +10,41 @@ const MOCK_RESPONSES: Record<string, string[]> = {
   clients: [
     'Para mejorar la retencion, te recomiendo implementar reuniones de revision mensuales con cada cliente. Esto muestra proactividad y permite detectar problemas temprano.',
     'Es importante registrar toda la informacion de contacto, objetivos del cliente, presupuesto mensual y los KPIs que mas le importan. Esto te permite personalizar tu servicio.',
-    'El valor de un cliente se calcula considerando su fee mensual, la duracion promedio de la relacion, y las oportunidades de upselling. Un cliente rentable no es solo el que paga mas.',
   ],
   projects: [
     'Para estructurar bien los microobjetivos, usa la metodologia SMART: especificos, medibles, alcanzables, relevantes y con fecha limite.',
     'Si un proyecto se atrasa, lo primero es identificar la causa raiz. Luego comunica al cliente con transparencia y presenta un plan de recuperacion concreto.',
-    'Usa actualizaciones semanales cortas con el cliente. Un mensaje de 3-5 lineas con progreso, proximos pasos y bloqueos genera confianza.',
   ],
   tasks: [
     'Usa la matriz de Eisenhower: urgente e importante primero, importante pero no urgente despues, urgente pero no importante delega, y ni urgente ni importante elimina.',
     'Para delegar mejor, asigna tareas con contexto claro: que se espera, para cuando, y que recursos tiene disponible la persona.',
-    'Revisa las tareas pendientes hace mas de una semana. Si no avanzaron, probablemente necesiten ser reasignadas o redefinidas.',
   ],
   finances: [
     'Para mejorar la rentabilidad, analiza que clientes generan mas margen y enfoca tu esfuerzo comercial en perfiles similares.',
     'El momento ideal para subir precios es cuando ya demostraste resultados concretos. Presenta el aumento junto con un resumen de logros.',
-    'Para clientes que pagan tarde, establece politicas claras desde el inicio: fecha de corte, recargos por mora, y pausar servicios si la deuda supera X dias.',
   ],
   reports: [
     'Un buen reporte mensual incluye: resumen ejecutivo, KPIs clave con comparativa vs mes anterior, acciones realizadas, resultados obtenidos y proximos pasos.',
-    'Cuando los resultados no fueron los esperados, se honesto pero orientado a soluciones. Explica que paso, que aprendiste y que vas a hacer diferente.',
-    'Para el resumen ejecutivo: empieza con el dato mas impactante, luego contexto en 2 oraciones, y cierra con la accion principal del proximo periodo.',
   ],
   kpis: [
     'Los KPIs esenciales dependen del tipo de servicio. Para marketing digital: ROAS, CPA, CTR, tasa de conversion. Para social media: engagement rate, alcance, crecimiento de seguidores.',
-    'Un buen objetivo de KPI debe ser desafiante pero alcanzable. Usa datos historicos como base y aplica un incremento del 10-20% como meta.',
-    'Presenta los KPIs al cliente con contexto: no solo el numero, sino que significa, como se compara con el periodo anterior, y que accion tomas al respecto.',
   ],
 }
+
+const ACTION_INSTRUCTION = `
+Si el usuario pide ejecutar una accion (crear tarea, marcar como completada, crear reporte, etc.),
+responde con un JSON especial al FINAL de tu mensaje normal:
+
+[ACTION:{"type":"create_task","data":{"title":"X","priority":"high","dueDate":"2026-04-01"}}]
+o
+[ACTION:{"type":"complete_task","data":{"taskId":"X"}}]
+o
+[ACTION:{"type":"create_report","data":{"clientId":"X","type":"weekly"}}]
+o
+[ACTION:{"type":"schedule_meeting","data":{"title":"X","date":"2026-04-01T10:00:00"}}]
+
+Solo inclui el JSON de accion si el usuario EXPLICITAMENTE pidio ejecutar algo.
+Para consultas informativas, responde normalmente sin JSON.`
 
 export async function POST(request: Request) {
   const auth = await getAuthContext()
@@ -45,7 +52,8 @@ export async function POST(request: Request) {
   const { supabase, workspaceId, userId } = auth
 
   try {
-    const { message, module, context } = await request.json()
+    const body = await request.json()
+    const { message, messages: chatHistory, module, context } = body
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
@@ -53,21 +61,30 @@ export async function POST(request: Request) {
 
     let response: string
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (apiKey && apiKey !== 'YOUR_KEY' && apiKey.startsWith('sk-ant-')) {
-      const systemPrompt = buildSystemPrompt(module, context)
+    // Try Anthropic API
+    const anthropicKey = process.env.ANTHROPIC_API_KEY
+    const openaiKey = process.env.OPENAI_API_KEY
+
+    if (anthropicKey && anthropicKey !== 'YOUR_KEY' && anthropicKey.startsWith('sk-ant-')) {
+      const systemPrompt = buildSystemPrompt(module, context) + '\n\n' + ACTION_INSTRUCTION
+
+      // Use full chat history if provided, otherwise single message
+      const apiMessages = chatHistory && chatHistory.length > 0
+        ? chatHistory
+        : [{ role: 'user' as const, content: message }]
+
       const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
+          'x-api-key': anthropicKey,
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 1000,
           system: systemPrompt,
-          messages: [{ role: 'user', content: message }],
+          messages: apiMessages,
         }),
       })
 
@@ -77,17 +94,44 @@ export async function POST(request: Request) {
       } else {
         response = getMockResponse(module)
       }
+    } else if (openaiKey && openaiKey !== 'YOUR_KEY' && openaiKey.startsWith('sk-')) {
+      const systemPrompt = buildSystemPrompt(module, context) + '\n\n' + ACTION_INSTRUCTION
+
+      const apiMessages = chatHistory && chatHistory.length > 0
+        ? [{ role: 'system' as const, content: systemPrompt }, ...chatHistory]
+        : [{ role: 'system' as const, content: systemPrompt }, { role: 'user' as const, content: message }]
+
+      const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          max_tokens: 1000,
+          messages: apiMessages,
+        }),
+      })
+
+      if (openaiRes.ok) {
+        const data = await openaiRes.json()
+        response = data.choices?.[0]?.message?.content || 'No pude generar una respuesta.'
+      } else {
+        response = getMockResponse(module)
+      }
     } else {
       response = getMockResponse(module)
     }
 
+    // Log conversation
     await supabase.from('ai_conversations').insert({
       workspace_id: workspaceId,
       user_id: userId,
       module: module || 'general',
       message,
       response,
-    })
+    }).then(() => {}, () => {})
 
     return NextResponse.json({ response })
   } catch {
@@ -106,13 +150,13 @@ function buildSystemPrompt(module: string, context: Record<string, unknown> = {}
     .join(', ')
 
   const prompts: Record<string, string> = {
-    dashboard: `Sos el asistente operacional de una agencia de marketing digital. Datos actuales: ${ctx}. Ayuda al usuario a priorizar su dia y detectar problemas urgentes. Responde en espanol.`,
-    clients: `Sos el agente CRM de una agencia. ${ctx}. Ayuda a gestionar relaciones, detectar oportunidades y mejorar retencion. Responde en espanol.`,
-    projects: `Sos el agente de gestion de proyectos. ${ctx}. Ayuda a detectar riesgos y sugerir acciones. Responde en espanol.`,
-    tasks: `Sos el agente de productividad. ${ctx}. Ayuda a priorizar y organizar el trabajo del equipo. Responde en espanol.`,
-    finances: `Sos el agente financiero de una agencia. ${ctx}. Ayuda a mejorar la rentabilidad y gestionar el flujo de caja. Responde en espanol.`,
-    reports: `Sos el agente de reportes. Ayuda a crear reportes profesionales que impresionen a los clientes. Responde en espanol.`,
-    kpis: `Sos el agente de metricas y KPIs. Ayuda a definir los indicadores correctos segun el tipo de agencia y cliente. Responde en espanol.`,
+    dashboard: `Sos el asistente operacional de una agencia de marketing digital. Datos actuales: ${ctx}. Ayuda al usuario a priorizar su dia y detectar problemas urgentes. Responde en espanol rioplatense.`,
+    clients: `Sos el agente CRM de una agencia. ${ctx}. Ayuda a gestionar relaciones, detectar oportunidades y mejorar retencion. Responde en espanol rioplatense.`,
+    projects: `Sos el agente de gestion de proyectos. ${ctx}. Ayuda a detectar riesgos y sugerir acciones. Responde en espanol rioplatense.`,
+    tasks: `Sos el agente de productividad. ${ctx}. Ayuda a priorizar y organizar el trabajo del equipo. Responde en espanol rioplatense.`,
+    finances: `Sos el agente financiero de una agencia. ${ctx}. Ayuda a mejorar la rentabilidad y gestionar el flujo de caja. Responde en espanol rioplatense.`,
+    reports: `Sos el agente de reportes. Ayuda a crear reportes profesionales que impresionen a los clientes. Responde en espanol rioplatense.`,
+    kpis: `Sos el agente de metricas y KPIs. Ayuda a definir los indicadores correctos segun el tipo de agencia y cliente. Responde en espanol rioplatense.`,
   }
 
   return prompts[module] || prompts.dashboard

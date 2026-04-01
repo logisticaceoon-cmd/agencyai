@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { cn, formatDate } from '@/lib/utils'
+import { DashboardAgent } from '@/components/ai/DashboardAgent'
 import {
   Users,
   FolderKanban,
@@ -212,6 +213,9 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* ── Agent Greeting ──────────────────────────────────────────── */}
+      {!loading && stats && <DashboardAgent stats={stats} />}
 
       {/* ── Row 1: Metric Cards ───────────────────────────────────────── */}
       {loading ? (
