@@ -18,7 +18,16 @@ import {
   StickyNote,
   Briefcase,
   Percent,
+  BookOpen,
+  Plus,
+  MoreVertical,
+  Pin,
+  PinOff,
+  Pencil,
+  Link2,
+  Trash2,
 } from 'lucide-react'
+import { BookmarkCard, type Bookmark } from '@/components/bookmarks/BookmarkCard'
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -221,6 +230,7 @@ export default function ClientDetailPage() {
             { value: 'proyectos', label: 'Proyectos', icon: Briefcase },
             { value: 'reportes', label: 'Reportes', icon: FileText },
             { value: 'notas', label: 'Notas', icon: StickyNote },
+            { value: 'documentos', label: 'Documentos', icon: BookOpen },
           ].map((tab) => (
             <Tabs.Trigger
               key={tab.value}
@@ -520,7 +530,88 @@ export default function ClientDetailPage() {
             )}
           </div>
         </Tabs.Content>
+
+        {/* Documentos tab */}
+        <Tabs.Content value="documentos" className="pt-6">
+          <ClientBookmarks clientId={client.id} clientName={client.name} />
+        </Tabs.Content>
       </Tabs.Root>
+    </div>
+  )
+}
+
+// ── Client Bookmarks Sub-component ──────────────────────────────────────────
+
+function ClientBookmarks({ clientId, clientName }: { clientId: string; clientName: string }) {
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/bookmarks')
+      .then(r => r.json())
+      .then(d => {
+        const all = d.data || []
+        setBookmarks(all.filter((b: Bookmark) => b.client_id === clientId))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [clientId])
+
+  async function handleDelete(id: string) {
+    if (!confirm('Eliminar este marcador?')) return
+    await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' })
+    setBookmarks(prev => prev.filter(b => b.id !== id))
+  }
+
+  async function handleTogglePin(id: string, pinned: boolean) {
+    setBookmarks(prev => prev.map(b => b.id === id ? { ...b, pinned } : b))
+    await fetch(`/api/bookmarks/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pinned }),
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {[1, 2].map(i => (
+          <div key={i} className="rounded-[var(--radius-lg)] border border-[var(--border-base)] bg-white p-4 space-y-3">
+            <div className="h-8 w-8 rounded bg-slate-100 animate-pulse" />
+            <div className="h-4 w-3/4 rounded bg-slate-100 animate-pulse" />
+            <div className="h-3 w-1/2 rounded bg-slate-100 animate-pulse" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (bookmarks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <BookOpen size={24} strokeWidth={1.5} className="text-[var(--text-muted)] mb-2" />
+        <p className="text-sm text-[var(--text-muted)] mb-4">No hay documentos vinculados a {clientName}</p>
+        <Link
+          href="/docs"
+          className="btn-primary text-sm py-2 px-4"
+        >
+          <Plus size={14} strokeWidth={1.5} /> Agregar documento
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {bookmarks.map(b => (
+        <BookmarkCard
+          key={b.id}
+          bookmark={b}
+          onEdit={() => {}}
+          onDelete={handleDelete}
+          onTogglePin={handleTogglePin}
+        />
+      ))}
     </div>
   )
 }
