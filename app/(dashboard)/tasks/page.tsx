@@ -17,6 +17,8 @@ import {
   Edit3,
   ChevronRight,
   Check,
+  MoreVertical,
+  ChevronDown,
 } from 'lucide-react'
 import {
   DndContext,
@@ -262,22 +264,31 @@ export default function TasksPage() {
   }
 
   async function handleStatusChange(taskId: string, newStatus: string) {
-    const res = await fetch(`/api/tasks/${taskId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        status: newStatus,
-        ...(newStatus === 'completed' ? { progressPercent: 100 } : {}),
-      }),
-    })
-    if (res.ok) {
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId
-            ? { ...t, status: newStatus, ...(newStatus === 'completed' ? { progressPercent: 100 } : {}) }
-            : t
-        )
+    // Optimistic update — instant UI
+    const previousTasks = tasks
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId
+          ? { ...t, status: newStatus, ...(newStatus === 'completed' ? { progressPercent: 100 } : {}) }
+          : t
       )
+    )
+
+    // API call in background
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: newStatus,
+          ...(newStatus === 'completed' ? { progressPercent: 100 } : {}),
+        }),
+      })
+      if (!res.ok) throw new Error('API error')
+    } catch {
+      // Revert on failure
+      setTasks(previousTasks)
+      alert('Error al mover la tarea. Intenta de nuevo.')
     }
   }
 
@@ -430,6 +441,8 @@ export default function TasksPage() {
           onStatusChange={handleStatusChange}
           onCardClick={(task) => loadTaskDetail(task.id)}
           onAddToColumn={openCreateModal}
+          onEdit={openEditModal}
+          onDelete={handleDeleteTask}
         />
       )}
 
@@ -562,6 +575,8 @@ function KanbanView({
   onStatusChange,
   onCardClick,
   onAddToColumn,
+  onEdit,
+  onDelete,
 }: {
   tasks: Task[]
   getMemberName: (id: string) => string
@@ -569,6 +584,8 @@ function KanbanView({
   onStatusChange: (taskId: string, status: string) => void
   onCardClick: (task: Task) => void
   onAddToColumn: (status: string) => void
+  onEdit: (task: Task) => void
+  onDelete: (id: string) => void
 }) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
 
@@ -638,6 +655,9 @@ function KanbanView({
             getMemberAvatar={getMemberAvatar}
             onCardClick={onCardClick}
             onAdd={() => onAddToColumn(col.key)}
+            onStatusChange={onStatusChange}
+            onEdit={onEdit}
+            onDelete={onDelete}
           />
         ))}
       </div>
@@ -662,6 +682,9 @@ function KanbanColumn({
   getMemberAvatar,
   onCardClick,
   onAdd,
+  onStatusChange,
+  onEdit,
+  onDelete,
 }: {
   id: string
   label: string
@@ -670,6 +693,9 @@ function KanbanColumn({
   getMemberAvatar: (id: string) => string | null
   onCardClick: (task: Task) => void
   onAdd: () => void
+  onStatusChange: (taskId: string, status: string) => void
+  onEdit: (task: Task) => void
+  onDelete: (id: string) => void
 }) {
   const { setNodeRef } = useDroppable({ id })
 
@@ -709,6 +735,9 @@ function KanbanColumn({
               getMemberName={getMemberName}
               getMemberAvatar={getMemberAvatar}
               onClick={() => onCardClick(task)}
+              onStatusChange={onStatusChange}
+              onEdit={onEdit}
+              onDelete={onDelete}
             />
           ))}
         </SortableContext>
@@ -727,15 +756,23 @@ function KanbanCard({
   getMemberName,
   getMemberAvatar,
   onClick,
+  onStatusChange,
+  onEdit,
+  onDelete,
 }: {
   task: Task
   getMemberName: (id: string) => string
   getMemberAvatar: (id: string) => string | null
   onClick: () => void
+  onStatusChange: (taskId: string, status: string) => void
+  onEdit: (task: Task) => void
+  onDelete: (id: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   })
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [statusDropdown, setStatusDropdown] = useState(false)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -754,9 +791,9 @@ function KanbanCard({
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:shadow-md cursor-pointer transition-shadow"
+      className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm hover:shadow-md cursor-pointer transition-shadow group relative"
     >
-      {/* Priority badge */}
+      {/* Priority + Menu */}
       <div className="flex items-center justify-between mb-2">
         <span
           className={cn(
@@ -767,14 +804,92 @@ function KanbanCard({
           <span className={cn('h-1.5 w-1.5 rounded-full', PRIORITY_DOT[task.priority])} />
           {PRIORITY_LABELS[task.priority]}
         </span>
-        <GripVertical className="h-3.5 w-3.5 text-slate-300" />
+        <div className="flex items-center gap-0.5">
+          {/* Context menu */}
+          <div className="relative">
+            <button
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
+              className="rounded p-0.5 text-slate-300 opacity-0 group-hover:opacity-100 hover:text-slate-600 hover:bg-slate-100 transition-all"
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }} />
+                <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-slate-200 bg-white shadow-lg py-1 text-sm animate-scale-in">
+                  {KANBAN_COLUMNS.map((col) => (
+                    <button
+                      key={col.key}
+                      onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, col.key); setMenuOpen(false) }}
+                      className={cn(
+                        'flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-slate-50 transition-colors',
+                        task.status === col.key ? 'text-blue-600 font-medium' : 'text-slate-600'
+                      )}
+                    >
+                      {task.status === col.key && <Check className="h-3 w-3" />}
+                      {task.status !== col.key && <span className="w-3" />}
+                      {col.label}
+                    </button>
+                  ))}
+                  <div className="border-t border-slate-100 my-1" />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onEdit(task); setMenuOpen(false) }}
+                    className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <Edit3 className="h-3 w-3" /> Editar tarea
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(task.id); setMenuOpen(false) }}
+                    className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 className="h-3 w-3" /> Eliminar
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+          <GripVertical className="h-3.5 w-3.5 text-slate-300" />
+        </div>
       </div>
 
       {/* Title */}
       <h4 className="text-sm font-medium text-slate-900 mb-2 line-clamp-2">{task.title}</h4>
 
+      {/* Clickable status badge */}
+      <div className="relative inline-block mb-2">
+        <button
+          onClick={(e) => { e.stopPropagation(); setStatusDropdown(!statusDropdown) }}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors',
+            STATUS_BADGE[task.status] || STATUS_BADGE.pending
+          )}
+        >
+          {STATUS_LABELS[task.status]}
+          <ChevronDown className="h-2.5 w-2.5" />
+        </button>
+        {statusDropdown && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setStatusDropdown(false) }} />
+            <div className="absolute left-0 top-full mt-1 z-20 w-36 rounded-lg border border-slate-200 bg-white shadow-lg py-1 text-sm animate-scale-in">
+              {KANBAN_COLUMNS.map((col) => (
+                <button
+                  key={col.key}
+                  onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, col.key); setStatusDropdown(false) }}
+                  className={cn(
+                    'flex items-center gap-2 w-full px-3 py-1.5 text-left hover:bg-slate-50 transition-colors',
+                    task.status === col.key ? 'text-blue-600 font-medium' : 'text-slate-600'
+                  )}
+                >
+                  {col.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Footer: due date + assignee */}
-      <div className="flex items-center justify-between mt-2">
+      <div className="flex items-center justify-between mt-1">
         {task.deadline ? (
           <div className="flex items-center gap-1 text-xs text-slate-500">
             <Calendar className="h-3 w-3" />

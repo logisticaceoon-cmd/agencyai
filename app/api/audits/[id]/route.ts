@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
+import { getOrgContext } from '@/lib/org'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: Request,
@@ -8,21 +8,22 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const ctx = await getOrgContext()
+    if ('error' in ctx) return ctx.error
+
     const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { data, error } = await supabase
+      .from('audits')
+      .select('*')
+      .eq('id', id)
+      .eq('workspace_id', ctx.org.id)
+      .single()
 
-    const audit = await prisma.audit.findUnique({
-      where: { id },
-      include: {
-        createdBy: true,
-        client: true,
-      },
-    })
+    if (error || !data) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
 
-    if (!audit) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-    return NextResponse.json({ data: audit })
+    return NextResponse.json({ data })
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
@@ -34,44 +35,61 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser || dbUser.role === 'Team') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const ctx = await getOrgContext()
+    if ('error' in ctx) return ctx.error
 
     const body = await request.json()
+    const supabase = await createServerSupabaseClient()
 
-    // Calculate score if findings provided
-    let complianceScore: number | undefined
-    let overallStatus: any
-    if (body.findings?.checklist) {
-      const checklist = body.findings.checklist as Array<{ result: string | null }>
-      const total = checklist.length
-      if (total > 0) {
-        const passed = checklist.filter((i) => i.result === 'compliant').length
-        const partial = checklist.filter((i) => i.result === 'partial').length
-        complianceScore = Math.round(((passed * 1.0 + partial * 0.5) / total) * 100)
-        overallStatus = complianceScore >= 90 ? 'compliant' : complianceScore >= 70 ? 'partial' : 'non_compliant'
-      }
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
     }
 
-    const audit = await prisma.audit.update({
-      where: { id },
-      data: {
-        findings: body.findings,
-        notes: body.notes,
-        correctiveActions: body.correctiveActions,
-        correctiveActionsDue: body.correctiveActionsDue ? new Date(body.correctiveActionsDue) : undefined,
-        status: body.status,
-        ...(complianceScore !== undefined && { complianceScore, overallStatus, executedAt: new Date() }),
-      },
-    })
+    if (body.status !== undefined) updateData.status = body.status
+    if (body.action_plan !== undefined) updateData.action_plan = body.action_plan
+    if (body.resolved_at !== undefined) updateData.resolved_at = body.resolved_at
+    if (body.findings !== undefined) updateData.findings = body.findings
+    if (body.description !== undefined) updateData.description = body.description
 
-    return NextResponse.json({ data: audit })
+    const { data, error } = await supabase
+      .from('audits')
+      .update(updateData)
+      .eq('id', id)
+      .eq('workspace_id', ctx.org.id)
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ data })
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const ctx = await getOrgContext()
+    if ('error' in ctx) return ctx.error
+
+    const supabase = await createServerSupabaseClient()
+    const { error } = await supabase
+      .from('audits')
+      .delete()
+      .eq('id', id)
+      .eq('workspace_id', ctx.org.id)
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ success: true })
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

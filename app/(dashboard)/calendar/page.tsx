@@ -67,6 +67,15 @@ interface DayEvent {
   completed?: boolean
 }
 
+interface GoogleEvent {
+  id: string
+  title: string
+  start: string
+  end: string
+  description: string
+  htmlLink: string
+}
+
 const DAY_NAMES = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom']
 
 export default function CalendarPage() {
@@ -75,6 +84,12 @@ export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [events, setEvents] = useState<DayEvent[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Google Calendar
+  const [gcalConnected, setGcalConnected] = useState(false)
+  const [gcalEvents, setGcalEvents] = useState<GoogleEvent[]>([])
+  const [gcalLoading, setGcalLoading] = useState(false)
+  const hasGoogleConfig = typeof window !== 'undefined'
 
   // Slide-in panel for event detail
   const [panelOpen, setPanelOpen] = useState(false)
@@ -127,15 +142,31 @@ export default function CalendarPage() {
     }
   }, [currentMonth])
 
+  // Fetch Google Calendar events
+  const fetchGcalEvents = useCallback(async () => {
+    setGcalLoading(true)
+    try {
+      const res = await fetch('/api/calendar/google/sync')
+      const data = await res.json()
+      setGcalConnected(data.connected || false)
+      setGcalEvents(data.events || [])
+    } catch {
+      setGcalConnected(false)
+    } finally {
+      setGcalLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (org) {
       fetchEvents()
+      fetchGcalEvents()
       fetch('/api/projects')
         .then(r => r.json())
         .then(j => setProjects((j.data || []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name }))))
         .catch(() => {})
     }
-  }, [org, fetchEvents])
+  }, [org, fetchEvents, fetchGcalEvents])
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
@@ -147,6 +178,17 @@ export default function CalendarPage() {
     return events.filter((e) => {
       try {
         const eventDate = parseISO(e.date)
+        return isSameDay(eventDate, day)
+      } catch {
+        return false
+      }
+    })
+  }
+
+  const getGcalEventsForDay = (day: Date): GoogleEvent[] => {
+    return gcalEvents.filter((e) => {
+      try {
+        const eventDate = parseISO(e.start)
         return isSameDay(eventDate, day)
       } catch {
         return false
@@ -232,6 +274,41 @@ export default function CalendarPage() {
             Visualiza tareas y microobjetivos del mes
           </p>
         </div>
+      </div>
+
+      {/* Google Calendar Connection */}
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border-base)] bg-white p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <CalIcon className="h-4 w-4 text-emerald-600" strokeWidth={1.5} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-[var(--text-primary)]">Google Calendar</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {gcalConnected ? `Sincronizado — ${gcalEvents.length} eventos` : 'Conecta para ver tus eventos'}
+              </p>
+            </div>
+          </div>
+          {gcalConnected ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">
+              <Check className="h-3 w-3" /> Conectado
+            </span>
+          ) : (
+            <a
+              href="/api/calendar/google/auth"
+              className="btn-primary text-xs py-1.5 px-3"
+            >
+              Conectar Google Calendar
+            </a>
+          )}
+        </div>
+        {!gcalConnected && !gcalLoading && (
+          <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--bg-subtle)] p-3 text-xs text-[var(--text-secondary)]">
+            Para conectar Google Calendar, configura GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en las variables de entorno del proyecto.
+            Podes obtenerlas en console.cloud.google.com.
+          </div>
+        )}
       </div>
 
       <div className="relative">
@@ -329,10 +406,24 @@ export default function CalendarPage() {
                         </button>
                       ))}
 
+                      {/* Google Calendar events */}
+                      {getGcalEventsForDay(day).slice(0, 2).map(ge => (
+                        <a
+                          key={ge.id}
+                          href={ge.htmlLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-left truncate text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors"
+                        >
+                          {truncate(ge.title, 15)}
+                        </a>
+                      ))}
+
                       {/* "+N mas" indicator */}
-                      {dayEvents.length > 4 && (
+                      {(dayEvents.length + getGcalEventsForDay(day).length) > 4 && (
                         <span className="text-[10px] text-slate-400 font-medium px-1.5">
-                          +{dayEvents.length - 4} mas
+                          +{dayEvents.length + getGcalEventsForDay(day).length - 4} mas
                         </span>
                       )}
                     </div>
