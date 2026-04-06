@@ -498,7 +498,7 @@ export default function FinancesPage() {
         <Tabs.Content value="clientes" className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
-              <h2 className="text-base font-semibold text-slate-900">Clientes de la agencia</h2>
+              <h2 className="text-base font-semibold text-slate-900">Clientes</h2>
               <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer">
                 <input type="checkbox" checked={showDeleted} onChange={e => setShowDeleted(e.target.checked)} className="rounded border-slate-300" />
                 Mostrar eliminados

@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { Building2, Upload, Globe, DollarSign, Briefcase, AlertTriangle, Save, Trash2 } from 'lucide-react'
+import { useProfessionalType } from '@/hooks/useProfessionalType'
+import { PROFESSIONAL_TYPES } from '@/lib/professional-types'
 
 export default function WorkspacePage() {
   const [nombre, setNombre] = useState('')
@@ -12,6 +14,8 @@ export default function WorkspacePage() {
   const [saving, setSaving] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState('')
+  const { config: proConfig, refresh: refreshPro } = useProfessionalType()
+  const [showTypeModal, setShowTypeModal] = useState(false)
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -26,6 +30,65 @@ export default function WorkspacePage() {
         <h1 className="text-2xl font-bold text-slate-900">Configuración del Workspace</h1>
         <p className="text-sm text-slate-500 mt-1">Administrá la información de tu agencia u organización</p>
       </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 mb-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl" style={{ backgroundColor: proConfig.color + '15' }}>
+              {proConfig.icon}
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">Tipo de negocio</p>
+              <h3 className="text-base font-bold text-slate-900 mt-0.5">{proConfig.name}</h3>
+              <p className="text-xs text-slate-500 mt-1">Personaliza la terminología, vocabulario del agente IA y categorías sugeridas.</p>
+            </div>
+          </div>
+          <button onClick={() => setShowTypeModal(true)} className="px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 whitespace-nowrap">
+            Cambiar tipo
+          </button>
+        </div>
+      </div>
+
+      {showTypeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setShowTypeModal(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-900 mb-1">Cambiar tipo de negocio</h3>
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 mb-4">
+              <p className="text-xs text-amber-800">Cambiar el tipo actualizará las categorías sugeridas y el vocabulario. Tus datos existentes no se modificarán.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {PROFESSIONAL_TYPES.map((pt) => {
+                const selected = proConfig.id === pt.id
+                return (
+                  <button
+                    key={pt.id}
+                    onClick={async () => {
+                      await fetch('/api/workspace/professional-type', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ professional_type_id: pt.id }),
+                      })
+                      await refreshPro()
+                      setShowTypeModal(false)
+                    }}
+                    className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-all ${selected ? 'border-2 shadow-sm' : 'border border-slate-200 bg-white hover:border-slate-300'}`}
+                    style={selected ? { borderColor: pt.color, backgroundColor: pt.color + '10' } : undefined}
+                  >
+                    <span className="text-3xl flex-shrink-0">{pt.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-900">{pt.name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{pt.description}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex justify-end mt-4">
+              <button onClick={() => setShowTypeModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* General info */}

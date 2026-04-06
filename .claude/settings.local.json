@@ -79,7 +79,9 @@
       "Bash(wc -l \"C:/Users/RAFAEL~1/AppData/Local/Temp/claude/C--Users-Rafael-B-agencyai/850f6dc2-d602-4b80-bbb5-ec5807874293/tasks/\"*.output)",
       "mcp__claude_ai_Supabase__list_tables",
       "Bash(node scripts/import-finances.mjs)",
-      "mcp__claude_ai_Supabase__execute_sql"
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(xargs -0 sed -i -e 's/agregá/agrega/g' -e 's/creá\\\\b/crea/g' -e 's/hacé\\\\b/haz/g' -e 's/tenés\\\\b/tienes/g' -e 's/podés\\\\b/puedes/g' -e 's/mostrá\\\\b/muestra/g' -e 's/escribí\\\\b/escribe/g' -e 's/ingresá\\\\b/ingresa/g' -e 's/seleccioná\\\\b/selecciona/g' -e 's/arrastrá\\\\b/arrastra/g' -e 's/pegá\\\\b/pega/g' -e 's/mandá\\\\b/envía/g' -e 's/avisá\\\\b/avisa/g' -e 's/buscá\\\\b/busca/g' -e 's/elegí\\\\b/elige/g' -e 's/configurá\\\\b/configura/g' -e 's/revisá\\\\b/revisa/g')",
+      "Bash(xargs -0 sed -i 's/Clientes de la agencia/Clientes/g')"
     ]
   }
 }

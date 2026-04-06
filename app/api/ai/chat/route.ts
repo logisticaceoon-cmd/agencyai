@@ -21,6 +21,27 @@ export async function POST(request: Request) {
       .eq('workspace_id', workspaceId)
       .maybeSingle()
 
+    // Get professional type context
+    const { data: workspaceRow } = await supabase
+      .from('workspaces')
+      .select('professional_type_id')
+      .eq('id', workspaceId)
+      .maybeSingle()
+
+    let professionalContext = ''
+    let professionalName = 'agencia'
+    if (workspaceRow?.professional_type_id) {
+      const { data: ptype } = await supabase
+        .from('professional_types')
+        .select('name, ai_agent_context')
+        .eq('id', workspaceRow.professional_type_id)
+        .maybeSingle()
+      if (ptype) {
+        professionalContext = ptype.ai_agent_context || ''
+        professionalName = ptype.name || 'agencia'
+      }
+    }
+
     // Get workspace context
     const workspaceContext = await getWorkspaceContext(supabase, workspaceId)
 
@@ -37,8 +58,8 @@ export async function POST(request: Request) {
     const now = new Date()
     const dateStr = now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
 
-    const systemPrompt = `Sos ${agentName}, el asistente de IA de una agencia de marketing digital.
-Tu personalidad es: ${personality}. Respondes de forma ${personalityDesc}.
+    const systemPrompt = `Sos ${agentName}, el asistente de IA para ${professionalName}.
+${professionalContext ? professionalContext + '\n' : ''}Tu personalidad es: ${personality}. Respondes de forma ${personalityDesc}.
 Hoy es ${dateStr}.
 
 DATOS ACTUALES DE LA AGENCIA:
@@ -68,7 +89,7 @@ IMPORTANTE:
 - No hagas listas enormes sin que te las pidan.
 - Cuando el usuario salude, responde con saludo contextual del dia y UNA pregunta concreta.
 - Si el mensaje empieza con [SISTEMA:] es un trigger automatico, responde como si fuera un saludo inicial.
-- Habla en espanol rioplatense (vos, tenes, etc).
+- Habla en espanol neutro latinoamericano (tu, tienes, puedes).
 - Maximo 1-2 emojis por mensaje.`
 
     // Build API messages

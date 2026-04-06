@@ -195,7 +195,7 @@ export default function SignUpPage() {
           </form>
 
           <p className="mt-5 text-center text-sm text-slate-500">
-            ¿Ya tenés cuenta?{' '}
+            ¿Ya tienes cuenta?{' '}
             <Link href="/sign-in" className="font-medium text-blue-600 hover:text-blue-700 transition-colors">
               Iniciar sesión
             </Link>

@@ -11,6 +11,7 @@ import {
   DollarSign, Clock, UserPlus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { PROFESSIONAL_TYPES } from '@/lib/professional-types'
 
 const STORAGE_KEY = 'agencyai_onboarding'
 
@@ -25,6 +26,7 @@ interface OnboardingData {
   workspaceName: string
   currency: string
   timezone: string
+  customType: string
   invites: { email: string; role: string }[]
 }
 
@@ -39,19 +41,9 @@ const defaultData: OnboardingData = {
   workspaceName: '',
   currency: 'ARS',
   timezone: 'America/Argentina/Buenos_Aires',
+  customType: '',
   invites: [{ email: '', role: 'admin' }],
 }
-
-const agencyTypes = [
-  { id: 'marketing_digital', label: 'Marketing Digital', icon: Megaphone },
-  { id: 'diseno_creatividad', label: 'Diseno y Creatividad', icon: Palette },
-  { id: 'desarrollo_web', label: 'Desarrollo Web/App', icon: Code },
-  { id: 'relaciones_publicas', label: 'Relaciones Publicas', icon: Radio },
-  { id: 'consultoria', label: 'Consultoria', icon: Briefcase },
-  { id: 'social_media', label: 'Social Media', icon: MessageCircle },
-  { id: 'produccion', label: 'Produccion', icon: Video },
-  { id: 'otra', label: 'Otra', icon: HelpCircle },
-]
 
 const teamSizeOptions = ['Solo', '2-5', '6-20', 'Mas de 20']
 const clientCountOptions = ['1-5', '6-20', 'Mas de 20']
@@ -204,6 +196,12 @@ export default function OnboardingPage() {
           status: 'active',
         })
 
+        await supabase.from('workspaces').update({
+          professional_type_id: data.agencyType || 'marketing_agency',
+          professional_type_custom: data.customType || null,
+          onboarding_completed: true,
+        }).eq('id', workspace.id)
+
         localStorage.setItem('agencyai_workspace_id', workspace.id)
 
         // Send invites if any
@@ -349,7 +347,7 @@ export default function OnboardingPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Tu perfil</h2>
-                  <p className="text-sm text-slate-500">Contanos un poco sobre vos</p>
+                  <p className="text-sm text-slate-500">Cuéntanos un poco sobre ti</p>
                 </div>
               </div>
 
@@ -395,42 +393,57 @@ export default function OnboardingPage() {
                   <Building2 className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Tipo de agencia</h2>
-                  <p className="text-sm text-slate-500">A que se dedica tu agencia?</p>
+                  <h2 className="text-lg font-semibold text-slate-900">¿A qué te dedicas?</h2>
+                  <p className="text-sm text-slate-500">Esto personaliza todo el sistema para tu tipo de trabajo</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {agencyTypes.map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => update({ agencyType: id })}
-                    className={cn(
-                      'flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all',
-                      data.agencyType === id
-                        ? 'border-blue-500 bg-blue-50 shadow-sm'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                    )}
-                  >
-                    <div className={cn(
-                      'h-10 w-10 rounded-lg flex items-center justify-center',
-                      data.agencyType === id ? 'bg-blue-100' : 'bg-slate-100'
-                    )}>
-                      <Icon className={cn('h-5 w-5', data.agencyType === id ? 'text-blue-600' : 'text-slate-500')} />
-                    </div>
-                    <span className={cn(
-                      'text-xs font-medium',
-                      data.agencyType === id ? 'text-blue-700' : 'text-slate-600'
-                    )}>
-                      {label}
-                    </span>
-                    {data.agencyType === id && (
-                      <Check className="h-4 w-4 text-blue-600" />
-                    )}
-                  </button>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[55vh] overflow-y-auto pr-1">
+                {PROFESSIONAL_TYPES.map((pt) => {
+                  const selected = data.agencyType === pt.id
+                  return (
+                    <button
+                      key={pt.id}
+                      type="button"
+                      onClick={() => update({ agencyType: pt.id })}
+                      className={cn(
+                        'flex items-start gap-3 rounded-xl border p-4 text-left transition-all',
+                        selected
+                          ? 'border-2 shadow-sm'
+                          : 'border border-slate-200 bg-white hover:border-slate-300'
+                      )}
+                      style={selected ? {
+                        borderColor: pt.color,
+                        backgroundColor: pt.color + '10',
+                      } : undefined}
+                    >
+                      <span className="text-3xl flex-shrink-0">{pt.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className={cn('text-sm font-bold', selected ? 'text-slate-900' : 'text-slate-700')}>{pt.name}</p>
+                          {selected && (
+                            <Check className="h-4 w-4 flex-shrink-0" style={{ color: pt.color }} />
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5 leading-tight">{pt.description}</p>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
+
+              {data.agencyType === 'other' && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">¿Cuál es tu actividad?</label>
+                  <input
+                    type="text"
+                    value={data.customType}
+                    onChange={(e) => update({ customType: e.target.value })}
+                    placeholder="Describe tu tipo de servicio"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -598,7 +611,7 @@ export default function OnboardingPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Invita a tu equipo</h2>
-                  <p className="text-sm text-slate-500">Opcional -- podes hacerlo despues</p>
+                  <p className="text-sm text-slate-500">Opcional — puedes hacerlo después</p>
                 </div>
               </div>
 
@@ -643,13 +656,13 @@ export default function OnboardingPage() {
                   className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors mb-6"
                 >
                   <Plus className="h-4 w-4" />
-                  Agregar otra invitacion
+                  Agregar otra invitación
                 </button>
               )}
 
               <div className="rounded-lg bg-slate-50 border border-slate-100 p-4">
                 <p className="text-xs text-slate-500 text-center">
-                  Las invitaciones se enviaran una vez creado el workspace. Tambien podes invitar miembros despues desde Configuracion.
+                  Las invitaciones se enviarán una vez creado el workspace. También puedes invitar miembros después desde Configuración.
                 </p>
               </div>
             </div>
@@ -666,14 +679,14 @@ export default function OnboardingPage() {
                 Tu workspace <span className="font-semibold text-slate-900">{data.workspaceName}</span> fue creado exitosamente.
               </p>
               <p className="text-sm text-slate-400 mb-8">
-                Ya podes empezar a gestionar tu agencia desde el dashboard.
+                Ya puedes empezar a gestionar tu agencia desde el dashboard.
               </p>
 
               {/* Summary */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8 text-left max-w-md mx-auto">
                 {[
                   { label: 'Agencia', value: data.workspaceName },
-                  { label: 'Tipo', value: agencyTypes.find((a) => a.id === data.agencyType)?.label || '-' },
+                  { label: 'Tipo', value: PROFESSIONAL_TYPES.find((a) => a.id === data.agencyType)?.name || '-' },
                   { label: 'Moneda', value: data.currency },
                   { label: 'Equipo', value: data.teamSize },
                   { label: 'Clientes', value: data.clientCount },

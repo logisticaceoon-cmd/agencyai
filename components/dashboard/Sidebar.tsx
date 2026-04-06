@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useProfessionalType } from '@/hooks/useProfessionalType'
 import { Avatar } from '@/components/shared/Avatar'
 import { toast } from '@/hooks/use-toast'
 import {
@@ -65,43 +66,6 @@ type NavItem = {
   minPlan?: OrgPlan
 }
 
-const navGroups: { label: string | null; items: NavItem[] }[] = [
-  {
-    label: null,
-    items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    ],
-  },
-  {
-    label: 'Operaciones',
-    items: [
-      { href: '/clients', label: 'Clientes', icon: Users },
-      { href: '/projects', label: 'Proyectos', icon: FolderKanban },
-      { href: '/tasks', label: 'Tareas', icon: CheckSquare },
-      { href: '/minutes', label: 'Minutas', icon: MessageSquare },
-      { href: '/calendar', label: 'Calendario', icon: Calendar },
-    ],
-  },
-  {
-    label: 'Reportes',
-    items: [
-      { href: '/reports', label: 'Reportes', icon: FileText },
-      { href: '/kpis', label: 'KPIs y Metricas', icon: BarChart2 },
-      { href: '/objectives', label: 'Objetivos', icon: Target },
-    ],
-  },
-  {
-    label: 'Gestion',
-    items: [
-      { href: '/audits', label: 'Auditorias', icon: Search },
-      { href: '/docs', label: 'Documentos', icon: BookOpen },
-      { href: '/finances', label: 'Finanzas', icon: DollarSign },
-      { href: '/recordings', label: 'Grabaciones', icon: Video },
-      { href: '/alerts', label: 'IA & Alertas', icon: Zap },
-    ],
-  },
-]
-
 const adminItems: NavItem[] = [
   { href: '/settings', label: 'Workspace', icon: Building2 },
   { href: '/settings/team', label: 'Equipo', icon: Users },
@@ -117,8 +81,46 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, org } = useCurrentUser()
+  const { config } = useProfessionalType()
 
   const orgPlan: OrgPlan = (org?.plan as OrgPlan) ?? 'free'
+
+  const navGroups: { label: string | null; items: NavItem[] }[] = [
+    {
+      label: null,
+      items: [
+        { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      ],
+    },
+    {
+      label: 'Operaciones',
+      items: [
+        { href: '/clients', label: config.terminology.clients, icon: Users },
+        { href: '/projects', label: config.terminology.projects, icon: FolderKanban },
+        { href: '/tasks', label: config.terminology.tasks, icon: CheckSquare },
+        { href: '/minutes', label: 'Minutas', icon: MessageSquare },
+        { href: '/calendar', label: 'Calendario', icon: Calendar },
+      ],
+    },
+    {
+      label: 'Reportes',
+      items: [
+        { href: '/reports', label: config.terminology.reports, icon: FileText },
+        { href: '/kpis', label: 'KPIs y Metricas', icon: BarChart2 },
+        { href: '/objectives', label: 'Objetivos', icon: Target },
+      ],
+    },
+    {
+      label: 'Gestion',
+      items: [
+        { href: '/audits', label: 'Auditorias', icon: Search },
+        { href: '/docs', label: 'Documentos', icon: BookOpen },
+        { href: '/finances', label: 'Finanzas', icon: DollarSign },
+        { href: '/recordings', label: 'Grabaciones', icon: Video },
+        { href: '/alerts', label: 'IA & Alertas', icon: Zap },
+      ],
+    },
+  ]
 
   async function handleLogout() {
     const supabase = (await import('@/lib/supabase')).createClient()

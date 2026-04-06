@@ -161,7 +161,7 @@ export default function SignInPage() {
           </form>
 
           <p className="mt-5 text-center text-sm text-slate-500">
-            ¿No tenés cuenta?{' '}
+            ¿No tienes cuenta?{' '}
             <Link href="/sign-up" className="font-medium text-blue-600 hover:text-blue-700 transition-colors">
               Crear cuenta gratis
             </Link>
