@@ -71,7 +71,15 @@
       "Bash(sed -i \"s/c\\\\.author\\\\.avatarUrl/c.author?.avatarUrl/g\" \"app/\\(dashboard\\)/tasks/[id]/page.tsx\")",
       "Bash(sed -i \"s/task\\\\.createdBy\\\\.fullName/task.createdBy?.fullName || ''Usuario''/g\" \"app/\\(dashboard\\)/tasks/[id]/page.tsx\")",
       "Bash(sed -i \"s/task\\\\.createdBy\\\\.avatarUrl/task.createdBy?.avatarUrl/g\" \"app/\\(dashboard\\)/tasks/[id]/page.tsx\")",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(do)",
+      "Bash(sed -i -e 's/text-zinc-200/text-slate-900/g' -e 's/text-zinc-300/text-slate-700/g' -e 's/text-zinc-400/text-[var\\(--text-muted\\)]/g' -e 's/text-zinc-500/text-[var\\(--text-secondary\\)]/g' -e 's/text-zinc-600/text-[var\\(--text-secondary\\)]/g' -e 's/bg-zinc-900\\\\/80/bg-white/g' -e 's/bg-zinc-900\\\\/50/bg-slate-50/g' -e 's/bg-zinc-800\\\\/50/bg-slate-100/g' -e 's/bg-zinc-800/bg-slate-100/g' -e 's/bg-zinc-900/bg-white/g' -e 's/bg-zinc-700/bg-slate-200/g' -e 's/border-zinc-700\\\\/50/border-[var\\(--border-base\\)]/g' -e 's/border-zinc-700/border-[var\\(--border-base\\)]/g' -e 's/border-zinc-800/border-[var\\(--border-base\\)]/g' -e 's/border-zinc-600/border-[var\\(--border-strong\\)]/g' -e 's/hover:bg-zinc-800/hover:bg-slate-100/g' -e 's/hover:bg-zinc-700/hover:bg-slate-200/g' -e 's/hover:text-zinc-200/hover:text-slate-900/g' -e 's/hover:text-zinc-300/hover:text-slate-700/g' -e 's/hover:border-zinc-600/hover:border-[var\\(--border-strong\\)]/g' -e 's/focus:border-zinc-600/focus:border-[var\\(--blue\\)]/g' -e 's/focus:ring-zinc-500/focus:ring-blue-500/g' -e 's/placeholder-zinc-500/placeholder-[var\\(--text-muted\\)]/g' -e 's/placeholder-zinc-600/placeholder-[var\\(--text-muted\\)]/g' -e 's/divide-zinc-800/divide-slate-200/g' -e 's/hover:text-white/hover:text-slate-900/g' -e 's/text-white/text-slate-900/g' \"$f\")",
+      "Bash(echo \"Done: $f\")",
+      "Bash(cd:*)",
+      "Bash(wc -l \"C:/Users/RAFAEL~1/AppData/Local/Temp/claude/C--Users-Rafael-B-agencyai/850f6dc2-d602-4b80-bbb5-ec5807874293/tasks/\"*.output)",
+      "mcp__claude_ai_Supabase__list_tables",
+      "Bash(node scripts/import-finances.mjs)",
+      "mcp__claude_ai_Supabase__execute_sql"
     ]
   }
 }
