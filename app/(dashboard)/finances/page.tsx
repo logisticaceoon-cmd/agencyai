@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   DollarSign, TrendingUp, TrendingDown, Plus, X, ChevronLeft, ChevronRight,
-  Loader2, Download, BarChart3, FileSignature, Users, Receipt,
-  MoreVertical, Pencil, Trash2, FileText, Coins, Upload,
+  Download, BarChart3, Users, Receipt, MoreVertical, Pencil, Trash2, FileText,
+  Coins, Upload, ChevronDown, ChevronRight as ChevRight, Settings, RotateCcw, Briefcase,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
@@ -23,19 +23,24 @@ interface Transaction {
   clients?: { id: string; name: string } | null
 }
 
-interface Contract {
-  id: string; code: string; trafficker_name: string; client_name: string
-  service: string | null; monthly_fee: number; currency: string
-  commission_percent: number; status: string; start_date: string | null
-  notes: string | null; contract_pdf_url: string | null
+interface ServiceCategory {
+  id: string; name: string; description: string | null; color: string
+  icon: string; position: number; created_at: string
+}
+
+interface FinanceClient {
+  id: string; category_id: string | null; client_name: string; company_name: string | null
+  assigned_to: string | null; contract_cost: number; commission_percent: number
+  commission_amount: number; currency: string; total_amount: number; cancelled_amount: number
+  accounts_count: number; start_date: string | null; status: string
+  observations: string | null; contract_pdf_url: string | null; contract_pdf_name: string | null
   deleted_at: string | null; created_at: string; updated_at: string
 }
 
-interface MonthlyRecord {
-  id: string; contract_id: string; workspace_id: string
-  month: number; year: number; monthly_fee: number
-  commission_amount: number; currency: string; status: string
-  notes: string | null; created_at: string
+interface ClientMonthly {
+  id: string; client_id: string; month: number; year: number
+  billed_amount: number; commission_amount: number; currency: string
+  status: string; notes: string | null; closed_at: string | null
 }
 
 interface PayrollEntry {
@@ -48,6 +53,7 @@ interface PayrollEntry {
 interface Client { id: string; name: string }
 
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const MONTHS_SHORT = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC']
 
 const CURRENCIES = [
   { value: 'USD', symbol: '$', label: 'USD' },
@@ -60,8 +66,55 @@ const CURRENCIES = [
   { value: 'VES', symbol: 'Bs', label: 'VES' },
 ]
 
+const CATEGORY_COLORS = [
+  { value: '#2563eb', name: 'Azul' },
+  { value: '#16a34a', name: 'Verde' },
+  { value: '#dc2626', name: 'Rojo' },
+  { value: '#ea580c', name: 'Naranja' },
+  { value: '#9333ea', name: 'Purpura' },
+  { value: '#4f46e5', name: 'Indigo' },
+  { value: '#ec4899', name: 'Rosa' },
+  { value: '#ca8a04', name: 'Amarillo' },
+  { value: '#0d9488', name: 'Teal' },
+  { value: '#475569', name: 'Gris' },
+]
+
+const CATEGORY_ICONS = ['📊','💼','🎯','🚀','💡','🛒','📱','🎨','💰','📈','🔧','✉️','🌐','📣','🎬','📝','🔑','⚡','🏆','🤝']
+
+const PRESET_CATEGORIES = [
+  { icon: '📊', name: 'Tráfico Pago', color: '#2563eb', description: 'Gestión de campañas publicitarias' },
+  { icon: '🔑', name: 'Cuenta Inhabilitada', color: '#ea580c', description: 'Recuperación de cuentas' },
+  { icon: '💡', name: 'Mentoría', color: '#9333ea', description: 'Asesoría y mentoría personalizada' },
+  { icon: '🌐', name: 'Diseño Web', color: '#16a34a', description: 'Desarrollo de sitios web' },
+  { icon: '📱', name: 'Social Media', color: '#ec4899', description: 'Gestión de redes sociales' },
+  { icon: '📣', name: 'Publicidad', color: '#dc2626', description: 'Campañas y estrategia publicitaria' },
+]
+
+const ASSIGNED_COLORS: Record<string, { bg: string; text: string }> = {
+  RAFA: { bg: '#dbeafe', text: '#2563eb' },
+  RAFAEL: { bg: '#dbeafe', text: '#2563eb' },
+  TEFY: { bg: '#dcfce7', text: '#16a34a' },
+  STEPHANY: { bg: '#dcfce7', text: '#16a34a' },
+}
+
+function getAssignedStyle(name: string | null) {
+  if (!name) return { bg: '#f3f4f6', text: '#374151' }
+  const upper = name.toUpperCase().trim()
+  for (const key of Object.keys(ASSIGNED_COLORS)) {
+    if (upper.includes(key)) return ASSIGNED_COLORS[key]
+  }
+  return { bg: '#f3f4f6', text: '#374151' }
+}
+
 function getCurrencySymbol(code: string) {
   return CURRENCIES.find(c => c.value === code)?.symbol || '$'
+}
+
+function hexToRgba(hex: string, alpha: number) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 // ═══════════════════════════════════════
@@ -71,8 +124,10 @@ function getCurrencySymbol(code: string) {
 export default function FinancesPage() {
   const [tab, setTab] = useState('resumen')
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [contracts, setContracts] = useState<Contract[]>([])
-  const [monthlyRecords, setMonthlyRecords] = useState<MonthlyRecord[]>([])
+  const [categories, setCategories] = useState<ServiceCategory[]>([])
+  const [financeClients, setFinanceClients] = useState<FinanceClient[]>([])
+  const [monthlyRecords, setMonthlyRecords] = useState<ClientMonthly[]>([])
+  const [prevMonthlyRecords, setPrevMonthlyRecords] = useState<ClientMonthly[]>([])
   const [payroll, setPayroll] = useState<PayrollEntry[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
@@ -81,37 +136,55 @@ export default function FinancesPage() {
   const [year, setYear] = useState(now.getFullYear())
   const [chartData, setChartData] = useState<{name:string;ingresos:number;gastos:number}[]>([])
   const [showDeleted, setShowDeleted] = useState(false)
+  const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({})
 
-  // Forms & modals
-  const [showContractForm, setShowContractForm] = useState(false)
+  // Modals
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null)
+  const [showClientModal, setShowClientModal] = useState<{ categoryId: string | null } | null>(null)
+  const [editingClient, setEditingClient] = useState<FinanceClient | null>(null)
+  const [closingClient, setClosingClient] = useState<FinanceClient | null>(null)
+  const [deletingClient, setDeletingClient] = useState<FinanceClient | null>(null)
+  const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [showPayrollForm, setShowPayrollForm] = useState(false)
   const [showExpenseForm, setShowExpenseForm] = useState(false)
-  const [editingContract, setEditingContract] = useState<Contract | null>(null)
-  const [closingContract, setClosingContract] = useState<Contract | null>(null)
-  const [deletingContract, setDeletingContract] = useState<Contract | null>(null)
-  const [menuOpen, setMenuOpen] = useState<string | null>(null)
 
   const currentPeriod = `${year}-${String(month).padStart(2, '0')}`
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [txRes, contractsRes, payrollRes, clientsRes] = await Promise.all([
+    const prevMonth = month === 1 ? 12 : month - 1
+    const prevYear = month === 1 ? year - 1 : year
+
+    const [txRes, catsRes, clientsRes, payrollRes, clientListRes, prevRes] = await Promise.all([
       fetch(`/api/finances?month=${month}&year=${year}`),
-      fetch(`/api/finances/contracts?month=${month}&year=${year}${showDeleted ? '&include_deleted=true' : ''}`),
+      fetch('/api/finances/categories'),
+      fetch(`/api/finances/finance-clients?month=${month}&year=${year}${showDeleted ? '&include_deleted=true' : ''}`),
       fetch(`/api/finances/payroll?period=${currentPeriod}`),
       fetch('/api/clients'),
+      fetch(`/api/finances/finance-clients?month=${prevMonth}&year=${prevYear}`),
     ])
-    if (txRes.ok) {
-      const j = await txRes.json()
-      setTransactions(j.data || [])
+
+    if (txRes.ok) { const j = await txRes.json(); setTransactions(j.data || []) }
+    if (catsRes.ok) {
+      const j = await catsRes.json()
+      setCategories(j.data || [])
+      // Auto-expand all categories by default
+      const expanded: Record<string, boolean> = {}
+      ;(j.data || []).forEach((c: ServiceCategory) => { expanded[c.id] = true })
+      setExpandedCats(prev => ({ ...expanded, ...prev }))
     }
-    if (contractsRes.ok) {
-      const j = await contractsRes.json()
-      setContracts(j.data || [])
+    if (clientsRes.ok) {
+      const j = await clientsRes.json()
+      setFinanceClients(j.data || [])
       setMonthlyRecords(j.monthlyRecords || [])
     }
+    if (prevRes.ok) {
+      const j = await prevRes.json()
+      setPrevMonthlyRecords(j.monthlyRecords || [])
+    }
     if (payrollRes.ok) { const j = await payrollRes.json(); setPayroll(j.data || []) }
-    if (clientsRes.ok) { const j = await clientsRes.json(); setClients(j.data || []) }
+    if (clientListRes.ok) { const j = await clientListRes.json(); setClients(j.data || []) }
 
     const cd: {name:string;ingresos:number;gastos:number}[] = []
     for (let i = 5; i >= 0; i--) {
@@ -128,6 +201,7 @@ export default function FinancesPage() {
     }
     setChartData(cd)
     setLoading(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, year, currentPeriod, showDeleted])
 
   useEffect(() => { fetchData() }, [fetchData])
@@ -139,93 +213,156 @@ export default function FinancesPage() {
     setMonth(m); setYear(y)
   }
 
+  // ═══ Derived data ═══
+
+  const getMonthlyRecord = (clientId: string) => monthlyRecords.find(r => r.client_id === clientId)
+
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
   const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
   const netProfit = totalIncome - totalExpenses
-  const activeContracts = contracts.filter(c => c.status === 'active')
-  const totalContractFees = activeContracts.reduce((s, c) => s + Number(c.monthly_fee), 0)
-  const totalPayroll = payroll.reduce((s, p) => s + Number(p.net_salary), 0)
   const expenseTx = transactions.filter(t => t.type === 'expense')
-  const totalMonthlyCommissions = monthlyRecords.reduce((s, r) => s + Number(r.commission_amount), 0)
+  const totalPayroll = payroll.reduce((s, p) => s + Number(p.net_salary), 0)
 
-  function getMonthlyRecord(contractId: string) {
-    return monthlyRecords.find(r => r.contract_id === contractId)
-  }
+  const activeClients = useMemo(() => financeClients.filter(c => !c.deleted_at), [financeClients])
+  const totalContractCost = activeClients.reduce((s, c) => s + Number(c.contract_cost), 0)
+  const totalCommissions = monthlyRecords.reduce((s, r) => s + Number(r.commission_amount), 0)
+  const totalBilled = monthlyRecords.reduce((s, r) => s + Number(r.billed_amount), 0)
+  const totalCancelled = activeClients.reduce((s, c) => s + Number(c.cancelled_amount), 0)
+  const prevBilled = prevMonthlyRecords.reduce((s, r) => s + Number(r.billed_amount), 0)
+  const billedChange = prevBilled > 0 ? ((totalBilled - prevBilled) / prevBilled) * 100 : 0
 
-  // ═══ Contract handlers ═══
-
-  async function handleCreateContract(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    const res = await fetch('/api/finances/contracts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code: fd.get('code'),
-        trafficker_name: fd.get('trafficker_name'),
-        client_name: fd.get('client_name') || '',
-        service: fd.get('service') || undefined,
-        monthly_fee: parseFloat(fd.get('monthly_fee') as string) || 0,
-        currency: fd.get('currency') || 'USD',
-        commission_percent: parseFloat(fd.get('commission_percent') as string) || 0,
-        start_date: fd.get('start_date') || undefined,
-        notes: fd.get('notes') || undefined,
-      }),
-    })
-    if (res.ok) {
-      const { data: newContract } = await res.json()
-      // Upload PDF if selected
-      const pdfFile = fd.get('contract_pdf') as File
-      if (pdfFile && pdfFile.size > 0 && newContract?.id) {
-        const uploadFd = new FormData()
-        uploadFd.append('file', pdfFile)
-        uploadFd.append('contract_id', newContract.id)
-        await fetch('/api/finances/contracts/upload', { method: 'POST', body: uploadFd })
+  const clientsByCategory = useMemo(() => {
+    const map: Record<string, FinanceClient[]> = {}
+    categories.forEach(c => { map[c.id] = [] })
+    map.__uncategorized__ = []
+    financeClients.forEach(fc => {
+      if (showDeleted || !fc.deleted_at) {
+        if (fc.category_id && map[fc.category_id]) map[fc.category_id].push(fc)
+        else map.__uncategorized__.push(fc)
       }
-    }
-    setShowContractForm(false); fetchData()
-  }
+    })
+    return map
+  }, [categories, financeClients, showDeleted])
 
-  async function handleEditContract(contractData: Record<string, unknown>, mode: 'this_month' | 'forward') {
-    if (!editingContract) return
-    if (mode === 'forward') {
-      await fetch(`/api/finances/contracts/${editingContract.id}`, {
+  // ═══ Category handlers ═══
+
+  async function handleSaveCategory(data: { name: string; description: string; color: string; icon: string }) {
+    if (editingCategory) {
+      await fetch(`/api/finances/categories/${editingCategory.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(contractData),
+        body: JSON.stringify({ ...data, position: editingCategory.position }),
       })
     } else {
-      // Create/update monthly record with overridden values for this month only
-      await fetch(`/api/finances/contracts/${editingContract.id}/monthly`, {
+      await fetch('/api/finances/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          month,
-          year,
-          monthly_fee: contractData.monthly_fee,
-          commission_amount: (Number(contractData.monthly_fee) * Number(contractData.commission_percent || 0)) / 100,
-          currency: contractData.currency,
-          status: 'pending',
-          notes: `Override solo este mes: ${contractData.notes || ''}`,
-        }),
+        body: JSON.stringify({ ...data, position: categories.length }),
       })
     }
-    setEditingContract(null); fetchData()
+    setShowCategoryModal(false); setEditingCategory(null); fetchData()
   }
 
-  async function handleDeleteContract() {
-    if (!deletingContract) return
-    await fetch(`/api/finances/contracts/${deletingContract.id}`, { method: 'DELETE' })
-    setDeletingContract(null); fetchData()
+  async function handleCreatePresets(selected: typeof PRESET_CATEGORIES) {
+    for (let i = 0; i < selected.length; i++) {
+      const p = selected[i]
+      await fetch('/api/finances/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...p, position: categories.length + i }),
+      })
+    }
+    fetchData()
   }
 
-  async function handleCloseMonth(contractId: string, data: { monthly_fee: number; commission_amount: number; currency: string; status: string; notes: string }) {
-    await fetch(`/api/finances/contracts/${contractId}/monthly`, {
+  async function handleDeleteCategory(cat: ServiceCategory) {
+    if (!confirm(`Eliminar categoria "${cat.name}"?`)) return
+    const res = await fetch(`/api/finances/categories/${cat.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const j = await res.json()
+      alert(j.error || 'Error al eliminar')
+      return
+    }
+    fetchData()
+  }
+
+  // ═══ Client handlers ═══
+
+  async function handleSaveClient(data: Record<string, unknown>, pdfFile: File | null, mode?: 'this_month' | 'forward') {
+    let clientId: string | null = null
+
+    if (editingClient) {
+      if (mode === 'this_month') {
+        // Only create/update monthly record
+        await fetch(`/api/finances/finance-clients/${editingClient.id}/monthly`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            month, year,
+            billed_amount: data.contract_cost,
+            commission_amount: (Number(data.contract_cost) * Number(data.commission_percent || 0)) / 100,
+            currency: data.currency,
+            status: 'pending',
+            notes: `Override ${MONTHS[month - 1]} ${year}`,
+          }),
+        })
+        clientId = editingClient.id
+      } else {
+        const res = await fetch(`/api/finances/finance-clients/${editingClient.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        })
+        if (res.ok) clientId = editingClient.id
+      }
+    } else {
+      const res = await fetch('/api/finances/finance-clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (res.ok) { const j = await res.json(); clientId = j.data?.id }
+    }
+
+    if (clientId && pdfFile) {
+      const fd = new FormData()
+      fd.append('file', pdfFile)
+      fd.append('client_id', clientId)
+      await fetch('/api/finances/finance-clients/upload', { method: 'POST', body: fd })
+    }
+
+    setShowClientModal(null); setEditingClient(null); fetchData()
+  }
+
+  async function handleDeleteClient() {
+    if (!deletingClient) return
+    await fetch(`/api/finances/finance-clients/${deletingClient.id}`, { method: 'DELETE' })
+    setDeletingClient(null); fetchData()
+  }
+
+  async function handleRestoreClient(c: FinanceClient) {
+    await fetch(`/api/finances/finance-clients/${c.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category_id: c.category_id, client_name: c.client_name, company_name: c.company_name,
+        assigned_to: c.assigned_to, contract_cost: c.contract_cost, commission_percent: c.commission_percent,
+        commission_amount: c.commission_amount, currency: c.currency, total_amount: c.total_amount,
+        cancelled_amount: c.cancelled_amount, accounts_count: c.accounts_count, start_date: c.start_date,
+        status: 'active', observations: c.observations, contract_pdf_url: c.contract_pdf_url,
+        contract_pdf_name: c.contract_pdf_name, deleted_at: null,
+      }),
+    })
+    fetchData()
+  }
+
+  async function handleCloseMonth(clientId: string, data: { billed_amount: number; commission_amount: number; currency: string; status: string; notes: string }) {
+    await fetch(`/api/finances/finance-clients/${clientId}/monthly`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ month, year, ...data }),
     })
-    setClosingContract(null); fetchData()
+    setClosingClient(null); fetchData()
   }
 
   // ═══ Payroll & Expense handlers ═══
@@ -237,14 +374,11 @@ export default function FinancesPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        employee_name: fd.get('employee_name'),
-        role: fd.get('role') || undefined,
+        employee_name: fd.get('employee_name'), role: fd.get('role') || undefined,
         base_salary: parseFloat(fd.get('base_salary') as string) || 0,
         bonus: parseFloat(fd.get('bonus') as string) || 0,
         deductions: parseFloat(fd.get('deductions') as string) || 0,
-        period: currentPeriod,
-        pay_date: fd.get('pay_date') || undefined,
-        status: 'pending',
+        period: currentPeriod, pay_date: fd.get('pay_date') || undefined, status: 'pending',
       }),
     })
     setShowPayrollForm(false); fetchData()
@@ -257,12 +391,9 @@ export default function FinancesPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        type: 'expense',
-        category: fd.get('category') || undefined,
-        description: fd.get('description'),
-        amount: parseFloat(fd.get('amount') as string),
-        date: fd.get('date'),
-        clientId: fd.get('clientId') || undefined,
+        type: 'expense', category: fd.get('category') || undefined,
+        description: fd.get('description'), amount: parseFloat(fd.get('amount') as string),
+        date: fd.get('date'), clientId: fd.get('clientId') || undefined,
       }),
     })
     setShowExpenseForm(false); fetchData()
@@ -279,7 +410,6 @@ export default function FinancesPage() {
     const a = document.createElement('a'); a.href = url; a.download = `gastos_${month}_${year}.csv`; a.click()
   }
 
-  // Expense stats
   const expenseByCategory = expenseTx.reduce<Record<string, number>>((acc, t) => {
     const cat = t.category || 'other'
     acc[cat] = (acc[cat] || 0) + Number(t.amount)
@@ -289,18 +419,18 @@ export default function FinancesPage() {
 
   const tabItems = [
     { id: 'resumen', label: 'Resumen', icon: BarChart3 },
-    { id: 'contratos', label: 'Contratos', icon: FileSignature },
+    { id: 'clientes', label: 'Clientes', icon: Briefcase },
     { id: 'nominas', label: 'Nominas', icon: Users },
     { id: 'gastos', label: 'Gastos', icon: Receipt },
   ]
 
   return (
     <div className="space-y-6">
-      <InfoBanner id="finances" title="Finanzas" description="Controla contratos, nominas y gastos de tu agencia." />
+      <InfoBanner id="finances" title="Finanzas" description="Controla clientes, nominas y gastos de tu agencia." />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Finanzas</h1>
-          <p className="mt-1 text-sm text-slate-500">Contratos, nominas y control de gastos</p>
+          <p className="mt-1 text-sm text-slate-500">Clientes por categoria, nominas y control de gastos</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-slate-100"><ChevronLeft className="h-5 w-5 text-slate-500" /></button>
@@ -321,13 +451,13 @@ export default function FinancesPage() {
           ))}
         </Tabs.List>
 
-        {/* ═══ TAB 1: RESUMEN ═══ */}
+        {/* ═══ TAB RESUMEN ═══ */}
         <Tabs.Content value="resumen" className="space-y-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <KPICard icon={DollarSign} label="Ingresos del mes" value={`$${totalIncome.toLocaleString()}`} color="text-green-600" bg="bg-green-50" border="border-green-200" />
             <KPICard icon={TrendingDown} label="Gastos del mes" value={`$${totalExpenses.toLocaleString()}`} color="text-red-600" bg="bg-red-50" border="border-red-200" />
             <KPICard icon={TrendingUp} label="Ganancia neta" value={`$${netProfit.toLocaleString()}`} color={netProfit >= 0 ? 'text-blue-600' : 'text-red-600'} bg={netProfit >= 0 ? 'bg-blue-50' : 'bg-red-50'} border={netProfit >= 0 ? 'border-blue-200' : 'border-red-200'} />
-            <KPICard icon={FileSignature} label="Contratos activos" value={`$${totalContractFees.toLocaleString()}/mes`} color="text-purple-600" bg="bg-purple-50" border="border-purple-200" />
+            <KPICard icon={Briefcase} label="Clientes activos" value={`$${totalContractCost.toLocaleString()}/mes`} color="text-purple-600" bg="bg-purple-50" border="border-purple-200" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -339,9 +469,9 @@ export default function FinancesPage() {
             <div className="rounded-xl border border-slate-200 bg-white p-5">
               <h3 className="text-sm font-semibold text-slate-900 mb-2">Resumen rapido</h3>
               <div className="space-y-1.5">
-                <div className="flex justify-between text-sm"><span className="text-slate-500">Contratos activos</span><span className="font-semibold text-slate-900">{activeContracts.length}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-slate-500">Gastos registrados</span><span className="font-semibold text-slate-900">{expenseTx.length}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-slate-500">Comisiones del mes</span><span className="font-semibold text-green-600">${totalMonthlyCommissions.toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">Clientes activos</span><span className="font-semibold text-slate-900">{activeClients.length}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">Categorias</span><span className="font-semibold text-slate-900">{categories.length}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">Comisiones del mes</span><span className="font-semibold text-green-600">${totalCommissions.toLocaleString()}</span></div>
               </div>
             </div>
           </div>
@@ -364,119 +494,248 @@ export default function FinancesPage() {
           )}
         </Tabs.Content>
 
-        {/* ═══ TAB 2: CONTRATOS ═══ */}
-        <Tabs.Content value="contratos" className="space-y-4">
-          <div className="flex items-center justify-between">
+        {/* ═══ TAB CLIENTES ═══ */}
+        <Tabs.Content value="clientes" className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
-              <h2 className="text-base font-semibold text-slate-900">Contratos de Traffickers</h2>
+              <h2 className="text-base font-semibold text-slate-900">Clientes de la agencia</h2>
               <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer">
                 <input type="checkbox" checked={showDeleted} onChange={e => setShowDeleted(e.target.checked)} className="rounded border-slate-300" />
                 Mostrar eliminados
               </label>
             </div>
-            <button onClick={() => { setShowContractForm(!showContractForm); setEditingContract(null) }} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
-              {showContractForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {showContractForm ? 'Cancelar' : 'Nuevo contrato'}
-            </button>
-          </div>
-
-          {showContractForm && (
-            <ContractForm onSubmit={handleCreateContract} onCancel={() => setShowContractForm(false)} />
-          )}
-
-          <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead><tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase">Codigo</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase">Trafficker</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase">Cliente</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase">Servicio</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase">Fee/mes</th>
-                  <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase">% Com.</th>
-                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase">Com. pagada</th>
-                  <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase">PDF</th>
-                  <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase">Estado</th>
-                  <th className="text-center px-4 py-2.5 text-xs font-semibold text-slate-500 uppercase w-10"></th>
-                </tr></thead>
-                <tbody className="divide-y divide-slate-100">
-                  {loading ? (
-                    <tr><td colSpan={10}><LoadingSkeleton /></td></tr>
-                  ) : contracts.length === 0 ? (
-                    <tr><td colSpan={10} className="px-5 py-8 text-center text-sm text-slate-400">No hay contratos registrados</td></tr>
-                  ) : contracts.map(c => {
-                    const isDeleted = c.status === 'deleted'
-                    const record = getMonthlyRecord(c.id)
-                    const sym = getCurrencySymbol(c.currency)
-                    return (
-                      <tr key={c.id} className={cn('hover:bg-slate-50 relative', isDeleted && 'bg-slate-50/80')}>
-                        <td className={cn('px-4 py-3 text-sm font-medium text-blue-600', isDeleted && 'line-through text-slate-400')}>{c.code}</td>
-                        <td className={cn('px-4 py-3 text-sm font-medium text-slate-800', isDeleted && 'line-through text-slate-400')}>{c.trafficker_name}</td>
-                        <td className={cn('px-4 py-3 text-sm text-slate-600', isDeleted && 'line-through text-slate-400')}>{c.client_name || '-'}</td>
-                        <td className="px-4 py-3 text-sm text-slate-500">{c.service || '-'}</td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold text-green-600">{sym}{Number(c.monthly_fee).toLocaleString()} <span className="text-[10px] text-slate-400">{c.currency}</span></td>
-                        <td className="px-4 py-3 text-center text-sm">{Number(c.commission_percent) > 0 ? <span className="bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full text-[10px] font-semibold">{c.commission_percent}%</span> : <span className="text-slate-300">&mdash;</span>}</td>
-                        <td className="px-4 py-3 text-right text-sm">{record ? <span className={cn('font-semibold', record.status === 'paid' ? 'text-green-600' : 'text-amber-600')}>{sym}{Number(record.commission_amount).toLocaleString()}</span> : <span className="text-slate-300">&mdash;</span>}</td>
-                        <td className="px-4 py-3 text-center">{c.contract_pdf_url ? <a href={c.contract_pdf_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700"><FileText className="h-4 w-4 inline" /></a> : <span className="text-slate-300">&mdash;</span>}</td>
-                        <td className="px-4 py-3 text-center"><ContractStatusBadge status={c.status} /></td>
-                        <td className="px-4 py-3 text-center relative">
-                          {!isDeleted && (
-                            <div className="relative inline-block">
-                              <button onClick={() => setMenuOpen(menuOpen === c.id ? null : c.id)} className="p-1 rounded hover:bg-slate-100"><MoreVertical className="h-4 w-4 text-slate-400" /></button>
-                              {menuOpen === c.id && (
-                                <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-lg border border-slate-200 bg-white shadow-lg py-1">
-                                  <button onClick={() => { setEditingContract(c); setMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"><Pencil className="h-3.5 w-3.5" /> Editar contrato</button>
-                                  {c.contract_pdf_url && <a href={c.contract_pdf_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50" onClick={() => setMenuOpen(null)}><FileText className="h-3.5 w-3.5" /> Ver PDF</a>}
-                                  <button onClick={() => { setClosingContract(c); setMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"><Coins className="h-3.5 w-3.5" /> Cierre de mes</button>
-                                  <hr className="my-1 border-slate-100" />
-                                  <button onClick={() => { setDeletingContract(c); setMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /> Eliminar contrato</button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {/* TOTALS ROW */}
-                  {!loading && contracts.filter(c => c.status === 'active').length > 0 && (
-                    <tr className="bg-[#0f172a] text-white">
-                      <td className="px-4 py-3 text-sm font-bold">TOTALES</td>
-                      <td className="px-4 py-3 text-sm">&mdash;</td>
-                      <td className="px-4 py-3 text-sm font-bold">{activeContracts.length} contratos</td>
-                      <td className="px-4 py-3 text-sm">&mdash;</td>
-                      <td className="px-4 py-3 text-right text-sm font-bold">${totalContractFees.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center text-sm">&mdash;</td>
-                      <td className="px-4 py-3 text-right text-sm font-bold">${totalMonthlyCommissions.toLocaleString()}</td>
-                      <td className="px-4 py-3">&mdash;</td>
-                      <td className="px-4 py-3">&mdash;</td>
-                      <td className="px-4 py-3"></td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="flex items-center gap-2">
+              {/* Month selector */}
+              <div className="hidden md:flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
+                {MONTHS_SHORT.map((m, i) => (
+                  <button key={m} onClick={() => setMonth(i + 1)} className={cn('px-2 py-1 text-[10px] font-semibold rounded transition-colors', month === i + 1 ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700')}>{m}</button>
+                ))}
+              </div>
+              <button onClick={() => { setEditingCategory(null); setShowCategoryModal(true) }} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+                <Plus className="h-4 w-4" /> Nueva categoria
+              </button>
             </div>
           </div>
 
-          {!loading && activeContracts.length > 0 && (
+          {/* Resume cards */}
+          {!loading && activeClients.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
-                <p className="text-xs text-purple-600 font-medium">Total fees activos</p>
-                <p className="text-lg font-bold text-purple-800">${totalContractFees.toLocaleString()}/mes</p>
+              <div className="rounded-xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-4">
+                <p className="text-xs text-green-700 font-semibold uppercase tracking-wide">Facturado total del mes</p>
+                <p className="text-2xl font-bold text-green-700 mt-1">${totalBilled.toLocaleString()}</p>
+                {prevBilled > 0 && (
+                  <p className={cn('text-xs mt-1 flex items-center gap-1', billedChange >= 0 ? 'text-green-600' : 'text-red-600')}>
+                    {billedChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                    {billedChange.toFixed(1)}% vs mes anterior
+                  </p>
+                )}
               </div>
-              <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-                <p className="text-xs text-green-600 font-medium">Comisiones del mes</p>
-                <p className="text-lg font-bold text-green-800">${totalMonthlyCommissions.toLocaleString()}</p>
+              <div className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 p-4">
+                <p className="text-xs text-purple-700 font-semibold uppercase tracking-wide">Comisiones totales del mes</p>
+                <p className="text-2xl font-bold text-purple-700 mt-1">${totalCommissions.toLocaleString()}</p>
+                <p className="text-xs text-purple-600 mt-1">
+                  {monthlyRecords.filter(r => r.status === 'paid').length} pagadas | {monthlyRecords.filter(r => r.status !== 'paid').length} pendientes
+                </p>
               </div>
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                <p className="text-xs text-blue-600 font-medium">Fee promedio por contrato</p>
-                <p className="text-lg font-bold text-blue-800">${activeContracts.length > 0 ? Math.round(totalContractFees / activeContracts.length).toLocaleString() : 0}</p>
+              <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-sky-50 p-4">
+                <p className="text-xs text-blue-700 font-semibold uppercase tracking-wide">Clientes activos</p>
+                <p className="text-2xl font-bold text-blue-700 mt-1">{activeClients.length}</p>
+                <p className="text-xs text-blue-600 mt-1">{categories.length} categorias</p>
+              </div>
+            </div>
+          )}
+
+          {/* Empty state + preset categories */}
+          {!loading && categories.length === 0 && (
+            <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <Briefcase className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+              <h3 className="text-base font-semibold text-slate-900 mb-1">No tenes categorias aun</h3>
+              <p className="text-sm text-slate-500 mb-5">Queres empezar con categorias predefinidas para agencias?</p>
+              <PresetPicker onCreate={handleCreatePresets} />
+            </div>
+          )}
+
+          {/* Categories list */}
+          {loading ? (
+            <LoadingSkeleton />
+          ) : (
+            <div className="space-y-3">
+              {categories.map(cat => {
+                const catClients = clientsByCategory[cat.id] || []
+                const expanded = expandedCats[cat.id]
+                const catRecords = monthlyRecords.filter(r => catClients.some(c => c.id === r.client_id))
+                const catTotal = catClients.filter(c => !c.deleted_at).reduce((s, c) => s + Number(c.contract_cost), 0)
+                const catCommissions = catRecords.reduce((s, r) => s + Number(r.commission_amount), 0)
+                const catCancelled = catClients.filter(c => !c.deleted_at).reduce((s, c) => s + Number(c.cancelled_amount), 0)
+
+                return (
+                  <div key={cat.id} className="rounded-xl overflow-hidden" style={{ borderLeft: `4px solid ${cat.color}` }}>
+                    {/* Category header */}
+                    <div className="flex items-center justify-between px-5 py-3.5 cursor-pointer" style={{ backgroundColor: hexToRgba(cat.color, 0.08) }} onClick={() => setExpandedCats(prev => ({ ...prev, [cat.id]: !prev[cat.id] }))}>
+                      <div className="flex items-center gap-3">
+                        {expanded ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevRight className="h-4 w-4 text-slate-500" />}
+                        <span className="text-xl">{cat.icon}</span>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900" style={{ color: cat.color }}>{cat.name.toUpperCase()}</h3>
+                          <p className="text-[11px] text-slate-500">{catClients.filter(c => !c.deleted_at).length} clientes</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-green-600">${catTotal.toLocaleString()}</p>
+                          <p className="text-[10px] text-slate-400">total mensual</p>
+                        </div>
+                        <button onClick={() => { setShowClientModal({ categoryId: cat.id }); setEditingClient(null) }} className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50">
+                          <Plus className="h-3.5 w-3.5" /> Agregar cliente
+                        </button>
+                        <button onClick={() => { setEditingCategory(cat); setShowCategoryModal(true) }} className="p-1.5 rounded-lg hover:bg-white/60">
+                          <Settings className="h-3.5 w-3.5 text-slate-500" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Category table */}
+                    {expanded && (
+                      <div className="bg-white border border-slate-200 border-t-0 rounded-b-xl overflow-x-auto">
+                        {catClients.length === 0 ? (
+                          <p className="text-center text-sm text-slate-400 py-6">No hay clientes en esta categoria</p>
+                        ) : (
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b border-slate-100">
+                                <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Cliente</th>
+                                <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Costo contrato</th>
+                                <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Comision %</th>
+                                <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Cuentas</th>
+                                <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Fecha inicio</th>
+                                <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total</th>
+                                <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Cancelado</th>
+                                <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Asignado a</th>
+                                <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">PDF</th>
+                                <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Observacion</th>
+                                <th className="w-10"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {catClients.map(c => {
+                                const isDeleted = !!c.deleted_at
+                                const sym = getCurrencySymbol(c.currency)
+                                const assigned = getAssignedStyle(c.assigned_to)
+                                const total = Number(c.contract_cost) + Number(c.commission_amount)
+                                return (
+                                  <tr key={c.id} className={cn('border-b border-slate-100 hover:bg-slate-50', isDeleted && 'bg-slate-50 opacity-70')}>
+                                    <td className={cn('px-4 py-3 text-[13px] font-semibold text-slate-900', isDeleted && 'line-through')}>
+                                      {c.client_name}
+                                      {isDeleted && <span className="ml-2 text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">Eliminado</span>}
+                                    </td>
+                                    <td className="px-3 py-3 text-right font-mono text-[13px] text-slate-700">{sym}{Number(c.contract_cost).toLocaleString()}</td>
+                                    <td className="px-3 py-3 text-center">
+                                      {Number(c.commission_percent) > 0 ? (
+                                        <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-[10px] font-semibold">%{c.commission_percent}</span>
+                                      ) : <span className="text-slate-300">&mdash;</span>}
+                                    </td>
+                                    <td className="px-3 py-3 text-center">
+                                      <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-semibold">{c.accounts_count}</span>
+                                    </td>
+                                    <td className="px-3 py-3 text-[12px] text-slate-500">{c.start_date ? new Date(c.start_date).toLocaleDateString('es-ES') : '-'}</td>
+                                    <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-green-600">{sym}{total.toLocaleString()}</td>
+                                    <td className="px-3 py-3 text-right font-mono text-[13px]">
+                                      {Number(c.cancelled_amount) > 0 ? <span className="text-red-600">{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span className="text-slate-300">&mdash;</span>}
+                                    </td>
+                                    <td className="px-3 py-3">
+                                      {c.assigned_to ? (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: assigned.bg, color: assigned.text }}>{c.assigned_to.toUpperCase()}</span>
+                                      ) : <span className="text-slate-300">&mdash;</span>}
+                                    </td>
+                                    <td className="px-3 py-3 text-center">
+                                      {c.contract_pdf_url ? (
+                                        <a href={c.contract_pdf_url} target="_blank" rel="noopener noreferrer" className="text-red-500 hover:text-red-700" title="Ver PDF"><FileText className="h-4 w-4 inline" /></a>
+                                      ) : <span className="text-slate-300">&mdash;</span>}
+                                    </td>
+                                    <td className="px-3 py-3 text-[11px] text-slate-500 italic max-w-[200px]">
+                                      <div className="truncate" title={c.observations || ''}>{c.observations ? (c.observations.length > 60 ? c.observations.slice(0, 60) + '...' : c.observations) : '-'}</div>
+                                    </td>
+                                    <td className="px-2 py-3 text-center relative">
+                                      <button onClick={() => setMenuOpen(menuOpen === c.id ? null : c.id)} className="p-1 rounded hover:bg-slate-100"><MoreVertical className="h-4 w-4 text-slate-400" /></button>
+                                      {menuOpen === c.id && (
+                                        <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+                                          {!isDeleted && (
+                                            <>
+                                              <button onClick={() => { setEditingClient(c); setMenuOpen(null); setShowClientModal({ categoryId: c.category_id }) }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"><Pencil className="h-3.5 w-3.5" /> Editar</button>
+                                              <button onClick={() => { setClosingClient(c); setMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"><Coins className="h-3.5 w-3.5" /> Cerrar mes</button>
+                                              {c.contract_pdf_url && <a href={c.contract_pdf_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"><FileText className="h-3.5 w-3.5" /> Ver PDF</a>}
+                                              <hr className="my-1 border-slate-100" />
+                                              <button onClick={() => { setDeletingClient(c); setMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /> Eliminar</button>
+                                            </>
+                                          )}
+                                          {isDeleted && (
+                                            <button onClick={() => { handleRestoreClient(c); setMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-blue-600 hover:bg-blue-50"><RotateCcw className="h-3.5 w-3.5" /> Restaurar</button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                              {/* Category totals row */}
+                              <tr className="bg-[#0f172a] text-white">
+                                <td className="px-4 py-3 text-[11px] font-bold uppercase">Total categoria</td>
+                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold">${catTotal.toLocaleString()}</td>
+                                <td className="px-3 py-3">&mdash;</td>
+                                <td className="px-3 py-3">&mdash;</td>
+                                <td className="px-3 py-3">&mdash;</td>
+                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold">${(catTotal + catCommissions).toLocaleString()}</td>
+                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold">${catCancelled.toLocaleString()}</td>
+                                <td className="px-3 py-3">&mdash;</td>
+                                <td className="px-3 py-3">&mdash;</td>
+                                <td className="px-3 py-3">&mdash;</td>
+                                <td className="px-3 py-3"></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* Uncategorized */}
+              {clientsByCategory.__uncategorized__ && clientsByCategory.__uncategorized__.length > 0 && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <h4 className="text-sm font-semibold text-slate-600 mb-2">Sin categoria ({clientsByCategory.__uncategorized__.length})</h4>
+                  <p className="text-xs text-slate-500">Hay clientes sin categoria. Editalos para asignarlos.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* General totals */}
+          {!loading && activeClients.length > 0 && (
+            <div className="rounded-xl p-5" style={{ backgroundColor: '#1e3a5f' }}>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Total contratos</p>
+                  <p className="text-xl font-bold mt-1">${totalContractCost.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Total comisiones</p>
+                  <p className="text-xl font-bold mt-1">${totalCommissions.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Total cancelado</p>
+                  <p className="text-xl font-bold mt-1">${totalCancelled.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Ganancia neta</p>
+                  <p className="text-xl font-bold mt-1 text-green-300">${(totalBilled - totalCancelled).toLocaleString()}</p>
+                </div>
               </div>
             </div>
           )}
         </Tabs.Content>
 
-        {/* ═══ TAB 3: NOMINAS ═══ */}
+        {/* ═══ TAB NOMINAS ═══ */}
         <Tabs.Content value="nominas" className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-slate-900">Nominas - {MONTHS[month - 1]} {year}</h2>
@@ -530,7 +789,6 @@ export default function FinancesPage() {
                       <td className="px-5 py-3 text-center"><PayrollStatusBadge status={p.status} /></td>
                     </tr>
                   ))}
-                  {/* TOTALS ROW */}
                   <tr className="bg-[#0f172a] text-white">
                     <td className="px-5 py-3 text-sm font-bold">TOTAL</td>
                     <td className="px-5 py-3 text-sm">{payroll.length} empleados</td>
@@ -546,7 +804,7 @@ export default function FinancesPage() {
           </div>
         </Tabs.Content>
 
-        {/* ═══ TAB 4: GASTOS ═══ */}
+        {/* ═══ TAB GASTOS ═══ */}
         <Tabs.Content value="gastos" className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-slate-900">Gastos - {MONTHS[month - 1]} {year}</h2>
@@ -615,7 +873,6 @@ export default function FinancesPage() {
                       <td className="px-5 py-3 text-right text-sm font-semibold text-red-600">-${Number(t.amount).toLocaleString()}</td>
                     </tr>
                   ))}
-                  {/* TOTALS ROW */}
                   <tr className="bg-[#0f172a] text-white">
                     <td className="px-5 py-3 text-sm font-bold">TOTAL</td>
                     <td className="px-5 py-3 text-sm">{expenseTx.length} gastos</td>
@@ -646,119 +903,371 @@ export default function FinancesPage() {
         </Tabs.Content>
       </Tabs.Root>
 
-      {/* ═══ MODALS ═══ */}
+      {/* MODALS */}
 
-      {/* Close Month Modal */}
-      {closingContract && (
+      {showCategoryModal && (
+        <CategoryModal
+          category={editingCategory}
+          onSave={handleSaveCategory}
+          onDelete={editingCategory ? () => { handleDeleteCategory(editingCategory); setShowCategoryModal(false) } : undefined}
+          onClose={() => { setShowCategoryModal(false); setEditingCategory(null) }}
+        />
+      )}
+
+      {showClientModal && (
+        <ClientModal
+          client={editingClient}
+          categoryId={showClientModal.categoryId}
+          categories={categories}
+          onSave={handleSaveClient}
+          onClose={() => { setShowClientModal(null); setEditingClient(null) }}
+        />
+      )}
+
+      {closingClient && (
         <CloseMonthModal
-          contract={closingContract}
+          client={closingClient}
           month={month}
           year={year}
-          existingRecord={getMonthlyRecord(closingContract.id)}
-          onSave={(data) => handleCloseMonth(closingContract.id, data)}
-          onClose={() => setClosingContract(null)}
+          existingRecord={getMonthlyRecord(closingClient.id)}
+          onSave={(data) => handleCloseMonth(closingClient.id, data)}
+          onClose={() => setClosingClient(null)}
         />
       )}
 
-      {/* Edit Contract Modal */}
-      {editingContract && (
-        <EditContractModal
-          contract={editingContract}
-          onSave={handleEditContract}
-          onClose={() => setEditingContract(null)}
-        />
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deletingContract && (
-        <Modal onClose={() => setDeletingContract(null)}>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Eliminar contrato de {deletingContract.client_name || deletingContract.trafficker_name}?</h3>
+      {deletingClient && (
+        <Modal onClose={() => setDeletingClient(null)}>
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">Eliminar cliente {deletingClient.client_name}?</h3>
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 mb-4">
-            <p className="text-sm text-amber-800">Los registros de meses anteriores se conservaran para el historial.</p>
+            <p className="text-sm text-amber-800">Los registros de meses anteriores se conservaran en el historial.</p>
           </div>
           <div className="flex justify-end gap-3">
-            <button onClick={() => setDeletingContract(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-            <button onClick={handleDeleteContract} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar contrato</button>
+            <button onClick={() => setDeletingClient(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+            <button onClick={handleDeleteClient} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar cliente</button>
           </div>
         </Modal>
       )}
 
-      {/* Click outside to close menu */}
       {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(null)} />}
 
       <AgentWidget config={{
         name: 'Agente Financiero',
-        description: 'Te ayudo a optimizar contratos, nominas y reducir gastos',
+        description: 'Te ayudo a optimizar clientes, nominas y reducir gastos',
         module: 'finances',
         suggestions: ['Como optimizo mis contratos?', 'Que gastos puedo reducir?', 'Como estructuro las nominas?'],
-        context: { ingresos: totalIncome, gastos: totalExpenses, ganancia: netProfit, contratos: totalContractFees, nomina: totalPayroll },
+        context: { ingresos: totalIncome, gastos: totalExpenses, ganancia: netProfit, clientes: activeClients.length, nomina: totalPayroll },
       }} />
     </div>
   )
 }
 
 // ═══════════════════════════════════════
-// CONTRACT FORM (Create)
+// PRESET CATEGORIES PICKER
 // ═══════════════════════════════════════
 
-function ContractForm({ onSubmit, onCancel }: { onSubmit: (e: React.FormEvent<HTMLFormElement>) => void; onCancel: () => void }) {
-  const [pdfName, setPdfName] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
+function PresetPicker({ onCreate }: { onCreate: (selected: typeof PRESET_CATEGORIES) => void }) {
+  const [selected, setSelected] = useState<Set<number>>(new Set([0, 1, 2]))
+  const toggle = (i: number) => {
+    const n = new Set(selected)
+    if (n.has(i)) n.delete(i); else n.add(i)
+    setSelected(n)
+  }
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap justify-center gap-2">
+        {PRESET_CATEGORIES.map((p, i) => (
+          <button
+            key={i}
+            onClick={() => toggle(i)}
+            className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 text-sm transition-all', selected.has(i) ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300')}
+          >
+            {selected.has(i) && <span className="text-blue-500">✓</span>}
+            <span>{p.icon}</span>
+            <span className="font-medium">{p.name}</span>
+          </button>
+        ))}
+      </div>
+      <button
+        onClick={() => onCreate(PRESET_CATEGORIES.filter((_, i) => selected.has(i)))}
+        disabled={selected.size === 0}
+        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-lg text-sm font-medium"
+      >
+        Crear seleccionadas ({selected.size})
+      </button>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════
+// CATEGORY MODAL
+// ═══════════════════════════════════════
+
+function CategoryModal({ category, onSave, onDelete, onClose }: {
+  category: ServiceCategory | null
+  onSave: (data: { name: string; description: string; color: string; icon: string }) => void
+  onDelete?: () => void
+  onClose: () => void
+}) {
+  const [name, setName] = useState(category?.name || '')
+  const [description, setDescription] = useState(category?.description || '')
+  const [color, setColor] = useState(category?.color || '#2563eb')
+  const [icon, setIcon] = useState(category?.icon || '📊')
 
   return (
-    <form onSubmit={onSubmit} className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <FormField label="Codigo *" name="code" placeholder="TD2026-006" required />
-        <FormField label="Trafficker *" name="trafficker_name" required />
-        <FormField label="Cliente *" name="client_name" required />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <FormField label="Servicio" name="service" placeholder="Meta Ads + Google Ads" />
-        <FormField label="Fee mensual *" name="monthly_fee" type="number" step="0.01" required />
+    <Modal onClose={onClose}>
+      <h3 className="text-lg font-semibold text-slate-900 mb-4">{category ? 'Editar categoria' : 'Nueva categoria de servicio'}</h3>
+      <div className="space-y-4">
         <div>
-          <label className="text-xs text-slate-500 mb-1 block font-medium">Divisa *</label>
-          <select name="currency" defaultValue="USD" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm">
-            {CURRENCIES.map(c => <option key={c.value} value={c.value}>{c.symbol} {c.label}</option>)}
-          </select>
+          <label className="text-xs text-slate-500 mb-1 block font-medium">Nombre *</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="ej: Trafico Pago, Mentoria, Diseno Web..." className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" required />
         </div>
         <div>
-          <label className="text-xs text-slate-500 mb-1 block font-medium">% Comision</label>
-          <input name="commission_percent" type="number" step="0.01" min="0" max="100" placeholder="0.00" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-          <p className="text-[10px] text-slate-400 mt-0.5">Porcentaje que cobra el trafficker sobre el fee</p>
+          <label className="text-xs text-slate-500 mb-1 block font-medium">Descripcion</label>
+          <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Que tipo de servicio incluye?" className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm h-16 resize-none" />
+        </div>
+        <div>
+          <label className="text-xs text-slate-500 mb-2 block font-medium">Color</label>
+          <div className="flex flex-wrap gap-2">
+            {CATEGORY_COLORS.map(c => (
+              <button key={c.value} type="button" onClick={() => setColor(c.value)} className={cn('w-8 h-8 rounded-lg border-2 transition-all', color === c.value ? 'border-slate-900 scale-110' : 'border-transparent')} style={{ backgroundColor: c.value }} title={c.name} />
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-slate-500 mb-2 block font-medium">Icono</label>
+          <div className="grid grid-cols-10 gap-1.5">
+            {CATEGORY_ICONS.map(i => (
+              <button key={i} type="button" onClick={() => setIcon(i)} className={cn('w-8 h-8 rounded-lg border text-lg flex items-center justify-center transition-all', icon === i ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:bg-slate-50')}>{i}</button>
+            ))}
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <FormField label="Fecha inicio" name="start_date" type="date" />
-        <FormField label="Notas" name="notes" />
+      <div className="flex justify-between gap-3 mt-6">
+        {onDelete ? (
+          <button onClick={onDelete} className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg">Eliminar</button>
+        ) : <div />}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+          <button onClick={() => onSave({ name, description, color, icon })} disabled={!name} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">{category ? 'Guardar cambios' : 'Crear categoria'}</button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ═══════════════════════════════════════
+// CLIENT MODAL (Create/Edit)
+// ═══════════════════════════════════════
+
+function ClientModal({ client, categoryId, categories, onSave, onClose }: {
+  client: FinanceClient | null
+  categoryId: string | null
+  categories: ServiceCategory[]
+  onSave: (data: Record<string, unknown>, pdfFile: File | null, mode?: 'this_month' | 'forward') => void
+  onClose: () => void
+}) {
+  const [catId, setCatId] = useState(client?.category_id || categoryId || '')
+  const [clientName, setClientName] = useState(client?.client_name || '')
+  const [companyName, setCompanyName] = useState(client?.company_name || '')
+  const [assignedTo, setAssignedTo] = useState(client?.assigned_to || '')
+  const [contractCost, setContractCost] = useState(Number(client?.contract_cost || 0))
+  const [currency, setCurrency] = useState(client?.currency || 'USD')
+  const [commissionPct, setCommissionPct] = useState(Number(client?.commission_percent || 0))
+  const [accountsCount, setAccountsCount] = useState(Number(client?.accounts_count || 1))
+  const [startDate, setStartDate] = useState(client?.start_date || '')
+  const [status, setStatus] = useState(client?.status || 'active')
+  const [cancelledAmount, setCancelledAmount] = useState(Number(client?.cancelled_amount || 0))
+  const [observations, setObservations] = useState(client?.observations || '')
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [showModeConfirm, setShowModeConfirm] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const commissionAmount = Math.round(contractCost * commissionPct / 100 * 100) / 100
+  const total = contractCost + commissionAmount
+  const sym = getCurrencySymbol(currency)
+
+  function buildData() {
+    return {
+      category_id: catId || null, client_name: clientName, company_name: companyName,
+      assigned_to: assignedTo, contract_cost: contractCost, commission_percent: commissionPct,
+      commission_amount: commissionAmount, currency, total_amount: total,
+      cancelled_amount: cancelledAmount, accounts_count: accountsCount,
+      start_date: startDate || null, status, observations,
+    }
+  }
+
+  function handleSave() {
+    if (client) {
+      setShowModeConfirm(true)
+    } else {
+      onSave(buildData(), pdfFile)
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    const f = e.dataTransfer.files[0]
+    if (f && f.type === 'application/pdf') setPdfFile(f)
+  }
+
+  if (showModeConfirm) {
+    return (
+      <Modal onClose={() => setShowModeConfirm(false)}>
+        <h3 className="text-lg font-semibold text-slate-900 mb-3">Como aplicar los cambios?</h3>
+        <div className="space-y-3">
+          <button onClick={() => onSave(buildData(), pdfFile, 'this_month')} className="w-full text-left p-4 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50">
+            <p className="text-sm font-semibold text-slate-900">Solo este mes</p>
+            <p className="text-xs text-slate-500 mt-0.5">Crea un registro mensual con los nuevos valores. El cliente base no cambia.</p>
+          </button>
+          <button onClick={() => onSave(buildData(), pdfFile, 'forward')} className="w-full text-left p-4 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50">
+            <p className="text-sm font-semibold text-slate-900">Este mes y los siguientes</p>
+            <p className="text-xs text-slate-500 mt-0.5">Actualiza el cliente base. Los meses anteriores no se tocan.</p>
+          </button>
+        </div>
+        <div className="flex justify-end mt-4">
+          <button onClick={() => setShowModeConfirm(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+        </div>
+      </Modal>
+    )
+  }
+
+  return (
+    <Modal onClose={onClose} size="xl">
+      <h3 className="text-lg font-semibold text-slate-900 mb-5">{client ? `Editar ${client.client_name}` : 'Nuevo cliente'}</h3>
+
+      <div className="space-y-5">
+        {/* SECCION 1: Datos basicos */}
         <div>
-          <label className="text-xs text-slate-500 mb-1 block font-medium">Contrato PDF (opcional)</label>
+          <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Datos basicos</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block font-medium">Categoria</label>
+              <select value={catId} onChange={e => setCatId(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm">
+                <option value="">Sin categoria</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block font-medium">Cliente / Nombre empresa *</label>
+              <input value={clientName} onChange={e => setClientName(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" required />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block font-medium">Empresa (opcional)</label>
+              <input value={companyName} onChange={e => setCompanyName(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block font-medium">Asignado a *</label>
+              <input value={assignedTo} onChange={e => setAssignedTo(e.target.value)} placeholder="RAFA, TEFY, ..." className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+            </div>
+          </div>
+        </div>
+
+        {/* SECCION 2: Contrato financiero */}
+        <div>
+          <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Contrato financiero</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block font-medium">Costo contrato</label>
+              <input type="number" step="0.01" value={contractCost} onChange={e => setContractCost(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block font-medium">Divisa</label>
+              <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm">
+                {CURRENCIES.map(c => <option key={c.value} value={c.value}>{c.symbol} {c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block font-medium">Comision %</label>
+              <input type="number" step="0.01" min="0" max="100" value={commissionPct} onChange={e => setCommissionPct(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block font-medium">Cuentas activas</label>
+              <input type="number" value={accountsCount} onChange={e => setAccountsCount(parseInt(e.target.value) || 1)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block font-medium">Fecha inicio</label>
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block font-medium">Estado</label>
+              <select value={status} onChange={e => setStatus(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm">
+                <option value="active">Activo</option>
+                <option value="paused">Pausado</option>
+                <option value="cancelled">Cancelado</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* SECCION 3: Totales calculados */}
+        <div>
+          <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Totales calculados</h4>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+              <p className="text-[10px] text-green-600 uppercase font-semibold">Comision calculada</p>
+              <p className="text-base font-bold text-green-700">{sym}{commissionAmount.toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+              <p className="text-[10px] text-blue-600 uppercase font-semibold">Total (costo + comision)</p>
+              <p className="text-base font-bold text-blue-700">{sym}{total.toLocaleString()}</p>
+            </div>
+            <div>
+              <label className="text-[10px] text-red-600 uppercase font-semibold block mb-1">Monto cancelado</label>
+              <input type="number" step="0.01" value={cancelledAmount} onChange={e => setCancelledAmount(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-red-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+        </div>
+
+        {/* SECCION 4: Observaciones */}
+        <div>
+          <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Observaciones</h4>
+          <textarea
+            value={observations}
+            onChange={e => setObservations(e.target.value)}
+            placeholder="ej: 300.000CLP + 3.5% COMISION DE VENTAS DEL ADMIN DESCONTANDO INVERSION EN ANUNCIOS Y EL 4% SI SUPERA LOS 50MILL"
+            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-[13px] italic text-slate-600 min-h-[100px] resize-y"
+          />
+        </div>
+
+        {/* SECCION 5: PDF */}
+        <div>
+          <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Contrato PDF</h4>
+          {client?.contract_pdf_url && !pdfFile && (
+            <div className="mb-2 flex items-center gap-2 text-xs">
+              <FileText className="h-4 w-4 text-red-500" />
+              <a href={client.contract_pdf_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{client.contract_pdf_name || 'Ver PDF actual'}</a>
+            </div>
+          )}
           <div
-            className="border-2 border-dashed border-slate-200 rounded-lg p-3 text-center cursor-pointer hover:border-blue-400 transition-colors"
+            className="border-2 border-dashed border-slate-200 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 transition-colors"
             onClick={() => fileRef.current?.click()}
-            onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-blue-400') }}
-            onDragLeave={e => e.currentTarget.classList.remove('border-blue-400')}
-            onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-blue-400'); const f = e.dataTransfer.files[0]; if (f && f.type === 'application/pdf') { const dt = new DataTransfer(); dt.items.add(f); if (fileRef.current) fileRef.current.files = dt.files; setPdfName(f.name) }}}
+            onDragOver={e => e.preventDefault()}
+            onDrop={handleDrop}
           >
-            {pdfName ? (
+            {pdfFile ? (
               <div className="flex items-center justify-center gap-2">
-                <FileText className="h-4 w-4 text-blue-500" />
-                <span className="text-xs text-slate-700">{pdfName}</span>
-                <button type="button" onClick={e => { e.stopPropagation(); setPdfName(''); if (fileRef.current) fileRef.current.value = '' }} className="text-slate-400 hover:text-red-500"><X className="h-3.5 w-3.5" /></button>
+                <FileText className="h-5 w-5 text-red-500" />
+                <span className="text-sm text-slate-700">{pdfFile.name}</span>
+                <span className="text-xs text-slate-400">({(pdfFile.size / 1024).toFixed(0)} KB)</span>
+                <button type="button" onClick={e => { e.stopPropagation(); setPdfFile(null) }} className="text-slate-400 hover:text-red-500 ml-2"><X className="h-4 w-4" /></button>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
-                <Upload className="h-4 w-4" /> Arrastra el PDF o click para seleccionar
+              <div className="flex flex-col items-center gap-2 text-slate-400">
+                <span className="text-2xl">📄</span>
+                <p className="text-xs">Arrastra el PDF del contrato o hace click para seleccionar</p>
+                <p className="text-[10px] text-slate-300">Solo .pdf, max 10MB</p>
               </div>
             )}
           </div>
-          <input ref={fileRef} type="file" name="contract_pdf" accept=".pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; setPdfName(f?.name || '') }} />
+          <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f && f.size <= 10 * 1024 * 1024) setPdfFile(f) }} />
         </div>
       </div>
-      <div className="flex gap-2">
-        <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium">Guardar contrato</button>
-        <button type="button" onClick={onCancel} className="px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+
+      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+        <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+        <button onClick={handleSave} disabled={!clientName} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Guardar cliente</button>
       </div>
-    </form>
+    </Modal>
   )
 }
 
@@ -766,35 +1275,33 @@ function ContractForm({ onSubmit, onCancel }: { onSubmit: (e: React.FormEvent<HT
 // CLOSE MONTH MODAL
 // ═══════════════════════════════════════
 
-function CloseMonthModal({ contract, month, year, existingRecord, onSave, onClose }: {
-  contract: Contract; month: number; year: number; existingRecord?: MonthlyRecord
-  onSave: (data: { monthly_fee: number; commission_amount: number; currency: string; status: string; notes: string }) => void
+function CloseMonthModal({ client, month, year, existingRecord, onSave, onClose }: {
+  client: FinanceClient; month: number; year: number; existingRecord?: ClientMonthly
+  onSave: (data: { billed_amount: number; commission_amount: number; currency: string; status: string; notes: string }) => void
   onClose: () => void
 }) {
-  const [billedAmount, setBilledAmount] = useState(existingRecord ? Number(existingRecord.monthly_fee) : Number(contract.monthly_fee))
-  const pct = Number(contract.commission_percent) || 0
+  const [billedAmount, setBilledAmount] = useState(existingRecord ? Number(existingRecord.billed_amount) : Number(client.contract_cost))
+  const pct = Number(client.commission_percent) || 0
   const autoCommission = Math.round(billedAmount * pct / 100 * 100) / 100
   const [commissionAmount, setCommissionAmount] = useState(existingRecord ? Number(existingRecord.commission_amount) : autoCommission)
   const [notes, setNotes] = useState(existingRecord?.notes || '')
   const [paid, setPaid] = useState(existingRecord?.status === 'paid')
-  const sym = getCurrencySymbol(contract.currency)
+  const sym = getCurrencySymbol(client.currency)
 
   useEffect(() => {
-    if (!existingRecord) {
-      setCommissionAmount(autoCommission)
-    }
+    if (!existingRecord) setCommissionAmount(autoCommission)
   }, [autoCommission, existingRecord])
 
   return (
     <Modal onClose={onClose}>
-      <h3 className="text-lg font-semibold text-slate-900 mb-1">Cierre de mes &mdash; {contract.client_name || contract.trafficker_name}</h3>
+      <h3 className="text-lg font-semibold text-slate-900 mb-1">Cierre de mes &mdash; {client.client_name}</h3>
       <p className="text-sm text-slate-500 mb-5">{MONTHS[month - 1]} {year}</p>
 
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-xs text-slate-500">Fee mensual del contrato</p>
-            <p className="text-lg font-bold text-slate-900">{sym}{Number(contract.monthly_fee).toLocaleString()} <span className="text-xs text-slate-400">{contract.currency}</span></p>
+            <p className="text-xs text-slate-500">Fee contractual</p>
+            <p className="text-lg font-bold text-slate-900">{sym}{Number(client.contract_cost).toLocaleString()} <span className="text-xs text-slate-400">{client.currency}</span></p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
             <p className="text-xs text-slate-500">% de comision</p>
@@ -804,149 +1311,39 @@ function CloseMonthModal({ contract, month, year, existingRecord, onSave, onClos
 
         <div>
           <label className="text-xs text-slate-500 mb-1 block font-medium">Monto facturado este mes</label>
-          <input type="number" step="0.01" value={billedAmount} onChange={e => setBilledAmount(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" placeholder={String(contract.monthly_fee)} />
-          <p className="text-[10px] text-slate-400 mt-0.5">Ingresa el monto real facturado al cliente este mes</p>
+          <input type="number" step="0.01" value={billedAmount} onChange={e => setBilledAmount(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+          <p className="text-[10px] text-slate-400 mt-0.5">Ingresa el monto real. Puede diferir si hubo escala o descuento.</p>
         </div>
 
         {pct > 0 && (
           <div className="rounded-lg bg-green-50 border border-green-200 p-3">
             <p className="text-xs text-green-600">Comision calculada ({pct}% de {sym}{billedAmount.toLocaleString()})</p>
-            <p className="text-xl font-bold text-green-700">{sym}{autoCommission.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-green-700">{sym}{autoCommission.toLocaleString()}</p>
           </div>
         )}
 
         <div>
           <label className="text-xs text-slate-500 mb-1 block font-medium">Comision a pagar</label>
           <input type="number" step="0.01" value={commissionAmount} onChange={e => setCommissionAmount(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
-        </div>
-
-        <div>
-          <label className="text-xs text-slate-500 mb-1 block font-medium">Notas del cierre</label>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm h-16 resize-none" />
+          <p className="text-[10px] text-slate-400 mt-0.5">Podes ajustar manualmente si hubo acuerdo diferente.</p>
         </div>
 
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setPaid(!paid)} className={cn('relative inline-flex h-6 w-11 items-center rounded-full transition-colors', paid ? 'bg-green-500' : 'bg-slate-300')}>
             <span className={cn('inline-block h-4 w-4 transform rounded-full bg-white transition-transform', paid ? 'translate-x-6' : 'translate-x-1')} />
           </button>
-          <span className="text-sm text-slate-700">{paid ? 'Comision pagada' : 'Pendiente de pago'}</span>
+          <span className="text-sm text-slate-700">{paid ? '✅ Comision pagada' : '⏳ Pendiente de pago'}</span>
         </div>
-      </div>
 
-      <div className="flex justify-end gap-3 mt-6">
-        <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-        <button onClick={() => onSave({ monthly_fee: billedAmount, commission_amount: commissionAmount, currency: contract.currency, status: paid ? 'paid' : 'pending', notes })} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Guardar cierre</button>
-      </div>
-    </Modal>
-  )
-}
-
-// ═══════════════════════════════════════
-// EDIT CONTRACT MODAL
-// ═══════════════════════════════════════
-
-function EditContractModal({ contract, onSave, onClose }: {
-  contract: Contract
-  onSave: (data: Record<string, unknown>, mode: 'this_month' | 'forward') => void
-  onClose: () => void
-}) {
-  const [trafficker, setTrafficker] = useState(contract.trafficker_name)
-  const [clientName, setClientName] = useState(contract.client_name)
-  const [service, setService] = useState(contract.service || '')
-  const [fee, setFee] = useState(Number(contract.monthly_fee))
-  const [currency, setCurrency] = useState(contract.currency)
-  const [commission, setCommission] = useState(Number(contract.commission_percent))
-  const [startDate, setStartDate] = useState(contract.start_date || '')
-  const [notes, setNotes] = useState(contract.notes || '')
-  const [pdfFile, setPdfFile] = useState<File | null>(null)
-  const [showConfirm, setShowConfirm] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  async function uploadPdf(contractId: string) {
-    if (!pdfFile) return
-    const fd = new FormData()
-    fd.append('file', pdfFile)
-    fd.append('contract_id', contractId)
-    await fetch('/api/finances/contracts/upload', { method: 'POST', body: fd })
-  }
-
-  function buildData() {
-    return {
-      trafficker_name: trafficker, client_name: clientName, service, monthly_fee: fee,
-      currency, commission_percent: commission, start_date: startDate || undefined,
-      notes: notes || undefined, status: contract.status,
-    }
-  }
-
-  async function handleSave(mode: 'this_month' | 'forward') {
-    if (pdfFile) await uploadPdf(contract.id)
-    onSave(buildData(), mode)
-  }
-
-  if (showConfirm) {
-    return (
-      <Modal onClose={onClose}>
-        <h3 className="text-lg font-semibold text-slate-900 mb-3">Como queres aplicar los cambios?</h3>
-        <div className="space-y-3">
-          <button onClick={() => handleSave('this_month')} className="w-full text-left p-4 rounded-lg border border-slate-200 hover:bg-slate-50">
-            <p className="text-sm font-semibold text-slate-900">Solo este mes</p>
-            <p className="text-xs text-slate-500 mt-0.5">Crea un registro mensual con los nuevos valores. El contrato base no cambia.</p>
-          </button>
-          <button onClick={() => handleSave('forward')} className="w-full text-left p-4 rounded-lg border border-slate-200 hover:bg-slate-50">
-            <p className="text-sm font-semibold text-slate-900">Este mes y los siguientes</p>
-            <p className="text-xs text-slate-500 mt-0.5">Actualiza el contrato base. Los meses anteriores no se tocan.</p>
-          </button>
-        </div>
-        <div className="flex justify-end mt-4">
-          <button onClick={() => setShowConfirm(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-        </div>
-      </Modal>
-    )
-  }
-
-  return (
-    <Modal onClose={onClose}>
-      <h3 className="text-lg font-semibold text-slate-900 mb-4">Editar contrato {contract.code}</h3>
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div><label className="text-xs text-slate-500 mb-1 block font-medium">Trafficker *</label><input value={trafficker} onChange={e => setTrafficker(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" required /></div>
-          <div><label className="text-xs text-slate-500 mb-1 block font-medium">Cliente *</label><input value={clientName} onChange={e => setClientName(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" required /></div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div><label className="text-xs text-slate-500 mb-1 block font-medium">Servicio</label><input value={service} onChange={e => setService(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" /></div>
-          <div><label className="text-xs text-slate-500 mb-1 block font-medium">Fecha inicio</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" /></div>
-        </div>
-        <div className="grid grid-cols-3 gap-4">
-          <div><label className="text-xs text-slate-500 mb-1 block font-medium">Fee mensual *</label><input type="number" step="0.01" value={fee} onChange={e => setFee(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" /></div>
-          <div>
-            <label className="text-xs text-slate-500 mb-1 block font-medium">Divisa</label>
-            <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm">
-              {CURRENCIES.map(c => <option key={c.value} value={c.value}>{c.symbol} {c.label}</option>)}
-            </select>
-          </div>
-          <div><label className="text-xs text-slate-500 mb-1 block font-medium">% Comision</label><input type="number" step="0.01" min="0" max="100" value={commission} onChange={e => setCommission(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" /></div>
-        </div>
-        <div><label className="text-xs text-slate-500 mb-1 block font-medium">Notas</label><textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm h-16 resize-none" /></div>
         <div>
-          <label className="text-xs text-slate-500 mb-1 block font-medium">PDF del contrato</label>
-          {contract.contract_pdf_url && !pdfFile && <p className="text-xs text-blue-500 mb-1"><a href={contract.contract_pdf_url} target="_blank" rel="noopener noreferrer">Ver PDF actual</a></p>}
-          <div className="border-2 border-dashed border-slate-200 rounded-lg p-3 text-center cursor-pointer hover:border-blue-400" onClick={() => fileRef.current?.click()}>
-            {pdfFile ? (
-              <div className="flex items-center justify-center gap-2">
-                <FileText className="h-4 w-4 text-blue-500" />
-                <span className="text-xs text-slate-700">{pdfFile.name}</span>
-                <button type="button" onClick={e => { e.stopPropagation(); setPdfFile(null) }}><X className="h-3.5 w-3.5 text-slate-400" /></button>
-              </div>
-            ) : (
-              <span className="text-xs text-slate-400 flex items-center justify-center gap-2"><Upload className="h-4 w-4" /> {contract.contract_pdf_url ? 'Reemplazar PDF' : 'Subir PDF'}</span>
-            )}
-          </div>
-          <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
+          <label className="text-xs text-slate-500 mb-1 block font-medium">Notas del cierre</label>
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm h-16 resize-none" />
         </div>
       </div>
+
       <div className="flex justify-end gap-3 mt-6">
         <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-        <button onClick={() => setShowConfirm(true)} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Guardar cambios</button>
+        <button onClick={() => onSave({ billed_amount: billedAmount, commission_amount: commissionAmount, currency: client.currency, status: paid ? 'paid' : 'pending', notes })} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Guardar cierre del mes</button>
       </div>
     </Modal>
   )
@@ -956,10 +1353,10 @@ function EditContractModal({ contract, onSave, onClose }: {
 // SHARED COMPONENTS
 // ═══════════════════════════════════════
 
-function Modal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function Modal({ onClose, children, size = 'lg' }: { onClose: () => void; children: React.ReactNode; size?: 'lg' | 'xl' }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className={cn('bg-white rounded-xl shadow-xl w-full mx-4 p-6 max-h-[90vh] overflow-y-auto', size === 'xl' ? 'max-w-3xl' : 'max-w-lg')} onClick={e => e.stopPropagation()}>
         {children}
       </div>
     </div>
@@ -974,18 +1371,6 @@ function KPICard({ icon: Icon, label, value, color, bg, border }: { icon: React.
       <p className="text-xl font-bold text-slate-900">{value}</p>
     </div>
   )
-}
-
-function ContractStatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    active: 'bg-green-50 text-green-700 border-green-200',
-    paused: 'bg-amber-50 text-amber-700 border-amber-200',
-    cancelled: 'bg-red-50 text-red-700 border-red-200',
-    deleted: 'bg-slate-100 text-slate-400 border-slate-200',
-    completed: 'bg-slate-100 text-slate-600 border-slate-200',
-  }
-  const labels: Record<string, string> = { active: 'Activo', paused: 'Pausado', cancelled: 'Cancelado', deleted: 'Eliminado', completed: 'Completado' }
-  return <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold', styles[status] || styles.active)}>{labels[status] || status}</span>
 }
 
 function PayrollStatusBadge({ status }: { status: string }) {
