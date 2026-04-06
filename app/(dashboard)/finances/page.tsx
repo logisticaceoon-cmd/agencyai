@@ -621,7 +621,7 @@ export default function FinancesPage() {
                                 const isDeleted = !!c.deleted_at
                                 const sym = getCurrencySymbol(c.currency)
                                 const assigned = getAssignedStyle(c.assigned_to)
-                                const total = Number(c.contract_cost) + Number(c.commission_amount)
+                                const total = Number(c.contract_cost)
                                 return (
                                   <tr key={c.id} className={cn('border-b border-slate-100 hover:bg-slate-50', isDeleted && 'bg-slate-50 opacity-70')}>
                                     <td className={cn('px-4 py-3 text-[13px] font-semibold text-slate-900', isDeleted && 'line-through')}>
@@ -638,7 +638,7 @@ export default function FinancesPage() {
                                       <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-semibold">{c.accounts_count}</span>
                                     </td>
                                     <td className="px-3 py-3 text-[12px] text-slate-500">{c.start_date ? new Date(c.start_date).toLocaleDateString('es-ES') : '-'}</td>
-                                    <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-green-600">{sym}{total.toLocaleString()}</td>
+                                    <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-green-600">{sym}{Number(c.contract_cost).toLocaleString()}</td>
                                     <td className="px-3 py-3 text-right font-mono text-[13px]">
                                       {Number(c.cancelled_amount) > 0 ? <span className="text-red-600">{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span className="text-slate-300">&mdash;</span>}
                                     </td>
@@ -678,14 +678,14 @@ export default function FinancesPage() {
                                 )
                               })}
                               {/* Category totals row */}
-                              <tr className="bg-[#0f172a] text-white">
+                              <tr className="text-white" style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%)' }}>
                                 <td className="px-4 py-3 text-[11px] font-bold uppercase">Total categoria</td>
                                 <td className="px-3 py-3 text-right font-mono text-[12px] font-bold">${catTotal.toLocaleString()}</td>
                                 <td className="px-3 py-3">&mdash;</td>
                                 <td className="px-3 py-3">&mdash;</td>
                                 <td className="px-3 py-3">&mdash;</td>
-                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold">${(catTotal + catCommissions).toLocaleString()}</td>
-                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold">${catCancelled.toLocaleString()}</td>
+                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold"><span style={{ color: '#86efac' }}>${(catTotal + catCommissions).toLocaleString()}</span></td>
+                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold"><span style={{ color: '#fca5a5' }}>${catCancelled.toLocaleString()}</span></td>
                                 <td className="px-3 py-3">&mdash;</td>
                                 <td className="px-3 py-3">&mdash;</td>
                                 <td className="px-3 py-3">&mdash;</td>
@@ -1083,7 +1083,7 @@ function ClientModal({ client, categoryId, categories, onSave, onClose }: {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const commissionAmount = Math.round(contractCost * commissionPct / 100 * 100) / 100
-  const total = contractCost + commissionAmount
+  const total = contractCost
   const sym = getCurrencySymbol(currency)
 
   function buildData() {
@@ -1168,7 +1168,19 @@ function ClientModal({ client, categoryId, categories, onSave, onClose }: {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <label className="text-xs text-slate-500 mb-1 block font-medium">Costo contrato</label>
-              <input type="number" step="0.01" value={contractCost} onChange={e => setContractCost(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={contractCost === 0 ? '' : contractCost}
+                onChange={e => {
+                  const val = e.target.value
+                  setContractCost(val === '' ? 0 : parseFloat(val) || 0)
+                }}
+                onFocus={e => { if (e.target.value === '0') e.target.select() }}
+                placeholder="0.00"
+                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
+              />
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block font-medium">Divisa</label>
@@ -1177,12 +1189,37 @@ function ClientModal({ client, categoryId, categories, onSave, onClose }: {
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1 block font-medium">Comision %</label>
-              <input type="number" step="0.01" min="0" max="100" value={commissionPct} onChange={e => setCommissionPct(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+              <label className="text-xs text-slate-500 mb-1 block font-medium">% Comision sobre ventas</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={commissionPct === 0 ? '' : commissionPct}
+                onChange={e => {
+                  const val = e.target.value
+                  setCommissionPct(val === '' ? 0 : parseFloat(val) || 0)
+                }}
+                onFocus={e => { if (e.target.value === '0') e.target.select() }}
+                placeholder="0.00"
+                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">Este % se aplica sobre el total de ventas del cliente al cierre del mes, no sobre el fee mensual.</p>
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block font-medium">Cuentas activas</label>
-              <input type="number" value={accountsCount} onChange={e => setAccountsCount(parseInt(e.target.value) || 1)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={accountsCount === 0 ? '' : accountsCount}
+                onChange={e => {
+                  const val = e.target.value
+                  setAccountsCount(val === '' ? 0 : parseInt(val) || 0)
+                }}
+                onFocus={e => { if (e.target.value === '0') e.target.select() }}
+                placeholder="0"
+                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
+              />
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block font-medium">Fecha inicio</label>
@@ -1203,17 +1240,29 @@ function ClientModal({ client, categoryId, categories, onSave, onClose }: {
         <div>
           <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b border-slate-100">Totales calculados</h4>
           <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-lg bg-green-50 border border-green-200 p-3">
-              <p className="text-[10px] text-green-600 uppercase font-semibold">Comision calculada</p>
-              <p className="text-base font-bold text-green-700">{sym}{commissionAmount.toLocaleString()}</p>
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 col-span-2">
+              <p className="text-xs text-amber-700 font-semibold uppercase">Comision por ventas</p>
+              <p className="text-xs text-amber-900 mt-1">La comision se calcula al cierre del mes sobre el total de ventas. Usa el boton &quot;Cerrar mes&quot; para registrar el monto real.</p>
             </div>
             <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
-              <p className="text-[10px] text-blue-600 uppercase font-semibold">Total (costo + comision)</p>
+              <p className="text-[10px] text-blue-600 uppercase font-semibold">Total</p>
               <p className="text-base font-bold text-blue-700">{sym}{total.toLocaleString()}</p>
             </div>
             <div>
               <label className="text-[10px] text-red-600 uppercase font-semibold block mb-1">Monto cancelado</label>
-              <input type="number" step="0.01" value={cancelledAmount} onChange={e => setCancelledAmount(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-red-200 rounded-lg px-3 py-2 text-sm" />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={cancelledAmount === 0 ? '' : cancelledAmount}
+                onChange={e => {
+                  const val = e.target.value
+                  setCancelledAmount(val === '' ? 0 : parseFloat(val) || 0)
+                }}
+                onFocus={e => { if (e.target.value === '0') e.target.select() }}
+                placeholder="0.00"
+                className="w-full bg-white border border-red-200 rounded-lg px-3 py-2 text-sm"
+              />
             </div>
           </div>
         </div>

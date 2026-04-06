@@ -33,6 +33,14 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { name, description, color, icon, position } = body
 
+    const { data: existing } = await supabase
+      .from('service_categories')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .eq('name', name)
+      .maybeSingle()
+    if (existing) return NextResponse.json({ data: existing })
+
     const { data, error } = await supabase
       .from('service_categories')
       .insert({
