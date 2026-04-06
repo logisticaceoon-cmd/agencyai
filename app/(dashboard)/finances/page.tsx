@@ -106,6 +106,27 @@ function getAssignedStyle(name: string | null) {
   return { bg: '#f3f4f6', text: '#374151' }
 }
 
+function getAssignedBadgeStyle(name: string | null): { background: string; color: string } {
+  if (!name) return { background: '#6366f1', color: '#ffffff' }
+  const upper = name.toUpperCase().trim()
+  if (upper.includes('RAFA')) return { background: '#0891b2', color: '#ffffff' }
+  if (upper.includes('TEFY') || upper.includes('STEPH')) return { background: '#f97316', color: '#ffffff' }
+  return { background: '#6366f1', color: '#ffffff' }
+}
+
+function thStyle(align: 'left' | 'center' | 'right'): React.CSSProperties {
+  return {
+    textAlign: align,
+    padding: '12px 8px',
+    fontSize: '11px',
+    fontWeight: 700,
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    whiteSpace: 'nowrap',
+  }
+}
+
 function getCurrencySymbol(code: string) {
   return CURRENCIES.find(c => c.value === code)?.symbol || '$'
 }
@@ -631,98 +652,149 @@ export default function FinancesPage() {
                         {catClients.length === 0 ? (
                           <p className="text-center text-sm text-slate-400 py-6">No hay clientes en esta categoria</p>
                         ) : (
-                          <table className="w-full">
+                          <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse', minWidth: '1200px' }}>
+                            <colgroup>
+                              <col style={{ width: '40px' }} />
+                              <col style={{ width: '170px' }} />
+                              <col style={{ width: '120px' }} />
+                              <col style={{ width: '90px' }} />
+                              <col style={{ width: '70px' }} />
+                              <col style={{ width: '100px' }} />
+                              <col style={{ width: '100px' }} />
+                              <col style={{ width: '100px' }} />
+                              <col style={{ width: '120px' }} />
+                              <col />
+                              <col style={{ width: '190px' }} />
+                            </colgroup>
                             <thead>
-                              <tr className="border-b border-slate-100">
-                                <th className="text-center px-2 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-10">Nº</th>
-                                <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Cliente</th>
-                                <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Costo contrato</th>
-                                <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Comision %</th>
-                                <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Cuentas</th>
-                                <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Fecha inicio</th>
-                                <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total</th>
-                                <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Cancelado</th>
-                                <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Asignado a</th>
-                                <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Observacion</th>
-                                <th className="w-10"></th>
+                              <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                                <th style={thStyle('center')}>Nº</th>
+                                <th style={thStyle('left')}>Clientes</th>
+                                <th style={thStyle('right')}>Costo de contrato</th>
+                                <th style={thStyle('center')}>Comision %</th>
+                                <th style={thStyle('center')}>Cuentas</th>
+                                <th style={thStyle('center')}>Fecha inicio</th>
+                                <th style={thStyle('right')}>Total</th>
+                                <th style={thStyle('right')}>Cancelado</th>
+                                <th style={thStyle('center')}>Asignado a</th>
+                                <th style={thStyle('left')}>Observacion</th>
+                                <th style={thStyle('center')}>Acciones</th>
                               </tr>
                             </thead>
                             <tbody>
                               {catClients.map((c, idx) => {
                                 const isDeleted = !!c.deleted_at
                                 const sym = getCurrencySymbol(c.currency)
-                                const assigned = getAssignedStyle(c.assigned_to)
+                                const rowBg = idx % 2 === 0 ? '#ffffff' : '#fafafa'
                                 return (
-                                  <tr key={c.id} className={cn('border-b border-slate-100 hover:bg-slate-50', isDeleted && 'bg-slate-50 opacity-70')}>
-                                    <td className="px-2 py-3 text-center text-[11px] font-bold text-slate-400">{idx + 1}</td>
-                                    <td className={cn('px-4 py-3 text-[13px] font-semibold text-slate-900', isDeleted && 'line-through')}>
+                                  <tr key={c.id} style={{ background: isDeleted ? '#f8fafc' : rowBg, borderBottom: '1px solid #f1f5f9', opacity: isDeleted ? 0.7 : 1 }}>
+                                    <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
+                                    <td style={{ padding: '10px 8px', fontSize: '13px', fontWeight: 700, color: '#0f172a', textDecoration: isDeleted ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                       {c.client_name}
-                                      {isDeleted && <span className="ml-2 text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">Eliminado</span>}
+                                      {isDeleted && <span style={{ marginLeft: '6px', fontSize: '10px', background: '#e2e8f0', color: '#64748b', padding: '1px 6px', borderRadius: '4px' }}>Eliminado</span>}
                                       {c.contract_pdf_url && (
-                                        <a href={c.contract_pdf_url} target="_blank" rel="noopener noreferrer" className="ml-2 text-red-500 hover:text-red-700 inline-block align-middle" title="Ver PDF">
-                                          <FileText className="h-3.5 w-3.5 inline" />
+                                        <a href={c.contract_pdf_url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: '6px', color: '#ef4444', display: 'inline-block', verticalAlign: 'middle' }} title="Ver PDF">
+                                          <FileText style={{ width: '13px', height: '13px', display: 'inline' }} />
                                         </a>
                                       )}
                                     </td>
-                                    <td className="px-3 py-3 text-right font-mono text-[13px] text-slate-700">{sym}{Number(c.contract_cost).toLocaleString()}</td>
-                                    <td className="px-3 py-3 text-center">
+                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{Number(c.contract_cost).toLocaleString()}</td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                       {Number(c.commission_percent) > 0 ? (
-                                        <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-[10px] font-semibold">%{c.commission_percent}</span>
-                                      ) : <span className="text-slate-300">&mdash;</span>}
+                                        <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span>
+                                      ) : <span style={{ color: '#cbd5e1', fontSize: '12px' }}>$0</span>}
                                     </td>
-                                    <td className="px-3 py-3 text-center">
-                                      <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[10px] font-semibold">{c.accounts_count}</span>
+                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                      <span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span>
                                     </td>
-                                    <td className="px-3 py-3 text-[12px] text-slate-500">{c.start_date ? new Date(c.start_date).toLocaleDateString('es-ES') : '-'}</td>
-                                    <td className="px-3 py-3 text-right font-mono text-[13px] font-bold text-green-600">{sym}{Number(c.contract_cost).toLocaleString()}</td>
-                                    <td className="px-3 py-3 text-right font-mono text-[13px]">
-                                      {Number(c.cancelled_amount) > 0 ? <span className="text-red-600">{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span className="text-slate-300">&mdash;</span>}
+                                    <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>
+                                      {c.start_date ? new Date(c.start_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
                                     </td>
-                                    <td className="px-3 py-3">
+                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{Number(c.contract_cost).toLocaleString()}</td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>
+                                      {Number(c.cancelled_amount) > 0
+                                        ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span>
+                                        : <span style={{ color: '#cbd5e1' }}>&mdash;</span>}
+                                    </td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                       {c.assigned_to ? (
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: assigned.bg, color: assigned.text }}>{c.assigned_to.toUpperCase()}</span>
-                                      ) : <span className="text-slate-300">&mdash;</span>}
+                                        <span style={{ ...getAssignedBadgeStyle(c.assigned_to), borderRadius: '4px', padding: '3px 10px', fontSize: '11px', fontWeight: 800 }}>{c.assigned_to.toUpperCase()}</span>
+                                      ) : <span style={{ color: '#cbd5e1' }}>&mdash;</span>}
                                     </td>
-                                    <td className="px-3 py-3 text-[11px] text-slate-500 italic max-w-[220px]">
-                                      <div className="truncate" title={c.observations || ''}>{c.observations ? (c.observations.length > 80 ? c.observations.slice(0, 80) + '...' : c.observations) : '-'}</div>
-                                    </td>
-                                    <td className="px-2 py-3 text-center relative">
-                                      <button onClick={() => setMenuOpen(menuOpen === c.id ? null : c.id)} className="p-1 rounded hover:bg-slate-100"><MoreVertical className="h-4 w-4 text-slate-400" /></button>
-                                      {menuOpen === c.id && (
-                                        <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-lg border border-slate-200 bg-white shadow-lg py-1">
-                                          {!isDeleted && (
-                                            <>
-                                              <button onClick={() => { setEditingClient(c); setMenuOpen(null); setShowClientModal({ categoryId: c.category_id }) }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"><Pencil className="h-3.5 w-3.5" /> Editar</button>
-                                              <button onClick={() => { setClosingClient(c); setMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"><Coins className="h-3.5 w-3.5" /> Cerrar mes</button>
-                                              {c.contract_pdf_url && <a href={c.contract_pdf_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 w-full px-3 py-2 text-xs text-slate-700 hover:bg-slate-50"><FileText className="h-3.5 w-3.5" /> Ver PDF</a>}
-                                              <hr className="my-1 border-slate-100" />
-                                              <button onClick={() => { setDeletingClient(c); setMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /> Eliminar</button>
-                                            </>
-                                          )}
-                                          {isDeleted && (
-                                            <button onClick={() => { handleRestoreClient(c); setMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-blue-600 hover:bg-blue-50"><RotateCcw className="h-3.5 w-3.5" /> Restaurar</button>
-                                          )}
+                                    <td style={{ padding: '10px 8px' }}>
+                                      {c.observations ? (
+                                        <div
+                                          title={c.observations}
+                                          style={{
+                                            background: '#dcfce7',
+                                            color: '#166534',
+                                            padding: '4px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '11px',
+                                            lineHeight: '1.4',
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: 'vertical',
+                                            overflow: 'hidden',
+                                          }}
+                                        >
+                                          {c.observations}
                                         </div>
+                                      ) : <span style={{ color: '#cbd5e1' }}>&mdash;</span>}
+                                    </td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                      {!isDeleted ? (
+                                        <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                                          <button
+                                            onClick={() => setClosingClient(c)}
+                                            title="Cierre de mes"
+                                            style={{ background: '#dcfce7', color: '#16a34a', padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                                          >
+                                            💰 Comisión
+                                          </button>
+                                          <button
+                                            onClick={() => { setEditingClient(c); setShowClientModal({ categoryId: c.category_id }) }}
+                                            title="Editar cliente"
+                                            style={{ background: '#dbeafe', color: '#2563eb', padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                                          >
+                                            ✏️ Editar
+                                          </button>
+                                          <button
+                                            onClick={() => setDeletingClient(c)}
+                                            title="Eliminar cliente"
+                                            style={{ background: '#fee2e2', color: '#dc2626', padding: '5px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                                          >
+                                            🗑️
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => handleRestoreClient(c)}
+                                          style={{ background: '#dbeafe', color: '#2563eb', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                                        >
+                                          ↩️ Restaurar
+                                        </button>
                                       )}
                                     </td>
                                   </tr>
                                 )
                               })}
-                              {/* Category totals row */}
-                              <tr className="text-white" style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%)' }}>
-                                <td className="px-2 py-3"></td>
-                                <td className="px-4 py-3 text-[11px] font-bold uppercase">Total categoria</td>
-                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold">${catTotal.toLocaleString()}</td>
-                                <td className="px-3 py-3">&mdash;</td>
-                                <td className="px-3 py-3">&mdash;</td>
-                                <td className="px-3 py-3">&mdash;</td>
-                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold"><span style={{ color: '#86efac' }}>${catTotal.toLocaleString()}</span></td>
-                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold"><span style={{ color: '#fca5a5' }}>${catCancelled.toLocaleString()}</span></td>
-                                <td className="px-3 py-3">&mdash;</td>
-                                <td className="px-3 py-3">&mdash;</td>
-                                <td className="px-3 py-3"></td>
-                              </tr>
                             </tbody>
+                            <tfoot>
+                              <tr style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%)', color: 'white', fontWeight: 700 }}>
+                                <td style={{ padding: '12px 8px', textAlign: 'center', color: '#93c5fd', fontSize: '11px', fontWeight: 800 }}>TOTAL</td>
+                                <td style={{ padding: '12px 8px', fontSize: '12px', color: 'white' }}>{catClients.filter(c => !c.deleted_at).length} clientes</td>
+                                <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: 'white', fontWeight: 700 }}>${catTotal.toLocaleString()}</td>
+                                <td style={{ padding: '12px 8px' }}></td>
+                                <td style={{ padding: '12px 8px' }}></td>
+                                <td style={{ padding: '12px 8px' }}></td>
+                                <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#86efac', fontWeight: 700 }}>${catTotal.toLocaleString()}</td>
+                                <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#fca5a5', fontWeight: 700 }}>${catCancelled.toLocaleString()}</td>
+                                <td style={{ padding: '12px 8px' }}></td>
+                                <td style={{ padding: '12px 8px' }}></td>
+                                <td style={{ padding: '12px 8px' }}></td>
+                              </tr>
+                            </tfoot>
                           </table>
                         )}
                       </div>
