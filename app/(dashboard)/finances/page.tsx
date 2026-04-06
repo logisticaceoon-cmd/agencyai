@@ -186,19 +186,22 @@ export default function FinancesPage() {
     if (payrollRes.ok) { const j = await payrollRes.json(); setPayroll(j.data || []) }
     if (clientListRes.ok) { const j = await clientListRes.json(); setClients(j.data || []) }
 
-    const cd: {name:string;ingresos:number;gastos:number}[] = []
-    for (let i = 5; i >= 0; i--) {
+    // Parallel fetches for last 6 months chart data
+    const monthPromises = Array.from({ length: 6 }, (_, idx) => {
+      const i = 5 - idx
       const d = new Date(year, month - 1 - i, 1)
       const m = d.getMonth() + 1
       const y = d.getFullYear()
-      const r = await fetch(`/api/finances?month=${m}&year=${y}`)
-      if (r.ok) {
+      return fetch(`/api/finances?month=${m}&year=${y}`).then(async (r) => {
+        if (!r.ok) return null
         const j = await r.json()
         const inc = (j.data || []).filter((t: Transaction) => t.type === 'income').reduce((s: number, t: Transaction) => s + Number(t.amount), 0)
         const exp = (j.data || []).filter((t: Transaction) => t.type === 'expense').reduce((s: number, t: Transaction) => s + Number(t.amount), 0)
-        cd.push({ name: MONTHS[d.getMonth()].substring(0, 3), ingresos: inc, gastos: exp })
-      }
-    }
+        return { name: MONTHS[d.getMonth()].substring(0, 3), ingresos: inc, gastos: exp }
+      })
+    })
+    const results = await Promise.all(monthPromises)
+    const cd = results.filter((r): r is { name: string; ingresos: number; gastos: number } => r !== null)
     setChartData(cd)
     setLoading(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -264,14 +267,15 @@ export default function FinancesPage() {
   }
 
   async function handleCreatePresets(selected: typeof PRESET_CATEGORIES) {
-    for (let i = 0; i < selected.length; i++) {
-      const p = selected[i]
-      await fetch('/api/finances/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...p, position: categories.length + i }),
-      })
-    }
+    await Promise.all(
+      selected.map((p, i) =>
+        fetch('/api/finances/categories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...p, position: categories.length + i }),
+        })
+      )
+    )
     fetchData()
   }
 

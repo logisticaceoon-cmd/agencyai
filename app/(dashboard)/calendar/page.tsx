@@ -142,31 +142,93 @@ export default function CalendarPage() {
     }
   }, [currentMonth])
 
-  // Fetch Google Calendar events
-  const fetchGcalEvents = useCallback(async () => {
-    setGcalLoading(true)
-    try {
-      const res = await fetch('/api/calendar/google/sync')
-      const data = await res.json()
-      setGcalConnected(data.connected || false)
-      setGcalEvents(data.events || [])
-    } catch {
-      setGcalConnected(false)
-    } finally {
-      setGcalLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
-    if (org) {
-      fetchEvents()
-      fetchGcalEvents()
-      fetch('/api/projects')
-        .then(r => r.json())
-        .then(j => setProjects((j.data || []).map((p: { id: string; name: string }) => ({ id: p.id, name: p.name }))))
-        .catch(() => {})
+    if (!org) return
+    const controller = new AbortController()
+    const { signal } = controller
+
+    async function loadAll() {
+      setLoading(true)
+      setGcalLoading(true)
+      try {
+        const monthStr = format(currentMonth, 'yyyy-MM')
+        const [calRes, gcalRes, projRes] = await Promise.all([
+          fetch(`/api/calendar?month=${monthStr}`, { signal }),
+          fetch('/api/calendar/google/sync', { signal }),
+          fetch('/api/projects', { signal }),
+        ])
+
+        // Calendar events
+        try {
+          const data = await calRes.json()
+          if (signal.aborted) return
+          const mapped: DayEvent[] = [
+            ...(data.tasks || []).map((t: CalendarTask) => ({
+              id: t.id,
+              type: 'task' as const,
+              title: t.title,
+              date: t.deadline,
+              status: t.status,
+              priority: t.priority,
+              description: t.description || null,
+              client: t.client?.name,
+              projectId: t.project?.id,
+              projectName: t.project?.name,
+            })),
+            ...(data.milestones || []).map((m: CalendarMilestone) => ({
+              id: m.id,
+              type: 'milestone' as const,
+              title: m.title,
+              date: m.due_date,
+              description: m.description || null,
+              completed: m.completed,
+              projectId: m.project_id,
+              projectName: m.project_name,
+            })),
+          ]
+          setEvents(mapped)
+        } catch {
+          if (!signal.aborted) setEvents([])
+        }
+
+        // Google Calendar
+        try {
+          const data = await gcalRes.json()
+          if (signal.aborted) return
+          setGcalConnected(data.connected || false)
+          setGcalEvents(data.events || [])
+        } catch {
+          if (!signal.aborted) setGcalConnected(false)
+        }
+
+        // Projects list
+        try {
+          const j = await projRes.json()
+          if (signal.aborted) return
+          setProjects(
+            (j.data || []).map((p: { id: string; name: string }) => ({
+              id: p.id,
+              name: p.name,
+            }))
+          )
+        } catch {
+          // ignore
+        }
+      } catch {
+        // aborted or network error
+      } finally {
+        if (!signal.aborted) {
+          setLoading(false)
+          setGcalLoading(false)
+        }
+      }
     }
-  }, [org, fetchEvents, fetchGcalEvents])
+
+    loadAll()
+    return () => {
+      controller.abort()
+    }
+  }, [org, currentMonth])
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)

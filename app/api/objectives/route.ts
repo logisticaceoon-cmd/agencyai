@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('objectives')
-      .select('*')
+      .select('*, key_results(*)')
       .eq('workspace_id', workspaceId)
       .order('createdAt', { ascending: false })
 
@@ -27,17 +27,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ data: [] })
     }
 
-    // Fetch key_results for each objective
-    const objectivesWithKRs = await Promise.all(
-      (data || []).map(async (obj: Record<string, unknown>) => {
-        const { data: krs } = await supabase
-          .from('key_results')
-          .select('*')
-          .eq('objective_id', obj.id as string)
-
-        return { ...obj, key_results: krs || [], clients: null }
-      })
-    )
+    const objectivesWithKRs = (data || []).map((obj: Record<string, unknown>) => ({
+      ...obj,
+      key_results: (obj.key_results as unknown[]) || [],
+      clients: null,
+    }))
 
     return NextResponse.json({ data: objectivesWithKRs })
   } catch (err) {

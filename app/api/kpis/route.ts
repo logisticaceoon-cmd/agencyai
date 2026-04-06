@@ -12,7 +12,7 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from('kpis')
-      .select('*')
+      .select('*, kpi_records(*)')
       .eq('workspace_id', workspaceId)
       .order('createdAt', { ascending: false })
 
@@ -25,19 +25,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ data: [] })
     }
 
-    // Fetch kpi_records separately for each KPI
-    const kpisWithRecords = await Promise.all(
-      (data || []).map(async (kpi: Record<string, unknown>) => {
-        const { data: records } = await supabase
-          .from('kpi_records')
-          .select('*')
-          .eq('kpi_id', kpi.id as string)
-          .order('recorded_at', { ascending: false })
-          .limit(10)
-
-        return { ...kpi, kpi_records: records || [], clients: null }
-      })
-    )
+    const kpisWithRecords = (data || []).map((kpi: Record<string, unknown>) => ({
+      ...kpi,
+      kpi_records: (kpi.kpi_records as unknown[]) || [],
+      clients: null,
+    }))
 
     return NextResponse.json({ data: kpisWithRecords })
   } catch (err) {

@@ -14,24 +14,25 @@ export async function GET(request: Request) {
     const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0]
     const endDate = new Date(year, month, 0).toISOString().split('T')[0]
 
-    const { data: transactions, error } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: false })
+    const [{ data: transactions, error }, { data: commClients }] = await Promise.all([
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: false }),
+      supabase
+        .from('clients')
+        .select('id, name, pays_percentage, percentage_value')
+        .eq('workspace_id', workspaceId)
+        .eq('pays_percentage', true),
+    ])
 
     if (error) {
       console.error('Error fetching transactions:', error)
       return NextResponse.json({ data: [], commissionClients: [], summary: { totalIncome: 0, totalExpenses: 0 } })
     }
-
-    const { data: commClients } = await supabase
-      .from('clients')
-      .select('id, name, pays_percentage, percentage_value')
-      .eq('workspace_id', workspaceId)
-      .eq('pays_percentage', true)
 
     return NextResponse.json({
       data: transactions || [],

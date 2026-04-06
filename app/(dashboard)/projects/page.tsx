@@ -138,31 +138,47 @@ export default function ProjectsPage() {
     }
   }, [filterClient, filterStatus])
 
-  const loadClients = useCallback(async () => {
-    try {
-      const res = await fetch('/api/clients')
-      if (res.ok) {
-        const json = await res.json()
-        setClients(
-          (json.data || []).map((c: ClientOption) => ({
-            id: c.id,
-            name: c.name,
-          }))
-        )
-      }
-    } catch {
-      // silently fail
-    }
-  }, [])
-
   useEffect(() => {
     loadProjects()
   }, [loadProjects])
 
   useEffect(() => {
-    loadClients()
-    fetch('/api/team').then(r => r.json()).then(j => setMembers((j.data || []).map((m: { user_id: string; name: string; email: string }) => ({ id: m.user_id, name: m.name || m.email, email: m.email })))).catch(() => {})
-  }, [loadClients])
+    let mounted = true
+    async function loadAux() {
+      try {
+        const [clientsRes, teamRes] = await Promise.all([
+          fetch('/api/clients'),
+          fetch('/api/team'),
+        ])
+        if (!mounted) return
+        if (clientsRes.ok) {
+          const json = await clientsRes.json()
+          setClients(
+            (json.data || []).map((c: ClientOption) => ({
+              id: c.id,
+              name: c.name,
+            }))
+          )
+        }
+        if (teamRes.ok) {
+          const json = await teamRes.json()
+          setMembers(
+            (json.data || []).map((m: { user_id: string; name: string; email: string }) => ({
+              id: m.user_id,
+              name: m.name || m.email,
+              email: m.email,
+            }))
+          )
+        }
+      } catch {
+        // silently fail
+      }
+    }
+    loadAux()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   // ── Handlers ───────────────────────────────────────────────────────────
 

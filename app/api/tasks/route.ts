@@ -16,6 +16,7 @@ export async function GET(request: Request) {
       .from('tasks')
       .select('*')
       .eq('workspace_id', workspaceId)
+      .limit(200)
       .order('createdAt', { ascending: false })
 
     if (status) query = query.eq('status', status)

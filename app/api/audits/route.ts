@@ -12,6 +12,7 @@ export async function GET() {
       .from('audits')
       .select('*')
       .eq('workspace_id', ctx.org.id)
+      .limit(200)
       .order('created_at', { ascending: false })
 
     if (error) {

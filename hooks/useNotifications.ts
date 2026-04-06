@@ -34,8 +34,8 @@ export function useNotifications() {
 
   useEffect(() => {
     fetchNotifications()
-    // Poll every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000)
+    // Poll every 90 seconds
+    const interval = setInterval(fetchNotifications, 90000)
     return () => clearInterval(interval)
   }, [fetchNotifications])
 

@@ -15,6 +15,7 @@ export async function GET(request: Request) {
       .from('projects')
       .select('*')
       .eq('workspace_id', workspaceId)
+      .limit(200)
       .order('createdAt', { ascending: false })
 
     if (clientId) query = query.eq('clientId', clientId)

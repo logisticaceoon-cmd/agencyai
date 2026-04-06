@@ -11,33 +11,34 @@ export async function GET(
     const { supabase, workspaceId } = auth
     const { id } = await params
 
-    // Fetch project with client info
-    const { data: project, error } = await supabase
-      .from('projects')
-      .select('*')
-      .eq('id', id)
-      .eq('workspace_id', workspaceId)
-      .single()
+    const [
+      { data: project, error: projectError },
+      { data: tasks },
+      { data: milestones },
+    ] = await Promise.all([
+      supabase
+        .from('projects')
+        .select('*')
+        .eq('id', id)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle(),
+      supabase
+        .from('tasks')
+        .select('*')
+        .eq('projectId', id)
+        .eq('workspace_id', workspaceId)
+        .order('createdAt', { ascending: true }),
+      supabase
+        .from('project_milestones')
+        .select('*')
+        .eq('project_id', id)
+        .eq('workspace_id', workspaceId)
+        .order('position', { ascending: true }),
+    ])
 
-    if (error || !project) {
+    if (projectError || !project) {
       return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
     }
-
-    // Fetch tasks
-    const { data: tasks } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('projectId', id)
-      .eq('workspace_id', workspaceId)
-      .order('createdAt', { ascending: true })
-
-    // Fetch milestones
-    const { data: milestones } = await supabase
-      .from('project_milestones')
-      .select('*')
-      .eq('project_id', id)
-      .eq('workspace_id', workspaceId)
-      .order('position', { ascending: true })
 
     // Calculate progress
     const totalTasks = tasks?.length || 0
