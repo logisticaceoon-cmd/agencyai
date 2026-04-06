@@ -291,47 +291,74 @@ export default function FinancesPage() {
   async function handleSaveClient(data: Record<string, unknown>, pdfFile: File | null, mode?: 'this_month' | 'forward') {
     let clientId: string | null = null
 
-    if (editingClient) {
-      if (mode === 'this_month') {
-        // Only create/update monthly record
-        await fetch(`/api/finances/finance-clients/${editingClient.id}/monthly`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            month, year,
-            billed_amount: data.contract_cost,
-            commission_amount: (Number(data.contract_cost) * Number(data.commission_percent || 0)) / 100,
-            currency: data.currency,
-            status: 'pending',
-            notes: `Override ${MONTHS[month - 1]} ${year}`,
-          }),
-        })
-        clientId = editingClient.id
+    try {
+      if (editingClient) {
+        if (mode === 'this_month') {
+          // Only create/update monthly record
+          const res = await fetch(`/api/finances/finance-clients/${editingClient.id}/monthly`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              month, year,
+              billed_amount: data.contract_cost,
+              commission_amount: 0,
+              currency: data.currency,
+              status: 'pending',
+              notes: `Override ${MONTHS[month - 1]} ${year}`,
+            }),
+          })
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({ error: 'Error desconocido' }))
+            alert('Error al guardar cambios del mes: ' + (j.error || res.statusText))
+            return
+          }
+          clientId = editingClient.id
+        } else {
+          const res = await fetch(`/api/finances/finance-clients/${editingClient.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          })
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({ error: 'Error desconocido' }))
+            alert('Error al actualizar cliente: ' + (j.error || res.statusText))
+            return
+          }
+          const j = await res.json()
+          clientId = editingClient.id
+          // Optimistic update: reflect changes immediately
+          if (j?.data) {
+            setFinanceClients(prev => prev.map(c => c.id === editingClient.id ? { ...c, ...j.data } : c))
+          }
+        }
       } else {
-        const res = await fetch(`/api/finances/finance-clients/${editingClient.id}`, {
-          method: 'PUT',
+        const res = await fetch('/api/finances/finance-clients', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data),
         })
-        if (res.ok) clientId = editingClient.id
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({ error: 'Error desconocido' }))
+          alert('Error al crear cliente: ' + (j.error || res.statusText))
+          return
+        }
+        const j = await res.json()
+        clientId = j.data?.id
       }
-    } else {
-      const res = await fetch('/api/finances/finance-clients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      if (res.ok) { const j = await res.json(); clientId = j.data?.id }
+
+      if (clientId && pdfFile) {
+        const fd = new FormData()
+        fd.append('file', pdfFile)
+        fd.append('client_id', clientId)
+        await fetch('/api/finances/finance-clients/upload', { method: 'POST', body: fd })
+      }
+    } catch (err) {
+      console.error('Error in handleSaveClient:', err)
+      alert('Error inesperado al guardar')
+      return
     }
 
-    if (clientId && pdfFile) {
-      const fd = new FormData()
-      fd.append('file', pdfFile)
-      fd.append('client_id', clientId)
-      await fetch('/api/finances/finance-clients/upload', { method: 'POST', body: fd })
-    }
-
-    setShowClientModal(null); setEditingClient(null); fetchData()
+    setShowClientModal(null); setEditingClient(null); await fetchData()
   }
 
   async function handleDeleteClient() {
@@ -603,6 +630,7 @@ export default function FinancesPage() {
                           <table className="w-full">
                             <thead>
                               <tr className="border-b border-slate-100">
+                                <th className="text-center px-2 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide w-10">Nº</th>
                                 <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Cliente</th>
                                 <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Costo contrato</th>
                                 <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Comision %</th>
@@ -611,22 +639,26 @@ export default function FinancesPage() {
                                 <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Total</th>
                                 <th className="text-right px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Cancelado</th>
                                 <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Asignado a</th>
-                                <th className="text-center px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">PDF</th>
                                 <th className="text-left px-3 py-2.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Observacion</th>
                                 <th className="w-10"></th>
                               </tr>
                             </thead>
                             <tbody>
-                              {catClients.map(c => {
+                              {catClients.map((c, idx) => {
                                 const isDeleted = !!c.deleted_at
                                 const sym = getCurrencySymbol(c.currency)
                                 const assigned = getAssignedStyle(c.assigned_to)
-                                const total = Number(c.contract_cost)
                                 return (
                                   <tr key={c.id} className={cn('border-b border-slate-100 hover:bg-slate-50', isDeleted && 'bg-slate-50 opacity-70')}>
+                                    <td className="px-2 py-3 text-center text-[11px] font-bold text-slate-400">{idx + 1}</td>
                                     <td className={cn('px-4 py-3 text-[13px] font-semibold text-slate-900', isDeleted && 'line-through')}>
                                       {c.client_name}
                                       {isDeleted && <span className="ml-2 text-[10px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded">Eliminado</span>}
+                                      {c.contract_pdf_url && (
+                                        <a href={c.contract_pdf_url} target="_blank" rel="noopener noreferrer" className="ml-2 text-red-500 hover:text-red-700 inline-block align-middle" title="Ver PDF">
+                                          <FileText className="h-3.5 w-3.5 inline" />
+                                        </a>
+                                      )}
                                     </td>
                                     <td className="px-3 py-3 text-right font-mono text-[13px] text-slate-700">{sym}{Number(c.contract_cost).toLocaleString()}</td>
                                     <td className="px-3 py-3 text-center">
@@ -647,13 +679,8 @@ export default function FinancesPage() {
                                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: assigned.bg, color: assigned.text }}>{c.assigned_to.toUpperCase()}</span>
                                       ) : <span className="text-slate-300">&mdash;</span>}
                                     </td>
-                                    <td className="px-3 py-3 text-center">
-                                      {c.contract_pdf_url ? (
-                                        <a href={c.contract_pdf_url} target="_blank" rel="noopener noreferrer" className="text-red-500 hover:text-red-700" title="Ver PDF"><FileText className="h-4 w-4 inline" /></a>
-                                      ) : <span className="text-slate-300">&mdash;</span>}
-                                    </td>
-                                    <td className="px-3 py-3 text-[11px] text-slate-500 italic max-w-[200px]">
-                                      <div className="truncate" title={c.observations || ''}>{c.observations ? (c.observations.length > 60 ? c.observations.slice(0, 60) + '...' : c.observations) : '-'}</div>
+                                    <td className="px-3 py-3 text-[11px] text-slate-500 italic max-w-[220px]">
+                                      <div className="truncate" title={c.observations || ''}>{c.observations ? (c.observations.length > 80 ? c.observations.slice(0, 80) + '...' : c.observations) : '-'}</div>
                                     </td>
                                     <td className="px-2 py-3 text-center relative">
                                       <button onClick={() => setMenuOpen(menuOpen === c.id ? null : c.id)} className="p-1 rounded hover:bg-slate-100"><MoreVertical className="h-4 w-4 text-slate-400" /></button>
@@ -679,14 +706,14 @@ export default function FinancesPage() {
                               })}
                               {/* Category totals row */}
                               <tr className="text-white" style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%)' }}>
+                                <td className="px-2 py-3"></td>
                                 <td className="px-4 py-3 text-[11px] font-bold uppercase">Total categoria</td>
                                 <td className="px-3 py-3 text-right font-mono text-[12px] font-bold">${catTotal.toLocaleString()}</td>
                                 <td className="px-3 py-3">&mdash;</td>
                                 <td className="px-3 py-3">&mdash;</td>
                                 <td className="px-3 py-3">&mdash;</td>
-                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold"><span style={{ color: '#86efac' }}>${(catTotal + catCommissions).toLocaleString()}</span></td>
+                                <td className="px-3 py-3 text-right font-mono text-[12px] font-bold"><span style={{ color: '#86efac' }}>${catTotal.toLocaleString()}</span></td>
                                 <td className="px-3 py-3 text-right font-mono text-[12px] font-bold"><span style={{ color: '#fca5a5' }}>${catCancelled.toLocaleString()}</span></td>
-                                <td className="px-3 py-3">&mdash;</td>
                                 <td className="px-3 py-3">&mdash;</td>
                                 <td className="px-3 py-3">&mdash;</td>
                                 <td className="px-3 py-3"></td>
@@ -1329,17 +1356,12 @@ function CloseMonthModal({ client, month, year, existingRecord, onSave, onClose 
   onSave: (data: { billed_amount: number; commission_amount: number; currency: string; status: string; notes: string }) => void
   onClose: () => void
 }) {
-  const [billedAmount, setBilledAmount] = useState(existingRecord ? Number(existingRecord.billed_amount) : Number(client.contract_cost))
-  const pct = Number(client.commission_percent) || 0
-  const autoCommission = Math.round(billedAmount * pct / 100 * 100) / 100
-  const [commissionAmount, setCommissionAmount] = useState(existingRecord ? Number(existingRecord.commission_amount) : autoCommission)
+  const [billedAmount, setBilledAmount] = useState<number>(existingRecord ? Number(existingRecord.billed_amount) : 0)
+  const [commissionAmount, setCommissionAmount] = useState<number>(existingRecord ? Number(existingRecord.commission_amount) : 0)
   const [notes, setNotes] = useState(existingRecord?.notes || '')
   const [paid, setPaid] = useState(existingRecord?.status === 'paid')
+  const pct = Number(client.commission_percent) || 0
   const sym = getCurrencySymbol(client.currency)
-
-  useEffect(() => {
-    if (!existingRecord) setCommissionAmount(autoCommission)
-  }, [autoCommission, existingRecord])
 
   return (
     <Modal onClose={onClose}>
@@ -1353,28 +1375,45 @@ function CloseMonthModal({ client, month, year, existingRecord, onSave, onClose 
             <p className="text-lg font-bold text-slate-900">{sym}{Number(client.contract_cost).toLocaleString()} <span className="text-xs text-slate-400">{client.currency}</span></p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-xs text-slate-500">% de comision</p>
-            <p className="text-lg font-bold text-slate-900">{pct}%</p>
+            <p className="text-xs text-slate-500">% comision (referencial)</p>
+            <p className="text-lg font-bold text-slate-900">{pct > 0 ? `${pct}%` : '—'}</p>
           </div>
         </div>
 
-        <div>
-          <label className="text-xs text-slate-500 mb-1 block font-medium">Monto facturado este mes</label>
-          <input type="number" step="0.01" value={billedAmount} onChange={e => setBilledAmount(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
-          <p className="text-[10px] text-slate-400 mt-0.5">Ingresa el monto real. Puede diferir si hubo escala o descuento.</p>
+        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 16px' }}>
+          <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>
+            ℹ️ El % de comision es solo referencial. Ingresa el monto real que calculaste desde la plataforma del cliente.
+          </p>
         </div>
 
-        {pct > 0 && (
-          <div className="rounded-lg bg-green-50 border border-green-200 p-3">
-            <p className="text-xs text-green-600">Comision calculada ({pct}% de {sym}{billedAmount.toLocaleString()})</p>
-            <p className="text-2xl font-bold text-green-700">{sym}{autoCommission.toLocaleString()}</p>
-          </div>
-        )}
+        <div>
+          <label className="text-xs text-slate-500 mb-1 block font-medium">Total de ventas del cliente ($)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={billedAmount === 0 ? '' : billedAmount}
+            onChange={e => { const v = e.target.value; setBilledAmount(v === '' ? 0 : parseFloat(v) || 0) }}
+            onFocus={e => { if (e.target.value === '0') e.target.select() }}
+            placeholder="0.00"
+            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
+          />
+          <p className="text-[10px] text-slate-400 mt-0.5">Total de ventas generadas por el cliente. La comision la calculas tu desde su plataforma.</p>
+        </div>
 
         <div>
-          <label className="text-xs text-slate-500 mb-1 block font-medium">Comision a pagar</label>
-          <input type="number" step="0.01" value={commissionAmount} onChange={e => setCommissionAmount(parseFloat(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
-          <p className="text-[10px] text-slate-400 mt-0.5">Podes ajustar manualmente si hubo acuerdo diferente.</p>
+          <label className="text-xs text-slate-500 mb-1 block font-medium">Comision a cobrar este mes ($)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={commissionAmount === 0 ? '' : commissionAmount}
+            onChange={e => { const v = e.target.value; setCommissionAmount(v === '' ? 0 : parseFloat(v) || 0) }}
+            onFocus={e => { if (e.target.value === '0') e.target.select() }}
+            placeholder="0.00"
+            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
+          />
+          <p className="text-[10px] text-slate-400 mt-0.5">Monto real a cobrar. Calcula manualmente segun lo acordado con el cliente.</p>
         </div>
 
         <div className="flex items-center gap-3">
