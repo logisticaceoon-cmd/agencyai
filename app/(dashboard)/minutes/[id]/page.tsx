@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/auth'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import {
   ArrowLeft,
   FileText,
@@ -80,7 +80,7 @@ const MEETING_TYPE_LABELS: Record<string, string> = Object.fromEntries(
 export default function MinuteDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const { org } = useAuthStore()
+  const { org } = useCurrentUser()
   const id = params.id as string
 
   const [minute, setMinute] = useState<MinuteDetail | null>(null)

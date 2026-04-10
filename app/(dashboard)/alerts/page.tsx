@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { useAuthStore } from '@/store/auth'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { toast } from '@/hooks/use-toast'
 import {
   Brain, Zap, Lightbulb, Cog, Sparkles,
@@ -84,7 +84,7 @@ const defaultConfig: AIConfig = {
 }
 
 export default function AIAgentPage() {
-  const { org } = useAuthStore()
+  const { org } = useCurrentUser()
   const [config, setConfig] = useState<AIConfig>({ ...defaultConfig })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

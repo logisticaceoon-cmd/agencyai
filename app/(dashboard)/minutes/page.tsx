@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useAuthStore } from '@/store/auth'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import {
   FileText,
   Plus,
@@ -62,7 +62,7 @@ function getInitials(name: string): string {
 }
 
 export default function MinutesPage() {
-  const { org } = useAuthStore()
+  const { org } = useCurrentUser()
   const [minutes, setMinutes] = useState<Minute[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')

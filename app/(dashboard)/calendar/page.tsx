@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/auth'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import {
   Calendar as CalIcon,
   ChevronLeft,
@@ -79,7 +79,7 @@ interface GoogleEvent {
 const DAY_NAMES = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom']
 
 export default function CalendarPage() {
-  const { org } = useAuthStore()
+  const { org } = useCurrentUser()
   const router = useRouter()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [events, setEvents] = useState<DayEvent[]>([])

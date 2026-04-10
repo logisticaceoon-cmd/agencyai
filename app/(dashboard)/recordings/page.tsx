@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { useAuthStore } from '@/store/auth'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { toast } from '@/hooks/use-toast'
 import {
   Video, Plus, ExternalLink, Clock, X, Play,
@@ -65,7 +65,7 @@ const emptyForm = {
 }
 
 export default function RecordingsPage() {
-  const { org } = useAuthStore()
+  const { org } = useCurrentUser()
   const [recordings, setRecordings] = useState<Recording[]>([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)

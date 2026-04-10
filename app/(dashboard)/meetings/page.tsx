@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
-import { useAuthStore } from '@/store/auth'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { MessageSquare, Plus, Calendar, Users, ChevronDown, ChevronUp, ArrowRight, X } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 
@@ -22,7 +22,7 @@ interface Meeting {
 }
 
 export default function MeetingsPage() {
-  const { org } = useAuthStore()
+  const { org } = useCurrentUser()
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
