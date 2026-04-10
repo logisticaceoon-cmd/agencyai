@@ -73,10 +73,7 @@ export async function GET() {
     })
   } catch (err) {
     console.error('Error in GET /api/auth/me:', err)
-    return NextResponse.json({
-      error: 'Error interno',
-      details: err instanceof Error ? err.message : String(err),
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
 

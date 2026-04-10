@@ -38,12 +38,12 @@ export async function GET() {
 
     const admin = createAdminClient()
 
-    // Query using Prisma column names (camelCase)
+    // Fix: use parameterized filter instead of string interpolation
     const { data, error: notifError } = await admin
       .from('notifications')
       .select('*')
-      .or(`"userId".eq.${user.id},user_id.eq.${user.id}`)
-      .order('createdAt', { ascending: false })
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
       .limit(20)
 
     if (notifError) {

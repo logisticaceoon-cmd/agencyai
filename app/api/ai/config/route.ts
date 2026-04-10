@@ -9,11 +9,31 @@ export async function GET() {
 
     const { data } = await supabase
       .from('workspace_ai_config')
-      .select('*')
+      .select('workspace_id, agent_name, agent_avatar, agent_personality, ai_provider, language, updated_at')
       .eq('workspace_id', workspaceId)
       .maybeSingle()
 
-    return NextResponse.json({ data: data || null })
+    // Never expose API keys in GET - only return non-sensitive config
+    const safeData = data ? {
+      ...data,
+      has_anthropic_key: false,
+      has_openai_key: false,
+    } : null
+
+    // Check if keys exist (without returning them)
+    if (data) {
+      const { data: keyCheck } = await supabase
+        .from('workspace_ai_config')
+        .select('anthropic_api_key, openai_api_key')
+        .eq('workspace_id', workspaceId)
+        .maybeSingle()
+      if (safeData && keyCheck) {
+        safeData.has_anthropic_key = !!keyCheck.anthropic_api_key
+        safeData.has_openai_key = !!keyCheck.openai_api_key
+      }
+    }
+
+    return NextResponse.json({ data: safeData })
   } catch (err) {
     console.error('Error fetching AI config:', err)
     return NextResponse.json({ data: null })

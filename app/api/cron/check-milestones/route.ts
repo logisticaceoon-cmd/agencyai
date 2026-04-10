@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server'
-import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { createAdminClient } from '@/lib/supabase/server'
 
-export async function GET() {
+export async function GET(request: Request) {
+  // C2 FIX: Validate CRON_SECRET like daily-digest
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
-    const auth = await getAuthContext()
-    if (isAuthError(auth)) return auth
-    const { supabase } = auth
+    const supabase = createAdminClient()
 
-    // Find milestones that are overdue by more than 2 days and not completed
     const twoDaysAgo = new Date()
     twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
 
@@ -22,41 +25,50 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    let notificationsCreated = 0
+    if (!overdueMilestones || overdueMilestones.length === 0) {
+      return NextResponse.json({ checked: 0, notificationsCreated: 0 })
+    }
 
-    for (const milestone of overdueMilestones || []) {
+    // Batch: get all existing notifications to avoid N+1
+    const milestoneIds = overdueMilestones.map(m => m.id)
+    const { data: existingNotifs } = await supabase
+      .from('notifications')
+      .select('message')
+      .eq('type', 'milestone')
+
+    const existingMilestoneIds = new Set(
+      (existingNotifs || [])
+        .map(n => milestoneIds.find(id => n.message?.includes(id)))
+        .filter(Boolean)
+    )
+
+    // Batch insert new notifications
+    const toInsert = []
+    for (const milestone of overdueMilestones) {
+      if (existingMilestoneIds.has(milestone.id)) continue
+
       const projects = milestone.projects as { owner_id: string; name: string }[] | null
       const project = projects?.[0] ?? null
       if (!project?.owner_id) continue
 
-      // Check if notification already exists to avoid duplicates
-      const { data: existing } = await supabase
-        .from('notifications')
-        .select('id')
-        .eq('workspace_id', milestone.workspace_id)
-        .eq('user_id', project.owner_id)
-        .eq('type', 'milestone')
-        .ilike('message', `%${milestone.id}%`)
-        .limit(1)
-
-      if (existing && existing.length > 0) continue
-
-      await supabase.from('notifications').insert({
+      toInsert.push({
         workspace_id: milestone.workspace_id,
         user_id: project.owner_id,
         title: 'Milestone atrasado',
-        message: `El milestone "${milestone.title}" del proyecto "${project.name}" está atrasado. (${milestone.id})`,
+        message: `El milestone "${milestone.title}" del proyecto "${project.name}" esta atrasado. (${milestone.id})`,
         type: 'milestone',
         read: false,
         link: `/projects/${milestone.project_id}`,
       })
+    }
 
-      notificationsCreated++
+    if (toInsert.length > 0) {
+      await supabase.from('notifications').insert(toInsert)
     }
 
     return NextResponse.json({
-      checked: overdueMilestones?.length || 0,
-      notificationsCreated,
+      checked: overdueMilestones.length,
+      notificationsCreated: toInsert.length,
     })
   } catch (err) {
     console.error('Error in GET /api/cron/check-milestones:', err)

@@ -86,23 +86,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    // Auto-create tasks from agreed tasks
+    // A2 FIX: Batch insert tasks instead of N+1 loop
     if (body.agreedTasks && body.agreedTasks.length > 0) {
-      for (const t of body.agreedTasks) {
-        if (t.title) {
-          await supabase.from('tasks').insert({
-            workspace_id: workspaceId,
-            title: t.title,
-            description: `Tarea creada desde minuta: ${body.title}`,
-            created_by: userId,
-            assignee_id: t.assignedTo || userId,
-            due_date: t.deadline || null,
-            client_id: body.clientId || null,
-            task_type: 'reunion',
-            priority: 'medium',
-            status: 'pending',
-          })
-        }
+      const tasksToInsert = body.agreedTasks
+        .filter((t: { title?: string }) => t.title)
+        .map((t: { title: string; assignedTo?: string; deadline?: string }) => ({
+          workspace_id: workspaceId,
+          title: t.title,
+          description: `Tarea creada desde minuta: ${body.title}`,
+          created_by: userId,
+          assignee_id: t.assignedTo || userId,
+          due_date: t.deadline || null,
+          client_id: body.clientId || null,
+          task_type: 'reunion',
+          priority: 'medium',
+          status: 'pending',
+        }))
+      if (tasksToInsert.length > 0) {
+        await supabase.from('tasks').insert(tasksToInsert)
       }
     }
 

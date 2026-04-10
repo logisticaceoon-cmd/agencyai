@@ -71,12 +71,17 @@ export async function PUT(
 
     const body = await request.json()
 
+    // C4 FIX: Whitelist fields to prevent privilege escalation
+    const allowed: Record<string, unknown> = { updated_at: new Date().toISOString() }
+    const safeFields = ['name', 'description', 'status', 'priority', 'start_date', 'end_date',
+      'budget', 'client_id', 'service_type', 'notes', 'tags', 'color']
+    for (const field of safeFields) {
+      if (body[field] !== undefined) allowed[field] = body[field]
+    }
+
     const { data, error } = await supabase
       .from('projects')
-      .update({
-        ...body,
-        updated_at: new Date().toISOString(),
-      })
+      .update(allowed)
       .eq('id', id)
       .eq('workspace_id', workspaceId)
       .select()

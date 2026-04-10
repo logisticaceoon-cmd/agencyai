@@ -83,7 +83,9 @@
       "Bash(xargs -0 sed -i -e 's/agregá/agrega/g' -e 's/creá\\\\b/crea/g' -e 's/hacé\\\\b/haz/g' -e 's/tenés\\\\b/tienes/g' -e 's/podés\\\\b/puedes/g' -e 's/mostrá\\\\b/muestra/g' -e 's/escribí\\\\b/escribe/g' -e 's/ingresá\\\\b/ingresa/g' -e 's/seleccioná\\\\b/selecciona/g' -e 's/arrastrá\\\\b/arrastra/g' -e 's/pegá\\\\b/pega/g' -e 's/mandá\\\\b/envía/g' -e 's/avisá\\\\b/avisa/g' -e 's/buscá\\\\b/busca/g' -e 's/elegí\\\\b/elige/g' -e 's/configurá\\\\b/configura/g' -e 's/revisá\\\\b/revisa/g')",
       "Bash(xargs -0 sed -i 's/Clientes de la agencia/Clientes/g')",
       "Bash(grep:*)",
-      "Bash(sort -t: -k2 -rn)"
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(wc -l \"C:/Users/Rafael B/agencyai/app/\\(dashboard\\)\"/**/page.tsx)",
+      "Bash(find \"/c/Users/Rafael B/agencyai/app/api\" -type f -name \"*.ts\" -exec grep -l \"workspace_ai_config\" {} \\\\;)"
     ]
   }
 }

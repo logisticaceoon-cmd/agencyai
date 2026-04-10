@@ -109,8 +109,8 @@ export default function AIAgentPage() {
               agent_avatar: json.data.agent_avatar || defaultConfig.agent_avatar,
               agent_personality: json.data.agent_personality || defaultConfig.agent_personality,
               ai_provider: json.data.ai_provider || '',
-              anthropic_api_key: json.data.anthropic_api_key || '',
-              openai_api_key: json.data.openai_api_key || '',
+              anthropic_api_key: json.data.has_anthropic_key ? '••••••••••••' : '',
+              openai_api_key: json.data.has_openai_key ? '••••••••••••' : '',
               language: json.data.language || 'es',
             })
           }
@@ -144,13 +144,37 @@ export default function AIAgentPage() {
 
   async function verifyKey(provider: string) {
     setVerifying(provider)
-    // Simulate verification
-    await new Promise(r => setTimeout(r, 1500))
     const key = provider === 'anthropic' ? config.anthropic_api_key : config.openai_api_key
-    if (key && key.length > 10) {
-      toast({ title: `API key de ${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} verificada` })
-    } else {
+    if (!key || key.length < 10) {
       toast({ title: 'API key invalida o vacia', variant: 'destructive' })
+      setVerifying(null)
+      return
+    }
+    try {
+      // Real verification: test the key with a minimal API call
+      if (provider === 'anthropic') {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+          body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+        })
+        if (res.ok || res.status === 429) {
+          toast({ title: 'API key de Anthropic verificada' })
+        } else {
+          toast({ title: 'API key de Anthropic invalida', variant: 'destructive' })
+        }
+      } else {
+        const res = await fetch('https://api.openai.com/v1/models', {
+          headers: { Authorization: `Bearer ${key}` },
+        })
+        if (res.ok) {
+          toast({ title: 'API key de OpenAI verificada' })
+        } else {
+          toast({ title: 'API key de OpenAI invalida', variant: 'destructive' })
+        }
+      }
+    } catch {
+      toast({ title: 'Error de conexion al verificar', variant: 'destructive' })
     }
     setVerifying(null)
   }
