@@ -1,16 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
-
-const updateSchema = z.object({
-  fullName: z.string().optional(),
-  role: z.enum(['CEO', 'Manager', 'Team']).optional(),
-  department: z.string().optional(),
-  status: z.enum(['active', 'inactive']).optional(),
-  phone: z.string().optional(),
-  isFreelancer: z.boolean().optional(),
-})
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function PATCH(
   request: Request,
@@ -18,24 +7,35 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, role } = auth
 
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser || dbUser.role !== 'CEO') {
+    if (role !== 'owner' && role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()
-    const data = updateSchema.parse(body)
 
-    const updated = await prisma.user.update({ where: { id }, data })
-    return NextResponse.json({ data: updated })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+    const updateData: Record<string, unknown> = {}
+    if (body.fullName !== undefined) updateData.name = body.fullName
+    if (body.role !== undefined) updateData.role = body.role
+    if (body.status !== undefined) updateData.status = body.status
+
+    const { data, error } = await supabase
+      .from('workspace_members')
+      .update(updateData)
+      .eq('user_id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
+
+    return NextResponse.json({ data })
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 async function refreshAccessToken(refreshToken: string) {
   const clientId = process.env.GOOGLE_CLIENT_ID
@@ -23,50 +22,45 @@ async function refreshAccessToken(refreshToken: string) {
 }
 
 export async function GET() {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
-
-  const supabase = await createServerSupabaseClient()
-
-  // Get stored tokens
-  const { data: tokenRow } = await supabase
-    .from('google_calendar_tokens')
-    .select('*')
-    .eq('workspace_id', ctx.org.id)
-    .eq('user_id', ctx.membership.userId)
-    .single()
-
-  if (!tokenRow) {
-    return NextResponse.json({ connected: false, events: [] })
-  }
-
-  let accessToken = tokenRow.access_token
-
-  // Check if token is expired
-  if (tokenRow.expiry_date && Date.now() > tokenRow.expiry_date) {
-    if (!tokenRow.refresh_token) {
-      return NextResponse.json({ connected: false, events: [], error: 'Token expired, reconnect required' })
-    }
-    const refreshed = await refreshAccessToken(tokenRow.refresh_token)
-    if (!refreshed?.access_token) {
-      return NextResponse.json({ connected: false, events: [], error: 'Failed to refresh token' })
-    }
-    accessToken = refreshed.access_token
-
-    // Update stored token
-    await supabase
-      .from('google_calendar_tokens')
-      .update({
-        access_token: refreshed.access_token,
-        expiry_date: refreshed.expires_in
-          ? Date.now() + refreshed.expires_in * 1000
-          : tokenRow.expiry_date,
-      })
-      .eq('id', tokenRow.id)
-  }
-
-  // Fetch events from Google Calendar
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, userId } = auth
+
+    const { data: tokenRow } = await supabase
+      .from('google_calendar_tokens')
+      .select('*')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .single()
+
+    if (!tokenRow) {
+      return NextResponse.json({ connected: false, events: [] })
+    }
+
+    let accessToken = tokenRow.access_token
+
+    if (tokenRow.expiry_date && Date.now() > tokenRow.expiry_date) {
+      if (!tokenRow.refresh_token) {
+        return NextResponse.json({ connected: false, events: [], error: 'Token expired, reconnect required' })
+      }
+      const refreshed = await refreshAccessToken(tokenRow.refresh_token)
+      if (!refreshed?.access_token) {
+        return NextResponse.json({ connected: false, events: [], error: 'Failed to refresh token' })
+      }
+      accessToken = refreshed.access_token
+
+      await supabase
+        .from('google_calendar_tokens')
+        .update({
+          access_token: refreshed.access_token,
+          expiry_date: refreshed.expires_in
+            ? Date.now() + refreshed.expires_in * 1000
+            : tokenRow.expiry_date,
+        })
+        .eq('id', tokenRow.id)
+    }
+
     const now = new Date()
     const timeMin = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
     const timeMax = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString()
@@ -80,9 +74,7 @@ export async function GET() {
           orderBy: 'startTime',
           maxResults: '100',
         }),
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }
+      { headers: { Authorization: `Bearer ${accessToken}` } }
     )
 
     if (!calRes.ok) {
@@ -90,7 +82,7 @@ export async function GET() {
     }
 
     const calData = await calRes.json()
-
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const events = (calData.items || []).map((item: any) => ({
       id: item.id,
       title: item.summary || 'Sin titulo',

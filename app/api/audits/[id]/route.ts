@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(
   request: Request,
@@ -8,15 +7,15 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-    const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase
       .from('audits')
       .select('*')
       .eq('id', id)
-      .eq('workspace_id', ctx.org.id)
+      .eq('workspace_id', workspaceId)
       .single()
 
     if (error || !data) {
@@ -24,7 +23,7 @@ export async function GET(
     }
 
     return NextResponse.json({ data })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -35,11 +34,11 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
     const body = await request.json()
-    const supabase = await createServerSupabaseClient()
 
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
@@ -55,7 +54,7 @@ export async function PATCH(
       .from('audits')
       .update(updateData)
       .eq('id', id)
-      .eq('workspace_id', ctx.org.id)
+      .eq('workspace_id', workspaceId)
       .select()
       .single()
 
@@ -64,7 +63,7 @@ export async function PATCH(
     }
 
     return NextResponse.json({ data })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -75,22 +74,22 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-    const supabase = await createServerSupabaseClient()
     const { error } = await supabase
       .from('audits')
       .delete()
       .eq('id', id)
-      .eq('workspace_id', ctx.org.id)
+      .eq('workspace_id', workspaceId)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

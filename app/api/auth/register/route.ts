@@ -1,37 +1,31 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
-
-const schema = z.object({
-  email: z.string().email(),
-  fullName: z.string().min(2),
-  supabaseId: z.string(),
-})
+import { createAdminClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { email, fullName } = schema.parse(body)
+    const { email, fullName } = body
 
-    // Check if user already exists
-    const existing = await prisma.user.findUnique({ where: { email } })
+    if (!email || !fullName) {
+      return NextResponse.json({ error: 'Email and fullName required' }, { status: 400 })
+    }
+
+    const supabase = createAdminClient()
+
+    // Check if user already exists via workspace_members
+    const { data: existing } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('name', email)
+      .limit(1)
+      .maybeSingle()
+
     if (existing) {
-      return NextResponse.json({ user: existing })
+      return NextResponse.json({ user: { id: existing.user_id, email, fullName } })
     }
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        fullName,
-        role: 'CEO', // All new registrations are CEOs of their own org
-      },
-    })
-
-    return NextResponse.json({ user }, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
-    }
+    return NextResponse.json({ user: { email, fullName } }, { status: 201 })
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,26 +1,24 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET() {
   try {
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-    const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase
       .from('bookmarks')
       .select('*, clients(id, name), projects(id, name)')
-      .eq('workspace_id', ctx.org.id)
+      .eq('workspace_id', workspaceId)
       .order('pinned', { ascending: false })
       .order('created_at', { ascending: false })
 
     if (error) {
-      // Fallback without joins
       const { data: fallback } = await supabase
         .from('bookmarks')
         .select('*')
-        .eq('workspace_id', ctx.org.id)
+        .eq('workspace_id', workspaceId)
         .order('pinned', { ascending: false })
         .order('created_at', { ascending: false })
       return NextResponse.json({ data: fallback || [] })
@@ -34,26 +32,26 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, userId } = auth
 
     const body = await request.json()
-    const supabase = await createServerSupabaseClient()
 
     const { data, error } = await supabase
       .from('bookmarks')
       .insert({
-        workspace_id: ctx.org.id,
+        workspace_id: workspaceId,
         title: body.title,
         url: body.url,
         description: body.description || null,
-        icon: body.icon || '📄',
+        icon: body.icon || '\u{1F4C4}',
         color: body.color || '#2563eb',
         category: body.category || 'general',
         client_id: body.client_id || null,
         project_id: body.project_id || null,
         pinned: body.pinned || false,
-        created_by: ctx.membership.userId,
+        created_by: userId,
       })
       .select()
       .single()

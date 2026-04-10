@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(
   request: Request,
@@ -8,18 +7,22 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-    const comments = await prisma.comment.findMany({
-      where: { taskId: id },
-      include: { author: { select: { id: true, fullName: true, avatarUrl: true } } },
-      orderBy: { createdAt: 'asc' },
-    })
+    const { data, error } = await supabase
+      .from('comments')
+      .select('*')
+      .eq('task_id', id)
+      .order('created_at', { ascending: true })
 
-    return NextResponse.json({ data: comments })
-  } catch (error) {
+    if (error) {
+      return NextResponse.json({ data: [] })
+    }
+
+    return NextResponse.json({ data: data || [] })
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -30,23 +33,30 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, userId, fullName } = auth
 
     const { text } = await request.json()
     if (!text?.trim()) return NextResponse.json({ error: 'Text required' }, { status: 400 })
 
-    const comment = await prisma.comment.create({
-      data: { text, authorId: dbUser.id, taskId: id },
-      include: { author: { select: { id: true, fullName: true, avatarUrl: true } } },
-    })
+    const { data, error } = await supabase
+      .from('comments')
+      .insert({
+        text,
+        author_id: userId,
+        author_name: fullName,
+        task_id: id,
+      })
+      .select()
+      .single()
 
-    return NextResponse.json({ data: comment }, { status: 201 })
-  } catch (error) {
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ data }, { status: 201 })
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

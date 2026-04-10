@@ -1,26 +1,34 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { prisma } from '@/lib/prisma'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET() {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-  // Return all users in this organization
-  const members = await prisma.organizationMember.findMany({
-    where: { organizationId: ctx.org.id, status: 'active' },
-    include: {
-      user: {
-        select: {
-          id: true, fullName: true, email: true, role: true,
-          department: true, avatarUrl: true, status: true, lastLogin: true,
-        },
-      },
-    },
-    orderBy: { createdAt: 'asc' },
-  })
+    const { data: members, error } = await supabase
+      .from('workspace_members')
+      .select('user_id, name, role, status')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: true })
 
-  const users = members.map((m) => ({ ...m.user, orgRole: m.role }))
+    if (error) {
+      console.error('Error fetching users:', error)
+      return NextResponse.json({ data: [] })
+    }
 
-  return NextResponse.json({ data: users })
+    const users = (members || []).map((m) => ({
+      id: m.user_id,
+      fullName: m.name || 'Usuario',
+      role: m.role,
+      status: m.status,
+    }))
+
+    return NextResponse.json({ data: users })
+  } catch (err) {
+    console.error('Error fetching users:', err)
+    return NextResponse.json({ data: [] })
+  }
 }

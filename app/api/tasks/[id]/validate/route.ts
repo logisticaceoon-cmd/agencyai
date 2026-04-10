@@ -1,13 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
-import { createNotificationForMultiple } from '@/lib/notifications'
-
-const schema = z.object({
-  action: z.enum(['validated', 'rejected', 'review']),
-  validationNotes: z.string().optional(),
-})
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function POST(
   request: Request,
@@ -15,59 +7,44 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, userId, role } = auth
 
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser || dbUser.role === 'Team') {
+    if (role !== 'owner' && role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()
-    const { action, validationNotes } = schema.parse(body)
+    const action = body.action as string
+    const validationNotes = body.validationNotes as string | undefined
 
-    const task = await prisma.task.update({
-      where: { id },
-      data: {
-        status: action === 'validated' ? 'completed' : action === 'rejected' ? 'rejected' : 'in_progress',
-        validatedById: dbUser.id,
-        validatedAt: new Date(),
-        validationNotes,
-      },
-    })
-
-    // Notify assignees
-    const messages = {
-      validated: `Tu tarea fue validada ✅: ${task.title}`,
-      rejected: `Tu tarea fue rechazada ❌: ${task.title}${validationNotes ? ` — ${validationNotes}` : ''}`,
-      review: `Tu tarea requiere revisión ⚠️: ${task.title}`,
+    const statusMap: Record<string, string> = {
+      validated: 'completed',
+      rejected: 'rejected',
+      review: 'in_progress',
     }
 
-    await createNotificationForMultiple(task.assignedTo, {
-      title: action === 'validated' ? 'Tarea validada' : action === 'rejected' ? 'Tarea rechazada' : 'Tarea en revisión',
-      message: messages[action],
-      type: 'task',
-      relatedEntityType: 'task',
-      relatedEntityId: id,
-    })
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({
+        status: statusMap[action] || 'in_progress',
+        validated_by: userId,
+        validated_at: new Date().toISOString(),
+        validation_notes: validationNotes || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
 
-    await prisma.activityLog.create({
-      data: {
-        userId: dbUser.id,
-        actionType: `task_${action}`,
-        entityType: 'task',
-        entityId: id,
-        taskId: id,
-        description: `Tarea ${action} por ${dbUser.fullName}`,
-      },
-    })
-
-    return NextResponse.json({ data: task })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
+
+    return NextResponse.json({ data })
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

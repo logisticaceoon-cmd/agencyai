@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET() {
   try {
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-    const supabase = await createServerSupabaseClient()
     const { data, error } = await supabase
       .from('recordings')
       .select('*')
-      .eq('workspace_id', ctx.org.id)
+      .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -28,17 +27,17 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, userId } = auth
 
     const body = await request.json()
-    const supabase = await createServerSupabaseClient()
 
     const { data, error } = await supabase
       .from('recordings')
       .insert({
-        workspace_id: ctx.org.id,
-        created_by: ctx.user.id,
+        workspace_id: workspaceId,
+        created_by: userId,
         title: body.title,
         platform: body.platform || null,
         url: body.url || null,

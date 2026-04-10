@@ -1,62 +1,68 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { getAuthContext } from '@/lib/org'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export async function GET(_: Request, { params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params
+  try {
+    const { token } = await params
+    const supabase = createAdminClient()
 
-  const invitation = await prisma.invitation.findUnique({
-    where: { token },
-    include: { organization: { select: { name: true, logoUrl: true, plan: true } } },
-  })
+    const { data: invitation } = await supabase
+      .from('workspace_invitations')
+      .select('*, workspaces(name, plan)')
+      .eq('token', token)
+      .single()
 
-  if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 })
-  if (invitation.acceptedAt) return NextResponse.json({ error: 'Invitation already accepted' }, { status: 400 })
-  if (invitation.expiresAt < new Date()) return NextResponse.json({ error: 'Invitation expired' }, { status: 400 })
+    if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 })
+    if (invitation.accepted_at) return NextResponse.json({ error: 'Invitation already accepted' }, { status: 400 })
+    if (new Date(invitation.expires_at) < new Date()) return NextResponse.json({ error: 'Invitation expired' }, { status: 400 })
 
-  return NextResponse.json({ data: invitation })
+    return NextResponse.json({ data: invitation })
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
 }
 
 export async function POST(_: Request, { params }: { params: Promise<{ token: string }> }) {
-  const ctx = await getAuthContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { userId, email } = auth
 
-  const { token } = await params
+    const { token } = await params
+    const supabase = createAdminClient()
 
-  const invitation = await prisma.invitation.findUnique({ where: { token } })
-  if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 })
-  if (invitation.acceptedAt) return NextResponse.json({ error: 'Already accepted' }, { status: 400 })
-  if (invitation.expiresAt < new Date()) return NextResponse.json({ error: 'Invitation expired' }, { status: 400 })
+    const { data: invitation } = await supabase
+      .from('workspace_invitations')
+      .select('*')
+      .eq('token', token)
+      .single()
 
-  // Verify email matches (optional strict check)
-  if (invitation.email !== ctx.user.email) {
-    return NextResponse.json({ error: 'This invitation is for a different email address' }, { status: 403 })
-  }
+    if (!invitation) return NextResponse.json({ error: 'Invitation not found' }, { status: 404 })
+    if (invitation.accepted_at) return NextResponse.json({ error: 'Already accepted' }, { status: 400 })
+    if (new Date(invitation.expires_at) < new Date()) return NextResponse.json({ error: 'Invitation expired' }, { status: 400 })
 
-  await prisma.$transaction(async (tx) => {
-    // Add user to org
-    await tx.organizationMember.upsert({
-      where: {
-        organizationId_userId: {
-          organizationId: invitation.organizationId,
-          userId: ctx.user.id,
-        },
-      },
-      create: {
-        organizationId: invitation.organizationId,
-        userId: ctx.user.id,
-        role: invitation.role,
-        status: 'active',
-      },
-      update: { status: 'active', role: invitation.role },
-    })
+    if (invitation.email !== email) {
+      return NextResponse.json({ error: 'This invitation is for a different email address' }, { status: 403 })
+    }
+
+    // Add user to workspace
+    await supabase.from('workspace_members').upsert({
+      workspace_id: invitation.workspace_id,
+      user_id: userId,
+      role: invitation.role || 'member',
+      name: email.split('@')[0],
+      status: 'active',
+    }, { onConflict: 'workspace_id,user_id' })
 
     // Mark invitation as accepted
-    await tx.invitation.update({
-      where: { token },
-      data: { acceptedAt: new Date() },
-    })
-  })
+    await supabase
+      .from('workspace_invitations')
+      .update({ accepted_at: new Date().toISOString() })
+      .eq('token', token)
 
-  return NextResponse.json({ message: 'Invitation accepted', organizationId: invitation.organizationId })
+    return NextResponse.json({ message: 'Invitation accepted', workspaceId: invitation.workspace_id })
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
 }

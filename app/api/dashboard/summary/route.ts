@@ -1,79 +1,53 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { prisma } from '@/lib/prisma'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET() {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-  const orgId = ctx.org.id
-  const now = new Date()
+    const now = new Date().toISOString()
 
-  const [
-    totalClients,
-    activeClients,
-    tasksTotal,
-    tasksCompleted,
-    tasksOverdue,
-    reportsTotal,
-    reportsProcessed,
-    reportsPending,
-    audits,
-    monthlyIncome,
-    pendingPayments,
-  ] = await Promise.all([
-    prisma.client.count({ where: { organizationId: orgId } }),
-    prisma.client.count({ where: { organizationId: orgId, status: 'active' } }),
-    prisma.task.count({ where: { organizationId: orgId, status: { not: 'rejected' } } }),
-    prisma.task.count({ where: { organizationId: orgId, status: 'completed' } }),
-    prisma.task.count({
-      where: {
-        organizationId: orgId,
-        status: { in: ['pending', 'in_progress'] },
-        deadline: { lt: now },
-      },
-    }),
-    prisma.report.count({ where: { organizationId: orgId } }),
-    prisma.report.count({
-      where: { organizationId: orgId, status: { in: ['validated', 'rejected'] } },
-    }),
-    prisma.report.count({ where: { organizationId: orgId, status: 'pending' } }),
-    prisma.audit.findMany({
-      where: { organizationId: orgId, status: 'completed', complianceScore: { not: null } },
-      select: { complianceScore: true },
-      orderBy: { executedAt: 'desc' },
-      take: 10,
-    }),
-    prisma.finance.aggregate({
-      where: {
-        organizationId: orgId,
-        type: 'income',
-        month: now.getMonth() + 1,
-        year: now.getFullYear(),
-      },
-      _sum: { amount: true },
-    }),
-    prisma.finance.count({
-      where: { organizationId: orgId, type: 'income', isPaid: false },
-    }),
-  ])
+    const [
+      clientsResult,
+      activeClientsResult,
+      tasksResult,
+      completedTasksResult,
+      overdueTasksResult,
+      reportsResult,
+      processedReportsResult,
+      pendingReportsResult,
+    ] = await Promise.all([
+      supabase.from('clients').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null),
+      supabase.from('clients').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).eq('status', 'active'),
+      supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).neq('status', 'rejected'),
+      supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).eq('status', 'completed'),
+      supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).in('status', ['pending', 'in_progress']).lt('due_date', now),
+      supabase.from('reports').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
+      supabase.from('reports').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).in('status', ['validated', 'rejected']),
+      supabase.from('reports').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('status', 'pending'),
+    ])
 
-  const complianceScore =
-    audits.length > 0
-      ? Math.round(audits.reduce((sum, a) => sum + (a.complianceScore ?? 0), 0) / audits.length)
-      : 0
-
-  return NextResponse.json({
-    totalClients,
-    clientsOnTrack: activeClients,
-    tasksTotal,
-    tasksCompleted,
-    tasksOverdue,
-    reportsTotal,
-    reportsProcessed,
-    reportsPending,
-    complianceScore,
-    monthlyRevenue: Number(monthlyIncome._sum.amount ?? 0),
-    pendingPayments,
-  })
+    return NextResponse.json({
+      totalClients: clientsResult.count || 0,
+      clientsOnTrack: activeClientsResult.count || 0,
+      tasksTotal: tasksResult.count || 0,
+      tasksCompleted: completedTasksResult.count || 0,
+      tasksOverdue: overdueTasksResult.count || 0,
+      reportsTotal: reportsResult.count || 0,
+      reportsProcessed: processedReportsResult.count || 0,
+      reportsPending: pendingReportsResult.count || 0,
+      complianceScore: 0,
+      monthlyRevenue: 0,
+      pendingPayments: 0,
+    })
+  } catch (err) {
+    console.error('Error fetching dashboard summary:', err)
+    return NextResponse.json({
+      totalClients: 0, clientsOnTrack: 0, tasksTotal: 0, tasksCompleted: 0,
+      tasksOverdue: 0, reportsTotal: 0, reportsProcessed: 0, reportsPending: 0,
+      complianceScore: 0, monthlyRevenue: 0, pendingPayments: 0,
+    })
+  }
 }

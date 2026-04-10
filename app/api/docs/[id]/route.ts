@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(
   request: Request,
@@ -8,19 +7,21 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-    const doc = await prisma.documentation.findUnique({
-      where: { id },
-      include: { author: { select: { id: true, fullName: true } } },
-    })
+    const { data, error } = await supabase
+      .from('docs')
+      .select('*')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .single()
 
-    if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    return NextResponse.json({ data: doc })
-  } catch (error) {
+    return NextResponse.json({ data })
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -31,29 +32,42 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-
-    const existing = await prisma.documentation.findUnique({ where: { id } })
-    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, fullName } = auth
 
     const body = await request.json()
 
-    const doc = await prisma.documentation.update({
-      where: { id },
-      data: {
-        ...body,
-        version: existing.version + 1,
-        versionNotes: body.versionNotes || `Actualizado por ${dbUser.fullName}`,
-      },
-    })
+    // Get current version
+    const { data: existing } = await supabase
+      .from('docs')
+      .select('version')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .single()
 
-    return NextResponse.json({ data: doc })
-  } catch (error) {
+    const updateData: Record<string, unknown> = {
+      ...body,
+      version: (existing?.version || 0) + 1,
+      version_notes: body.versionNotes || `Actualizado por ${fullName}`,
+      updated_at: new Date().toISOString(),
+    }
+    delete updateData.versionNotes
+
+    const { data, error } = await supabase
+      .from('docs')
+      .update(updateData)
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ data })
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

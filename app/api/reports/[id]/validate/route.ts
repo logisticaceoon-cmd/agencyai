@@ -1,13 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
-import { createNotification } from '@/lib/notifications'
-
-const schema = z.object({
-  action: z.enum(['validated', 'rejected', 'review']),
-  validationComments: z.string().optional(),
-})
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function PATCH(
   request: Request,
@@ -15,42 +7,38 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, userId, role } = auth
 
-    const dbUser = await prisma.user.findUnique({ where: { email: user.email! } })
-    if (!dbUser || dbUser.role === 'Team') {
+    if (role !== 'owner' && role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()
-    const { action, validationComments } = schema.parse(body)
+    const action = body.action as string
+    const validationComments = body.validationComments as string | undefined
 
-    const report = await prisma.report.update({
-      where: { id },
-      data: {
+    const { data, error } = await supabase
+      .from('reports')
+      .update({
         status: action,
-        validatedById: dbUser.id,
-        validatedAt: new Date(),
-        validationComments,
-      },
-    })
+        validated_by: userId,
+        validated_at: new Date().toISOString(),
+        validation_comments: validationComments || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
 
-    await createNotification({
-      userId: report.submittedById,
-      title: action === 'validated' ? 'Reporte validado ✅' : action === 'rejected' ? 'Reporte rechazado ❌' : 'Reporte en revisión',
-      message: `Tu reporte "${report.title}" fue ${action === 'validated' ? 'validado' : action === 'rejected' ? 'rechazado' : 'puesto en revisión'}`,
-      type: 'report',
-      relatedEntityType: 'report',
-      relatedEntityId: id,
-    })
-
-    return NextResponse.json({ data: report })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
+
+    return NextResponse.json({ data })
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

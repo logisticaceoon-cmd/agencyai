@@ -1,18 +1,17 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
     const { id } = await params
     const body = await request.json()
-    const supabase = await createServerSupabaseClient()
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (body.title !== undefined) updateData.title = body.title
@@ -29,7 +28,7 @@ export async function PUT(
       .from('bookmarks')
       .update(updateData)
       .eq('id', id)
-      .eq('workspace_id', ctx.org.id)
+      .eq('workspace_id', workspaceId)
       .select()
       .single()
 
@@ -47,17 +46,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const ctx = await getOrgContext()
-    if ('error' in ctx) return ctx.error
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
     const { id } = await params
-    const supabase = await createServerSupabaseClient()
 
     const { error } = await supabase
       .from('bookmarks')
       .delete()
       .eq('id', id)
-      .eq('workspace_id', ctx.org.id)
+      .eq('workspace_id', workspaceId)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

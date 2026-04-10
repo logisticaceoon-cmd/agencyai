@@ -1,58 +1,54 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { getOrgContext } from '@/lib/org'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-  const { id } = await params
-  if (ctx.org.id !== id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const { id } = await params
+    if (workspaceId !== id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { data } = await supabase
+      .from('workspace_members')
+      .select('*')
+      .eq('workspace_id', id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: true })
+
+    return NextResponse.json({ data: data || [] })
+  } catch {
+    return NextResponse.json({ data: [] })
   }
-
-  const members = await prisma.organizationMember.findMany({
-    where: { organizationId: id },
-    include: {
-      user: {
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-          avatarUrl: true,
-          role: true,
-          department: true,
-          status: true,
-          lastLogin: true,
-        },
-      },
-    },
-    orderBy: { createdAt: 'asc' },
-  })
-
-  return NextResponse.json({ data: members })
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, role } = auth
 
-  const { id } = await params
-  if (ctx.org.id !== id || ctx.membership.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const { id } = await params
+    if (workspaceId !== id || (role !== 'owner' && role !== 'admin')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { userId } = await request.json()
+    if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
+
+    const { error } = await supabase
+      .from('workspace_members')
+      .update({ status: 'removed' })
+      .eq('workspace_id', id)
+      .eq('user_id', userId)
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    return NextResponse.json({ message: 'Member removed' })
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  const { userId } = await request.json()
-  if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
-
-  // Cannot remove the org owner
-  if (ctx.org.ownerId === userId) {
-    return NextResponse.json({ error: 'Cannot remove organization owner' }, { status: 403 })
-  }
-
-  await prisma.organizationMember.deleteMany({
-    where: { organizationId: id, userId },
-  })
-
-  return NextResponse.json({ message: 'Member removed' })
 }

@@ -1,77 +1,70 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-  const { id } = await params
-  const supabase = await createServerSupabaseClient()
+    const { id } = await params
 
-  const { data, error } = await supabase
-    .from('minutes')
-    .select('*, clients!minutes_client_id_fkey(name), projects!minutes_project_id_fkey(name)')
-    .eq('id', id)
-    .eq('workspace_id', ctx.org.id)
-    .single()
-
-  if (error) {
-    // Fallback without joins
-    const { data: fallbackData, error: fallbackError } = await supabase
+    const { data, error } = await supabase
       .from('minutes')
-      .select('*')
+      .select('*, clients!minutes_client_id_fkey(name), projects!minutes_project_id_fkey(name)')
       .eq('id', id)
-      .eq('workspace_id', ctx.org.id)
+      .eq('workspace_id', workspaceId)
       .single()
 
-    if (fallbackError) {
-      return NextResponse.json(
-        { error: 'Minute not found' },
-        { status: 404 }
-      )
+    if (error) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('minutes')
+        .select('*')
+        .eq('id', id)
+        .eq('workspace_id', workspaceId)
+        .single()
+
+      if (fallbackError) {
+        return NextResponse.json({ error: 'Minute not found' }, { status: 404 })
+      }
+
+      return NextResponse.json({
+        data: { ...fallbackData, client_name: null, project_name: null },
+      })
     }
+
+    const clients = data.clients as { name: string } | null
+    const projects = data.projects as { name: string } | null
 
     return NextResponse.json({
       data: {
-        ...fallbackData,
-        client_name: null,
-        project_name: null,
+        ...data,
+        client_name: clients?.name || null,
+        project_name: projects?.name || null,
+        clients: undefined,
+        projects: undefined,
       },
     })
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  const clients = data.clients as { name: string } | null
-  const projects = data.projects as { name: string } | null
-
-  return NextResponse.json({
-    data: {
-      ...data,
-      client_name: clients?.name || null,
-      project_name: projects?.name || null,
-      clients: undefined,
-      projects: undefined,
-    },
-  })
 }
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
-
-  const { id } = await params
-
   try {
-    const body = await request.json()
-    const supabase = await createServerSupabaseClient()
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-    // Build update object with only provided fields
+    const { id } = await params
+    const body = await request.json()
+
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     }
@@ -92,7 +85,7 @@ export async function PUT(
       .from('minutes')
       .update(updateData)
       .eq('id', id)
-      .eq('workspace_id', ctx.org.id)
+      .eq('workspace_id', workspaceId)
       .select()
       .single()
 
@@ -102,10 +95,7 @@ export async function PUT(
 
     return NextResponse.json({ data })
   } catch {
-    return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 }
 
@@ -113,21 +103,25 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-  const { id } = await params
-  const supabase = await createServerSupabaseClient()
+    const { id } = await params
 
-  const { error } = await supabase
-    .from('minutes')
-    .delete()
-    .eq('id', id)
-    .eq('workspace_id', ctx.org.id)
+    const { error } = await supabase
+      .from('minutes')
+      .delete()
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  return NextResponse.json({ success: true })
 }

@@ -1,89 +1,61 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { getOrgContext } from '@/lib/org'
-import { z } from 'zod'
-
-const schema = z.object({
-  email: z.string().email(),
-  role: z.enum(['admin', 'trafficker', 'client']).default('trafficker'),
-})
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
-
-  const { id } = await params
-  if (ctx.org.id !== id || ctx.membership.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
-  // Check user limit
-  const memberCount = await prisma.organizationMember.count({
-    where: { organizationId: id, status: 'active' },
-  })
-  if (memberCount >= ctx.org.maxUsers) {
-    return NextResponse.json({
-      error: `Plan limit reached. Upgrade to add more users (current limit: ${ctx.org.maxUsers})`,
-    }, { status: 403 })
-  }
-
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, role } = auth
+
+    const { id } = await params
+    if (workspaceId !== id || (role !== 'owner' && role !== 'admin')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await request.json()
-    const { email, role } = schema.parse(body)
+    const { email, role: inviteRole } = body
 
-    // Check if already a member
-    const existingUser = await prisma.user.findUnique({ where: { email } })
-    if (existingUser) {
-      const existingMember = await prisma.organizationMember.findFirst({
-        where: { organizationId: id, userId: existingUser.id },
-      })
-      if (existingMember) {
-        return NextResponse.json({ error: 'User is already a member' }, { status: 400 })
-      }
-    }
+    if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
 
-    // Create or update invitation
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-
-    const invitation = await prisma.invitation.create({
-      data: {
-        organizationId: id,
+    const { data, error } = await supabase
+      .from('workspace_invitations')
+      .insert({
+        workspace_id: id,
         email,
-        role,
-        expiresAt,
-      },
-    })
+        role: inviteRole || 'member',
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .select()
+      .single()
 
-    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL}/invite/${invitation.token}`
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-    // TODO: Send email via Resend
-    // For now, return the invite URL so admin can share it manually
-    return NextResponse.json({
-      data: invitation,
-      inviteUrl,
-      message: 'Invitation created. Share the link with the user.',
-    }, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
-    }
+    return NextResponse.json({ data }, { status: 201 })
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, role } = auth
 
-  const { id } = await params
-  if (ctx.org.id !== id || ctx.membership.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const { id } = await params
+    if (workspaceId !== id || (role !== 'owner' && role !== 'admin')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const { data } = await supabase
+      .from('workspace_invitations')
+      .select('*')
+      .eq('workspace_id', id)
+      .is('accepted_at', null)
+      .order('created_at', { ascending: false })
+
+    return NextResponse.json({ data: data || [] })
+  } catch {
+    return NextResponse.json({ data: [] })
   }
-
-  const invitations = await prisma.invitation.findMany({
-    where: { organizationId: id, acceptedAt: null },
-    orderBy: { createdAt: 'desc' },
-  })
-
-  return NextResponse.json({ data: invitations })
 }

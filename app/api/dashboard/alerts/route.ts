@@ -1,35 +1,41 @@
 import { NextResponse } from 'next/server'
-import { getOrgContext } from '@/lib/org'
-import { prisma } from '@/lib/prisma'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function GET() {
-  const ctx = await getOrgContext()
-  if ('error' in ctx) return ctx.error
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
-  const orgId = ctx.org.id
-  const now = new Date()
-  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+    const now = new Date().toISOString()
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  const [overdueTasks, pendingReports, overdueReports] = await Promise.all([
-    prisma.task.findMany({
-      where: {
-        organizationId: orgId,
-        deadline: { lt: now },
-        status: { in: ['pending', 'in_progress'] },
-      },
-      select: { id: true, title: true, deadline: true, assignedTo: true, priority: true },
-      orderBy: { deadline: 'asc' },
-      take: 10,
-    }),
-    prisma.report.findMany({
-      where: { organizationId: orgId, status: 'pending', createdAt: { lt: yesterday } },
-      select: { id: true, title: true, createdAt: true },
-      take: 10,
-    }),
-    prisma.report.count({
-      where: { organizationId: orgId, status: 'pending', createdAt: { lt: yesterday } },
-    }),
-  ])
+    const [tasksResult, reportsResult] = await Promise.all([
+      supabase
+        .from('tasks')
+        .select('id, title, due_date, assignee_id, priority')
+        .eq('workspace_id', workspaceId)
+        .is('deleted_at', null)
+        .lt('due_date', now)
+        .in('status', ['pending', 'in_progress'])
+        .order('due_date', { ascending: true })
+        .limit(10),
+      supabase
+        .from('reports')
+        .select('id, title, created_at')
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'pending')
+        .lt('created_at', yesterday)
+        .limit(10),
+    ])
 
-  return NextResponse.json({ overdueTasks, pendingReports, overdueReportsCount: overdueReports })
+    return NextResponse.json({
+      overdueTasks: tasksResult.data || [],
+      pendingReports: reportsResult.data || [],
+      overdueReportsCount: reportsResult.data?.length || 0,
+    })
+  } catch (err) {
+    console.error('Error fetching dashboard alerts:', err)
+    return NextResponse.json({ overdueTasks: [], pendingReports: [], overdueReportsCount: 0 })
+  }
 }
