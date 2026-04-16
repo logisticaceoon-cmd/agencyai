@@ -17,7 +17,7 @@ export async function GET(request: Request) {
         .from('tasks')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'completed')
-        .gte('updated_at', yesterday),
+        .gte('createdAt', yesterday),
       supabase
         .from('tasks')
         .select('id', { count: 'exact', head: true })
@@ -25,8 +25,9 @@ export async function GET(request: Request) {
         .is('deleted_at', null),
       supabase
         .from('tasks')
-        .select('title, due_date')
-        .lt('due_date', now.toISOString())
+        .select('title, deadline')
+        .not('deadline', 'is', null)
+        .lt('deadline', now.toISOString())
         .in('status', ['pending', 'in_progress'])
         .is('deleted_at', null)
         .limit(10),

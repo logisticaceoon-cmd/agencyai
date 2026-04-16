@@ -23,10 +23,9 @@ export async function PATCH(
       .from('reports')
       .update({
         status: action,
-        validated_by: userId,
-        validated_at: new Date().toISOString(),
-        validation_comments: validationComments || null,
-        updated_at: new Date().toISOString(),
+        validatedById: userId,
+        validatedAt: new Date().toISOString(),
+        validationComments: validationComments || null,
       })
       .eq('id', id)
       .eq('workspace_id', workspaceId)

@@ -18,9 +18,8 @@ export async function POST(
       .from('comments')
       .insert({
         text,
-        author_id: userId,
-        author_name: fullName,
-        report_id: id,
+        authorId: userId,
+        reportId: id,
       })
       .select()
       .single()

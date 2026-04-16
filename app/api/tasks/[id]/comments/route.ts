@@ -11,11 +11,23 @@ export async function GET(
     if (isAuthError(auth)) return auth
     const { supabase, workspaceId } = auth
 
+    // Verify task belongs to this workspace before fetching comments
+    const { data: task } = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle()
+
+    if (!task) {
+      return NextResponse.json({ data: [] })
+    }
+
     const { data, error } = await supabase
       .from('comments')
       .select('*')
-      .eq('task_id', id)
-      .order('created_at', { ascending: true })
+      .eq('taskId', id)
+      .order('createdAt', { ascending: true })
 
     if (error) {
       return NextResponse.json({ data: [] })
@@ -35,7 +47,19 @@ export async function POST(
     const { id } = await params
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, userId, fullName } = auth
+    const { supabase, workspaceId, userId, fullName } = auth
+
+    // Verify task belongs to this workspace
+    const { data: task } = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle()
+
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
 
     const { text } = await request.json()
     if (!text?.trim()) return NextResponse.json({ error: 'Text required' }, { status: 400 })
@@ -44,9 +68,8 @@ export async function POST(
       .from('comments')
       .insert({
         text,
-        author_id: userId,
-        author_name: fullName,
-        task_id: id,
+        authorId: userId,
+        taskId: id,
       })
       .select()
       .single()

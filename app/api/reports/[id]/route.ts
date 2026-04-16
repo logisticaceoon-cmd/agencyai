@@ -41,9 +41,16 @@ export async function PUT(
 
     const body = await request.json()
 
+    // Whitelist allowed fields to prevent workspace_id or other sensitive field overrides
+    const allowed: Record<string, unknown> = {}
+    const safeFields = ['title', 'description', 'reportType', 'status', 'investment', 'sales', 'roas', 'previousSales', 'growthPct', 'tasksCompleted', 'tasksPending', 'nextMonthPlan', 'sentToClient', 'sentAt', 'clientId', 'taskId', 'priority', 'tags', 'fileUrls']
+    for (const key of safeFields) {
+      if (body[key] !== undefined) allowed[key] = body[key]
+    }
+
     const { data, error } = await supabase
       .from('reports')
-      .update(body)
+      .update(allowed)
       .eq('id', id)
       .eq('workspace_id', workspaceId)
       .select()

@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const { data: existing } = await supabase
       .from('workspace_members')
       .select('user_id')
-      .eq('name', email)
+      .eq('email', email)
       .limit(1)
       .maybeSingle()
 
