@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { User, Camera, Globe, Bell, Save } from 'lucide-react'
+import { User, Camera, Globe, Bell, Save, Key, ExternalLink } from 'lucide-react'
+import Link from 'next/link'
 
 export default function AccountPage() {
   const [nombre, setNombre] = useState('')
@@ -199,6 +200,48 @@ export default function AccountPage() {
           </button>
         </div>
       </form>
+
+      {/* API Keys for Cowork */}
+      <div className="rounded-xl border border-slate-200 bg-white p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-violet-50 flex items-center justify-center">
+              <Key className="h-5 w-5 text-violet-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">API Keys para Cowork</h2>
+              <p className="text-xs text-slate-500">Conecta herramientas externas como Cowork Desktop</p>
+            </div>
+          </div>
+          <Link
+            href="/settings/api-keys"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors"
+          >
+            Gestionar API Keys
+            <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="rounded-lg bg-slate-50 border border-slate-100 p-4">
+          <p className="text-sm text-slate-600 mb-3">
+            Genera una API key para sincronizar tareas, clientes y proyectos con Cowork automaticamente.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+            <div className="bg-white rounded-lg border border-slate-200 p-3">
+              <p className="text-2xl font-bold text-slate-900">1</p>
+              <p className="text-xs text-slate-500 mt-0.5">Genera una key</p>
+            </div>
+            <div className="bg-white rounded-lg border border-slate-200 p-3">
+              <p className="text-2xl font-bold text-slate-900">2</p>
+              <p className="text-xs text-slate-500 mt-0.5">Pegala en Cowork</p>
+            </div>
+            <div className="bg-white rounded-lg border border-slate-200 p-3">
+              <p className="text-2xl font-bold text-slate-900">3</p>
+              <p className="text-xs text-slate-500 mt-0.5">Tareas sincronizadas</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

@@ -28,6 +28,7 @@ export default function LandingPage() {
             <a href="#features" className="hover:text-white transition-colors">Funciones</a>
             <a href="#pricing" className="hover:text-white transition-colors">Precios</a>
             <a href="#for-who" className="hover:text-white transition-colors">¿Para quién?</a>
+            <Link href="/documentation" className="hover:text-white transition-colors">Docs</Link>
           </div>
           <div className="flex items-center gap-3">
             <Link

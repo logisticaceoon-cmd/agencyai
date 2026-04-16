@@ -61,16 +61,6 @@ export async function GET() {
       }
     }
 
-    // Debug: also test if getAuthContext would work
-    let authContextDebug = 'not_tested'
-    try {
-      const { getAuthContext, isAuthError } = await import('@/lib/auth-supabase')
-      const ctx = await getAuthContext()
-      authContextDebug = isAuthError(ctx) ? `error_${(ctx as Response).status}` : 'ok'
-    } catch (e) {
-      authContextDebug = `exception: ${e instanceof Error ? e.message : String(e)}`
-    }
-
     return NextResponse.json({
       user: {
         id: user.id,
@@ -80,12 +70,6 @@ export async function GET() {
         role,
       },
       org,
-      _debug: {
-        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-        serviceKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0,
-        authContextResult: authContextDebug,
-        workspaceId: workspaceId || null,
-      },
     })
   } catch (err) {
     console.error('Error in GET /api/auth/me:', err)
