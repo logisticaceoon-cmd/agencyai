@@ -1,37 +1,145 @@
 'use client'
 
-import { useState } from 'react'
-import { Building2, Upload, Globe, DollarSign, Briefcase, AlertTriangle, Save, Trash2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Building2, Upload, Globe, DollarSign, Briefcase, AlertTriangle, Save, Trash2, Loader2, Check, X } from 'lucide-react'
 import { useProfessionalType } from '@/hooks/useProfessionalType'
+import { useWorkspace } from '@/hooks/useWorkspace'
 import { PROFESSIONAL_TYPES } from '@/lib/professional-types'
 
 export default function WorkspacePage() {
+  const { workspace, loading: wsLoading, setWorkspace } = useWorkspace()
   const [nombre, setNombre] = useState('')
   const [sitioWeb, setSitioWeb] = useState('')
   const [moneda, setMoneda] = useState('ARS')
   const [timezone, setTimezone] = useState('America/Argentina/Buenos_Aires')
   const [tipoAgencia, setTipoAgencia] = useState('')
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const { config: proConfig, refresh: refreshPro } = useProfessionalType()
   const [showTypeModal, setShowTypeModal] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
-  function handleSave(e: React.FormEvent) {
+  // Load workspace data into form
+  useEffect(() => {
+    if (!workspace) return
+    setNombre(workspace.name || '')
+    setSitioWeb(workspace.website || '')
+    setMoneda(workspace.currency || 'ARS')
+    setTimezone(workspace.timezone || 'America/Argentina/Buenos_Aires')
+    setTipoAgencia(workspace.agency_type || '')
+    setLogoUrl(workspace.logo_url || null)
+  }, [workspace])
+
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
+    if (!workspace) return
     setSaving(true)
-    setTimeout(() => setSaving(false), 1000)
+    setSaveMsg(null)
+    try {
+      const res = await fetch(`/api/organizations/${workspace.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: nombre.trim(),
+          website: sitioWeb.trim(),
+          currency: moneda,
+          timezone,
+          agency_type: tipoAgencia,
+        }),
+      })
+      if (res.ok) {
+        const j = await res.json()
+        if (j.data) setWorkspace(j.data)
+        setSaveMsg({ type: 'ok', text: 'Cambios guardados correctamente' })
+      } else {
+        const err = await res.json()
+        setSaveMsg({ type: 'err', text: err.error || 'Error al guardar' })
+      }
+    } catch {
+      setSaveMsg({ type: 'err', text: 'Error de conexion' })
+    }
+    setSaving(false)
+    setTimeout(() => setSaveMsg(null), 4000)
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !workspace) return
+
+    if (file.size > 2 * 1024 * 1024) {
+      setSaveMsg({ type: 'err', text: 'El archivo es muy grande (max 2MB)' })
+      setTimeout(() => setSaveMsg(null), 4000)
+      return
+    }
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData })
+      if (!uploadRes.ok) {
+        setSaveMsg({ type: 'err', text: 'Error al subir el logo' })
+        setUploading(false)
+        return
+      }
+      const { url } = await uploadRes.json()
+
+      // Update workspace with logo URL
+      const patchRes = await fetch(`/api/organizations/${workspace.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ logo_url: url }),
+      })
+      if (patchRes.ok) {
+        const j = await patchRes.json()
+        if (j.data) setWorkspace(j.data)
+        setLogoUrl(url)
+        setSaveMsg({ type: 'ok', text: 'Logo actualizado' })
+      } else {
+        setSaveMsg({ type: 'err', text: 'Error al guardar el logo' })
+      }
+    } catch {
+      setSaveMsg({ type: 'err', text: 'Error al subir el logo' })
+    }
+    setUploading(false)
+    setTimeout(() => setSaveMsg(null), 4000)
+  }
+
+  if (wsLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Configuración del Workspace</h1>
-        <p className="text-sm text-slate-500 mt-1">Administrá la información de tu agencia u organización</p>
+        <h1 className="text-2xl font-bold text-slate-900">Configuracion del Workspace</h1>
+        <p className="text-sm text-slate-500 mt-1">Administra la informacion de tu agencia u organizacion</p>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 mb-6">
+      {/* Save feedback */}
+      {saveMsg && (
+        <div className={`rounded-lg px-4 py-3 text-sm flex items-center gap-2 ${
+          saveMsg.type === 'ok'
+            ? 'bg-green-50 text-green-700 border border-green-200'
+            : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
+          {saveMsg.type === 'ok' ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+          {saveMsg.text}
+        </div>
+      )}
+
+      {/* Professional type card */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="h-12 w-12 rounded-xl flex items-center justify-center text-2xl" style={{ backgroundColor: proConfig.color + '15' }}>
@@ -40,7 +148,7 @@ export default function WorkspacePage() {
             <div>
               <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">Tipo de negocio</p>
               <h3 className="text-base font-bold text-slate-900 mt-0.5">{proConfig.name}</h3>
-              <p className="text-xs text-slate-500 mt-1">Personaliza la terminología, vocabulario del agente IA y categorías sugeridas.</p>
+              <p className="text-xs text-slate-500 mt-1">Personaliza la terminologia, vocabulario del agente IA y categorias sugeridas.</p>
             </div>
           </div>
           <button onClick={() => setShowTypeModal(true)} className="px-3 py-1.5 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 whitespace-nowrap">
@@ -54,7 +162,7 @@ export default function WorkspacePage() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-slate-900 mb-1">Cambiar tipo de negocio</h3>
             <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 mb-4">
-              <p className="text-xs text-amber-800">Cambiar el tipo actualizará las categorías sugeridas y el vocabulario. Tus datos existentes no se modificarán.</p>
+              <p className="text-xs text-amber-800">Cambiar el tipo actualizara las categorias sugeridas y el vocabulario. Tus datos existentes no se modificaran.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {PROFESSIONAL_TYPES.map((pt) => {
@@ -97,7 +205,7 @@ export default function WorkspacePage() {
             <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center">
               <Building2 className="h-5 w-5 text-blue-600" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-900">Información general</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Informacion general</h2>
           </div>
 
           <div className="space-y-5">
@@ -105,17 +213,35 @@ export default function WorkspacePage() {
             <div>
               <label className="block text-sm font-medium text-slate-500 mb-2">Logo de la agencia</label>
               <div className="flex items-center gap-4">
-                <div className="h-20 w-20 rounded-xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
-                  <Upload className="h-6 w-6 text-slate-400" />
+                <div
+                  onClick={() => !uploading && fileRef.current?.click()}
+                  className="h-20 w-20 rounded-xl bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors overflow-hidden"
+                >
+                  {uploading ? (
+                    <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
+                  ) : logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="h-full w-full object-cover rounded-xl" />
+                  ) : (
+                    <Upload className="h-6 w-6 text-slate-400" />
+                  )}
                 </div>
                 <div>
                   <button
                     type="button"
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors disabled:opacity-50"
                   >
-                    Subir logo
+                    {uploading ? 'Subiendo...' : logoUrl ? 'Cambiar logo' : 'Subir logo'}
                   </button>
-                  <p className="text-xs text-slate-400 mt-1">PNG, SVG. Recomendado 256x256px.</p>
+                  <p className="text-xs text-slate-400 mt-1">PNG, SVG, JPG. Max 2MB.</p>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
                 </div>
               </div>
             </div>
@@ -157,7 +283,7 @@ export default function WorkspacePage() {
             <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center">
               <Globe className="h-5 w-5 text-blue-600" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-900">Configuración regional</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Configuracion regional</h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -175,9 +301,12 @@ export default function WorkspacePage() {
                 className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
               >
                 <option value="ARS">ARS - Peso Argentino</option>
-                <option value="USD">USD - Dólar Estadounidense</option>
+                <option value="USD">USD - Dolar Estadounidense</option>
                 <option value="EUR">EUR - Euro</option>
-                <option value="BRL">BRL - Real Brasileño</option>
+                <option value="BRL">BRL - Real Brasileno</option>
+                <option value="CLP">CLP - Peso Chileno</option>
+                <option value="COP">COP - Peso Colombiano</option>
+                <option value="MXN">MXN - Peso Mexicano</option>
               </select>
             </div>
 
@@ -190,12 +319,12 @@ export default function WorkspacePage() {
                 className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
               >
                 <option value="America/Argentina/Buenos_Aires">Buenos Aires (GMT-3)</option>
-                <option value="America/Sao_Paulo">São Paulo (GMT-3)</option>
+                <option value="America/Sao_Paulo">Sao Paulo (GMT-3)</option>
                 <option value="America/Santiago">Santiago (GMT-4)</option>
-                <option value="America/Bogota">Bogotá (GMT-5)</option>
-                <option value="America/Mexico_City">Ciudad de México (GMT-6)</option>
+                <option value="America/Bogota">Bogota (GMT-5)</option>
+                <option value="America/Mexico_City">Ciudad de Mexico (GMT-6)</option>
                 <option value="America/New_York">Nueva York (GMT-5)</option>
-                <option value="America/Los_Angeles">Los Ángeles (GMT-8)</option>
+                <option value="America/Los_Angeles">Los Angeles (GMT-8)</option>
                 <option value="Europe/Madrid">Madrid (GMT+1)</option>
               </select>
             </div>
@@ -215,12 +344,12 @@ export default function WorkspacePage() {
               >
                 <option value="">Seleccionar tipo...</option>
                 <option value="marketing_digital">Marketing Digital</option>
-                <option value="diseno_creatividad">Diseño y Creatividad</option>
+                <option value="diseno_creatividad">Diseno y Creatividad</option>
                 <option value="desarrollo_web">Desarrollo Web/App</option>
-                <option value="relaciones_publicas">Relaciones Públicas</option>
-                <option value="consultoria">Consultoría</option>
+                <option value="relaciones_publicas">Relaciones Publicas</option>
+                <option value="consultoria">Consultoria</option>
                 <option value="social_media">Social Media</option>
-                <option value="produccion">Producción Audiovisual</option>
+                <option value="produccion">Produccion Audiovisual</option>
                 <option value="otra">Otra</option>
               </select>
             </div>
@@ -234,7 +363,7 @@ export default function WorkspacePage() {
             disabled={saving}
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            <Save className="h-4 w-4" />
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
@@ -256,7 +385,7 @@ export default function WorkspacePage() {
           <div>
             <p className="text-sm font-medium text-slate-900">Eliminar workspace</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              Se eliminarán todos los datos, clientes, proyectos y tareas. Esta acción no se puede deshacer.
+              Se eliminaran todos los datos, clientes, proyectos y tareas. Esta accion no se puede deshacer.
             </p>
           </div>
           <button
@@ -279,18 +408,18 @@ export default function WorkspacePage() {
                 <AlertTriangle className="h-5 w-5 text-red-500" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">¿Eliminar workspace?</h3>
-                <p className="text-sm text-slate-500">Esta acción es permanente</p>
+                <h3 className="text-lg font-semibold text-slate-900">Eliminar workspace?</h3>
+                <p className="text-sm text-slate-500">Esta accion es permanente</p>
               </div>
             </div>
 
             <p className="text-sm text-slate-600 mb-4">
-              Todos los datos de tu workspace serán eliminados de forma permanente, incluyendo clientes, proyectos, tareas y archivos.
+              Todos los datos de tu workspace seran eliminados de forma permanente, incluyendo clientes, proyectos, tareas y archivos.
             </p>
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-slate-500 mb-1.5">
-                Escribí <span className="font-bold text-red-600">ELIMINAR</span> para confirmar
+                Escribe <span className="font-bold text-red-600">ELIMINAR</span> para confirmar
               </label>
               <input
                 type="text"
@@ -304,10 +433,7 @@ export default function WorkspacePage() {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  setShowDeleteDialog(false)
-                  setDeleteConfirm('')
-                }}
+                onClick={() => { setShowDeleteDialog(false); setDeleteConfirm('') }}
                 className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Cancelar

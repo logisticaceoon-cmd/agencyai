@@ -42,6 +42,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.name !== undefined) updateData.name = body.name
     if (body.currency !== undefined) updateData.currency = body.currency
     if (body.website !== undefined) updateData.website = body.website
+    if (body.timezone !== undefined) updateData.timezone = body.timezone
+    if (body.agency_type !== undefined) updateData.agency_type = body.agency_type
+    if (body.logo_url !== undefined) updateData.logo_url = body.logo_url
 
     const { data, error } = await supabase
       .from('workspaces')

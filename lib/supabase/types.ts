@@ -3,6 +3,7 @@ export interface Workspace {
   name: string
   slug: string | null
   logo_url: string | null
+  website: string | null
   currency: string
   timezone: string
   agency_type: string
@@ -10,6 +11,9 @@ export interface Workspace {
   owner_id: string
   stripe_customer_id: string | null
   plan_expires_at: string | null
+  professional_type_id: string | null
+  professional_type_custom: string | null
+  onboarding_completed: boolean
   created_at: string
   updated_at: string
 }
