@@ -49,7 +49,15 @@ export async function getAuthContext(): Promise<AuthContext | NextResponse> {
 
     if (ownerErr) {
       console.error('getAuthContext owner query error:', ownerErr.message)
-      // Fallback: try with admin client
+    }
+
+    if (ownedWs) {
+      workspaceId = ownedWs.id
+      role = 'owner'
+    }
+
+    // Fallback: if anon didn't find it (RLS or session issue), try admin
+    if (!workspaceId) {
       const { data: ownedWsAdmin } = await adminClient
         .from('workspaces')
         .select('id')
@@ -59,9 +67,6 @@ export async function getAuthContext(): Promise<AuthContext | NextResponse> {
         workspaceId = ownedWsAdmin.id
         role = 'owner'
       }
-    } else if (ownedWs) {
-      workspaceId = ownedWs.id
-      role = 'owner'
     }
 
     // Step 2: If not owner, check workspace_members
@@ -76,7 +81,16 @@ export async function getAuthContext(): Promise<AuthContext | NextResponse> {
 
       if (memberErr) {
         console.error('getAuthContext members query error:', memberErr.message)
-        // Fallback: try with admin client
+      }
+
+      if (member) {
+        workspaceId = member.workspace_id
+        role = member.role || 'member'
+        fullName = member.name || fullName
+      }
+
+      // Fallback: try admin if anon didn't find membership
+      if (!workspaceId) {
         const { data: memberAdmin } = await adminClient
           .from('workspace_members')
           .select('workspace_id, role, name')
@@ -89,10 +103,6 @@ export async function getAuthContext(): Promise<AuthContext | NextResponse> {
           role = memberAdmin.role || 'member'
           fullName = memberAdmin.name || fullName
         }
-      } else if (member) {
-        workspaceId = member.workspace_id
-        role = member.role || 'member'
-        fullName = member.name || fullName
       }
     }
 
