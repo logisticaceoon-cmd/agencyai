@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useInView } from 'react-intersection-observer'
 import { ArrowRight, Zap, Rocket } from 'lucide-react'
-import { fadeInUp, scaleIn, pulseGlow } from '@/lib/animations'
+import { fadeInUp, scaleIn } from '@/lib/animations'
 
 export default function CTASection() {
   const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.2 })
@@ -12,8 +12,12 @@ export default function CTASection() {
   return (
     <section className="py-24 px-4 relative overflow-hidden">
       <div className="absolute inset-0 -z-10">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-indigo-600/8 rounded-full blur-[150px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-purple-600/6 rounded-full blur-[100px]" />
+        <motion.div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[500px] rounded-full blur-[180px]"
+          style={{ background: 'radial-gradient(ellipse, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.06) 40%, transparent 70%)' }}
+          animate={{ scale: [1, 1.15, 1], opacity: [0.7, 1, 0.7] }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' as const }}
+        />
       </div>
 
       <div className="mx-auto max-w-3xl text-center" ref={ref}>
@@ -23,9 +27,13 @@ export default function CTASection() {
           animate={inView ? 'visible' : 'hidden'}
           className="mb-8"
         >
-          <div className="inline-flex items-center justify-center h-20 w-20 rounded-3xl bg-gradient-to-br from-indigo-600 to-purple-600 shadow-2xl shadow-indigo-600/30 mx-auto">
+          <motion.div
+            className="inline-flex items-center justify-center h-20 w-20 rounded-3xl bg-gradient-to-br from-indigo-600 to-purple-600 mx-auto"
+            animate={{ boxShadow: ['0 0 30px rgba(99,102,241,0.3)', '0 0 60px rgba(99,102,241,0.5)', '0 0 30px rgba(99,102,241,0.3)'] }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' as const }}
+          >
             <Rocket className="h-10 w-10 text-white" />
-          </div>
+          </motion.div>
         </motion.div>
 
         <motion.h2
@@ -35,7 +43,7 @@ export default function CTASection() {
           className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-6"
         >
           ¿Listo para{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 drop-shadow-[0_0_25px_rgba(139,92,246,0.3)]">
             transformar
           </span>
           {' '}tu agencia?
@@ -57,16 +65,14 @@ export default function CTASection() {
           animate={inView ? 'visible' : 'hidden'}
           className="flex flex-col sm:flex-row items-center justify-center gap-4"
         >
-          <motion.div {...pulseGlow} className="rounded-2xl">
-            <Link
-              href="/register"
-              className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-10 py-5 text-lg font-bold text-white hover:from-indigo-500 hover:to-purple-500 transition-all shadow-2xl shadow-indigo-600/30 hover:shadow-indigo-500/40 hover:scale-105"
-            >
-              <Zap className="h-5 w-5" />
-              Empezar Gratis Ahora
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-          </motion.div>
+          <Link
+            href="/register"
+            className="landing-btn-glow landing-shimmer flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-10 py-5 text-lg font-bold text-white hover:from-indigo-500 hover:to-purple-500 transition-all hover:scale-105"
+          >
+            <Zap className="h-5 w-5" />
+            Empezar Gratis Ahora
+            <ArrowRight className="h-5 w-5" />
+          </Link>
         </motion.div>
 
         <motion.div

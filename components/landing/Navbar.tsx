@@ -30,17 +30,21 @@ export default function Navbar() {
       transition={{ duration: 0.5, ease: 'easeOut' }}
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? 'bg-[#0a0a0a]/95 backdrop-blur-xl border-b border-zinc-800 shadow-lg shadow-black/20'
+          ? 'bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-zinc-800/50 shadow-[0_4px_30px_rgba(0,0,0,0.3)]'
           : 'bg-transparent'
       }`}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 lg:h-18 items-center justify-between">
-          {/* Logo */}
+          {/* Logo with glow */}
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:shadow-indigo-500/40 transition-shadow">
+            <motion.div
+              className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center"
+              whileHover={{ scale: 1.1, rotate: -5 }}
+              style={{ boxShadow: '0 0 20px rgba(99,102,241,0.3)' }}
+            >
               <Zap className="h-5 w-5 text-white" />
-            </div>
+            </motion.div>
             <span className="text-xl font-bold text-white">AgencyAI</span>
           </Link>
 
@@ -53,7 +57,7 @@ export default function Navbar() {
                 className="text-sm text-zinc-400 hover:text-white transition-colors relative group"
               >
                 {link.label}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300" />
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 group-hover:w-full transition-all duration-300 shadow-[0_0_6px_rgba(99,102,241,0.4)]" />
               </a>
             ))}
           </div>
@@ -68,7 +72,7 @@ export default function Navbar() {
             </Link>
             <Link
               href="/register"
-              className="text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/25 hover:shadow-indigo-500/40 hover:scale-105"
+              className="landing-shimmer text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 px-5 py-2.5 rounded-xl transition-all shadow-[0_0_20px_rgba(99,102,241,0.25)] hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-105"
             >
               Empezar gratis
             </Link>
@@ -112,7 +116,7 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/register"
-                className="text-center text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 py-2.5 rounded-xl"
+                className="text-center text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-600 py-2.5 rounded-xl shadow-[0_0_15px_rgba(99,102,241,0.2)]"
               >
                 Empezar gratis
               </Link>

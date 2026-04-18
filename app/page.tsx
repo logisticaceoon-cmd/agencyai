@@ -9,6 +9,7 @@ import PricingSection from '@/components/landing/PricingSection'
 import TestimonialsSection from '@/components/landing/TestimonialsSection'
 import CTASection from '@/components/landing/CTASection'
 import Footer from '@/components/landing/Footer'
+import AnimatedBackground from '@/components/landing/AnimatedBackground'
 
 export const metadata: Metadata = {
   title: 'AgencyAI — El sistema operativo para agencias de marketing digital',
@@ -32,6 +33,7 @@ export const metadata: Metadata = {
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <AnimatedBackground />
       <Navbar />
       <HeroSection />
       <PainPointsSection />

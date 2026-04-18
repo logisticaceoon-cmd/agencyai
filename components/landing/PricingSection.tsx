@@ -12,11 +12,12 @@ export default function PricingSection() {
 
   return (
     <section id="pricing" className="py-24 px-4 relative">
-      {/* Background */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/20 to-transparent" />
         <div className="absolute inset-0 bg-zinc-900/30" />
+        {/* Subtle glow behind pricing */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-indigo-600/5 rounded-full blur-[120px]" />
       </div>
 
       <div className="mx-auto max-w-7xl" ref={ref}>
@@ -26,7 +27,7 @@ export default function PricingSection() {
           animate={inView ? 'visible' : 'hidden'}
           className="text-center mb-16"
         >
-          <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-4 py-1.5 text-sm text-indigo-400 mb-6">
+          <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-4 py-1.5 text-sm text-indigo-400 mb-6 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
             <Zap className="h-4 w-4" />
             Precios transparentes
           </div>
@@ -51,16 +52,17 @@ export default function PricingSection() {
             <motion.div
               key={plan.id}
               variants={staggerItem}
-              whileHover={{ y: -8, scale: 1.02 }}
+              whileHover={{ y: -10, scale: 1.03 }}
               transition={{ type: 'spring', stiffness: 300 }}
               className={`relative rounded-2xl border p-6 text-left transition-all backdrop-blur-sm ${
                 plan.highlighted
-                  ? 'border-indigo-500/50 bg-gradient-to-b from-indigo-600/10 to-purple-600/5 shadow-xl shadow-indigo-600/10'
-                  : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'
+                  ? 'landing-card-glow-intense border-indigo-500/50 bg-gradient-to-b from-indigo-600/10 to-purple-600/5'
+                  : 'landing-card-glow border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'
               }`}
+              style={{ '--glow-color': plan.highlighted ? 'rgba(99,102,241,0.25)' : 'rgba(99,102,241,0.1)' } as React.CSSProperties}
             >
               {plan.highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-1 text-xs font-bold text-white shadow-lg">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-1 text-xs font-bold text-white shadow-[0_0_20px_rgba(99,102,241,0.4)]">
                   Más popular
                 </div>
               )}
@@ -71,7 +73,7 @@ export default function PricingSection() {
               </div>
 
               <div className="mb-6">
-                <span className="text-4xl font-extrabold text-white">
+                <span className={`text-4xl font-extrabold ${plan.highlighted ? 'text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-300' : 'text-white'}`}>
                   {plan.price === 0 ? '$0' : `$${plan.price}`}
                 </span>
                 {plan.price > 0 && <span className="text-sm text-zinc-500 ml-1">/mes</span>}
@@ -80,7 +82,7 @@ export default function PricingSection() {
               <ul className="space-y-2 mb-6">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm text-zinc-400">
-                    <Check className={`h-4 w-4 flex-shrink-0 mt-0.5 ${plan.highlighted ? 'text-indigo-400' : 'text-green-400'}`} />
+                    <Check className={`h-4 w-4 flex-shrink-0 mt-0.5 ${plan.highlighted ? 'text-indigo-400 drop-shadow-[0_0_4px_rgba(99,102,241,0.5)]' : 'text-green-400'}`} />
                     {f}
                   </li>
                 ))}
@@ -88,10 +90,10 @@ export default function PricingSection() {
 
               <Link
                 href="/register"
-                className={`block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all ${
+                className={`landing-shimmer block w-full rounded-xl py-3 text-center text-sm font-semibold transition-all ${
                   plan.highlighted
-                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-600/20'
-                    : 'border border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-600'
+                    ? 'landing-btn-glow bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500'
+                    : 'border border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-600 hover:shadow-[0_0_15px_rgba(99,102,241,0.1)]'
                 }`}
               >
                 {plan.price === 0 ? 'Empezar gratis' : 'Comenzar'}
