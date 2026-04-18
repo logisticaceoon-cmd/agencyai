@@ -124,6 +124,8 @@ function thStyle(align: 'left' | 'center' | 'right'): React.CSSProperties {
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   }
 }
 
@@ -168,6 +170,9 @@ export default function FinancesPage() {
   const [deletingClient, setDeletingClient] = useState<FinanceClient | null>(null)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [showPayrollForm, setShowPayrollForm] = useState(false)
+  const [editingPayroll, setEditingPayroll] = useState<PayrollEntry | null>(null)
+  const [deletingPayroll, setDeletingPayroll] = useState<PayrollEntry | null>(null)
+  const [payrollMenuOpen, setPayrollMenuOpen] = useState<string | null>(null)
   const [showExpenseForm, setShowExpenseForm] = useState(false)
 
   const currentPeriod = `${year}-${String(month).padStart(2, '0')}`
@@ -436,6 +441,36 @@ export default function FinancesPage() {
     setShowPayrollForm(false); fetchData()
   }
 
+  async function handleUpdatePayroll(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!editingPayroll) return
+    const fd = new FormData(e.currentTarget)
+    await fetch('/api/finances/payroll', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: editingPayroll.id,
+        employee_name: fd.get('employee_name'),
+        role: fd.get('role') || null,
+        base_salary: parseFloat(fd.get('base_salary') as string) || 0,
+        bonus: parseFloat(fd.get('bonus') as string) || 0,
+        deductions: parseFloat(fd.get('deductions') as string) || 0,
+        pay_date: fd.get('pay_date') || null,
+        status: fd.get('status') || 'pending',
+      }),
+    })
+    setEditingPayroll(null); fetchData()
+  }
+
+  async function handleDeletePayroll(entry: PayrollEntry, fromCurrentForward: boolean) {
+    if (fromCurrentForward) {
+      await fetch(`/api/finances/payroll?employee_name=${encodeURIComponent(entry.employee_name)}&from_period=${currentPeriod}`, { method: 'DELETE' })
+    } else {
+      await fetch(`/api/finances/payroll?id=${entry.id}`, { method: 'DELETE' })
+    }
+    setDeletingPayroll(null); fetchData()
+  }
+
   async function handleCreateExpense(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
@@ -652,17 +687,18 @@ export default function FinancesPage() {
                         {catClients.length === 0 ? (
                           <p className="text-center text-sm text-slate-400 py-6">No hay clientes en esta categoria</p>
                         ) : (
-                          <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse', minWidth: '1200px' }}>
+                          <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse', minWidth: '1350px' }}>
                             <colgroup>
                               <col style={{ width: '40px' }} />
-                              <col style={{ width: '170px' }} />
-                              <col style={{ width: '120px' }} />
+                              <col style={{ width: '160px' }} />
+                              <col style={{ width: '130px' }} />
                               <col style={{ width: '90px' }} />
                               <col style={{ width: '70px' }} />
                               <col style={{ width: '100px' }} />
-                              <col style={{ width: '100px' }} />
-                              <col style={{ width: '100px' }} />
                               <col style={{ width: '120px' }} />
+                              <col style={{ width: '100px' }} />
+                              <col style={{ width: '90px' }} />
+                              <col style={{ width: '110px' }} />
                               <col />
                               <col style={{ width: '190px' }} />
                             </colgroup>
@@ -670,10 +706,11 @@ export default function FinancesPage() {
                               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                                 <th style={thStyle('center')}>Nº</th>
                                 <th style={thStyle('left')}>Clientes</th>
-                                <th style={thStyle('right')}>Costo de contrato</th>
+                                <th style={thStyle('right')}>Costo contrato</th>
                                 <th style={thStyle('center')}>Comision %</th>
                                 <th style={thStyle('center')}>Cuentas</th>
                                 <th style={thStyle('center')}>Fecha inicio</th>
+                                <th style={thStyle('right')}>Comisión mes</th>
                                 <th style={thStyle('right')}>Total</th>
                                 <th style={thStyle('right')}>Cancelado</th>
                                 <th style={thStyle('center')}>Asignado a</th>
@@ -709,6 +746,27 @@ export default function FinancesPage() {
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>
                                       {c.start_date ? new Date(c.start_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
+                                    </td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'right' }}>
+                                      {(() => {
+                                        const rec = getMonthlyRecord(c.id)
+                                        if (!rec) return <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span>
+                                        const amt = Number(rec.commission_amount)
+                                        const isPaid = rec.status === 'paid'
+                                        return (
+                                          <span style={{
+                                            background: isPaid ? '#dcfce7' : '#fef9c3',
+                                            color: isPaid ? '#16a34a' : '#854d0e',
+                                            padding: '3px 8px',
+                                            borderRadius: '6px',
+                                            fontSize: '12px',
+                                            fontWeight: 700,
+                                            fontFamily: 'monospace',
+                                          }}>
+                                            {sym}{amt.toLocaleString()}
+                                          </span>
+                                        )
+                                      })()}
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{Number(c.contract_cost).toLocaleString()}</td>
                                     <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>
@@ -788,6 +846,7 @@ export default function FinancesPage() {
                                 <td style={{ padding: '12px 8px' }}></td>
                                 <td style={{ padding: '12px 8px' }}></td>
                                 <td style={{ padding: '12px 8px' }}></td>
+                                <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#86efac', fontWeight: 700 }}>${catCommissions.toLocaleString()}</td>
                                 <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#86efac', fontWeight: 700 }}>${catTotal.toLocaleString()}</td>
                                 <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#fca5a5', fontWeight: 700 }}>${catCancelled.toLocaleString()}</td>
                                 <td style={{ padding: '12px 8px' }}></td>
@@ -874,12 +933,13 @@ export default function FinancesPage() {
                 <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase">Deducciones</th>
                 <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase">Neto</th>
                 <th className="text-center px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase">Estado</th>
+                <th className="text-center px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase w-16">Acciones</th>
               </tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
-                  <tr><td colSpan={7}><LoadingSkeleton /></td></tr>
+                  <tr><td colSpan={8}><LoadingSkeleton /></td></tr>
                 ) : payroll.length === 0 ? (
-                  <tr><td colSpan={7} className="px-5 py-8 text-center text-sm text-slate-400">No hay nominas para este periodo</td></tr>
+                  <tr><td colSpan={8} className="px-5 py-8 text-center text-sm text-slate-400">No hay nominas para este periodo</td></tr>
                 ) : (<>
                   {payroll.map(p => (
                     <tr key={p.id} className="hover:bg-slate-50">
@@ -890,6 +950,23 @@ export default function FinancesPage() {
                       <td className="px-5 py-3 text-right text-sm text-red-600">{Number(p.deductions) > 0 ? `-$${Number(p.deductions).toLocaleString()}` : '-'}</td>
                       <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">${Number(p.net_salary).toLocaleString()}</td>
                       <td className="px-5 py-3 text-center"><PayrollStatusBadge status={p.status} /></td>
+                      <td className="px-5 py-3 text-center">
+                        <div className="relative">
+                          <button onClick={() => setPayrollMenuOpen(payrollMenuOpen === p.id ? null : p.id)} className="p-1 rounded hover:bg-slate-100">
+                            <MoreVertical className="h-4 w-4 text-slate-400" />
+                          </button>
+                          {payrollMenuOpen === p.id && (
+                            <div className="absolute right-0 top-8 z-20 bg-white border border-slate-200 rounded-lg shadow-lg py-1 w-44">
+                              <button onClick={() => { setEditingPayroll(p); setPayrollMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                                <Pencil className="h-3.5 w-3.5" /> Editar
+                              </button>
+                              <button onClick={() => { setDeletingPayroll(p); setPayrollMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50">
+                                <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   <tr className="bg-[#0f172a] text-white">
@@ -899,12 +976,102 @@ export default function FinancesPage() {
                     <td className="px-5 py-3 text-right text-sm font-bold">${payroll.reduce((s, p) => s + Number(p.bonus), 0).toLocaleString()}</td>
                     <td className="px-5 py-3 text-right text-sm font-bold">${payroll.reduce((s, p) => s + Number(p.deductions), 0).toLocaleString()}</td>
                     <td className="px-5 py-3 text-right text-sm font-bold">${totalPayroll.toLocaleString()}</td>
-                    <td className="px-5 py-3"></td>
+                    <td className="px-5 py-3" colSpan={2}></td>
                   </tr>
                 </>)}
               </tbody>
             </table>
           </div>
+
+          {/* Modal editar nomina */}
+          {editingPayroll && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditingPayroll(null)}>
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Editar nomina</h3>
+                <form onSubmit={handleUpdatePayroll} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block font-medium">Empleado *</label>
+                      <input name="employee_name" defaultValue={editingPayroll.employee_name} required className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block font-medium">Cargo</label>
+                      <input name="role" defaultValue={editingPayroll.role || ''} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block font-medium">Salario base *</label>
+                      <input name="base_salary" type="number" step="0.01" defaultValue={editingPayroll.base_salary} required className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block font-medium">Bonus</label>
+                      <input name="bonus" type="number" step="0.01" defaultValue={editingPayroll.bonus} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block font-medium">Deducciones</label>
+                      <input name="deductions" type="number" step="0.01" defaultValue={editingPayroll.deductions} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block font-medium">Fecha pago</label>
+                      <input name="pay_date" type="date" defaultValue={editingPayroll.pay_date || ''} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block font-medium">Estado</label>
+                      <select name="status" defaultValue={editingPayroll.status} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm">
+                        <option value="pending">Pendiente</option>
+                        <option value="paid">Pagado</option>
+                        <option value="cancelled">Cancelado</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 justify-end pt-2">
+                    <button type="button" onClick={() => setEditingPayroll(null)} className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancelar</button>
+                    <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Guardar cambios</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal eliminar nomina */}
+          {deletingPayroll && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeletingPayroll(null)}>
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                    <Trash2 className="h-5 w-5 text-red-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Eliminar nomina</h3>
+                    <p className="text-sm text-slate-500">{deletingPayroll.employee_name} - {deletingPayroll.role || 'Sin cargo'}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-600 mb-4">Elegi como queres eliminar esta nomina:</p>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handleDeletePayroll(deletingPayroll, false)}
+                    className="w-full text-left rounded-lg border border-slate-200 p-4 hover:bg-slate-50 transition-colors"
+                  >
+                    <p className="text-sm font-medium text-slate-900">Solo este mes ({MONTHS[month - 1]} {year})</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Elimina solo el registro de este periodo. Los meses anteriores y futuros no se afectan.</p>
+                  </button>
+                  <button
+                    onClick={() => handleDeletePayroll(deletingPayroll, true)}
+                    className="w-full text-left rounded-lg border border-red-200 p-4 hover:bg-red-50 transition-colors"
+                  >
+                    <p className="text-sm font-medium text-red-700">Este mes y todos los futuros</p>
+                    <p className="text-xs text-red-500 mt-0.5">Elimina de {MONTHS[month - 1]} {year} en adelante. Los meses anteriores se conservan para el registro historico.</p>
+                  </button>
+                </div>
+                <div className="flex justify-end mt-4">
+                  <button onClick={() => setDeletingPayroll(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                </div>
+              </div>
+            </div>
+          )}
         </Tabs.Content>
 
         {/* ═══ TAB GASTOS ═══ */}
