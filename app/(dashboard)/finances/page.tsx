@@ -669,7 +669,7 @@ export default function FinancesPage() {
                       </div>
                       <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
                         <div className="text-right">
-                          <p className="text-sm font-bold text-green-600">${catTotal.toLocaleString()}</p>
+                          <p className="text-sm font-bold text-green-600">${(catTotal + catCommissions).toLocaleString()}</p>
                           <p className="text-[10px] text-slate-400">total mensual</p>
                         </div>
                         <button onClick={() => { setShowClientModal({ categoryId: cat.id }); setEditingClient(null) }} className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50">
@@ -768,7 +768,13 @@ export default function FinancesPage() {
                                         )
                                       })()}
                                     </td>
-                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{Number(c.contract_cost).toLocaleString()}</td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>
+                                      {(() => {
+                                        const rec = getMonthlyRecord(c.id)
+                                        const rowTotal = Number(c.contract_cost) + (rec ? Number(rec.commission_amount) : 0)
+                                        return <>{sym}{rowTotal.toLocaleString()}</>
+                                      })()}
+                                    </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>
                                       {Number(c.cancelled_amount) > 0
                                         ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span>
@@ -847,7 +853,7 @@ export default function FinancesPage() {
                                 <td style={{ padding: '12px 8px' }}></td>
                                 <td style={{ padding: '12px 8px' }}></td>
                                 <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#86efac', fontWeight: 700 }}>${catCommissions.toLocaleString()}</td>
-                                <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#86efac', fontWeight: 700 }}>${catTotal.toLocaleString()}</td>
+                                <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#86efac', fontWeight: 700 }}>${(catTotal + catCommissions).toLocaleString()}</td>
                                 <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#fca5a5', fontWeight: 700 }}>${catCancelled.toLocaleString()}</td>
                                 <td style={{ padding: '12px 8px' }}></td>
                                 <td style={{ padding: '12px 8px' }}></td>
@@ -877,7 +883,7 @@ export default function FinancesPage() {
             <div className="rounded-xl p-5" style={{ backgroundColor: '#1e3a5f' }}>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Total contratos</p>
+                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Total fees</p>
                   <p className="text-xl font-bold mt-1">${totalContractCost.toLocaleString()}</p>
                 </div>
                 <div>
@@ -885,12 +891,12 @@ export default function FinancesPage() {
                   <p className="text-xl font-bold mt-1">${totalCommissions.toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Total cancelado</p>
-                  <p className="text-xl font-bold mt-1">${totalCancelled.toLocaleString()}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Total general</p>
+                  <p className="text-xl font-bold mt-1 text-green-300">${(totalContractCost + totalCommissions).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Ganancia neta</p>
-                  <p className="text-xl font-bold mt-1 text-green-300">${(totalBilled - totalCancelled).toLocaleString()}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Neto (- cancelados)</p>
+                  <p className="text-xl font-bold mt-1 text-green-300">${(totalContractCost + totalCommissions - totalCancelled).toLocaleString()}</p>
                 </div>
               </div>
             </div>
