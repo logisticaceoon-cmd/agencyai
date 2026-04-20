@@ -65,13 +65,15 @@ export async function GET(request: Request) {
   const results = []
 
   for (const sql of migrations) {
-    const { error } = await supabaseAdmin.rpc('exec_sql', { sql }).catch(() => ({ error: { message: 'rpc not available' } }))
-
-    if (error) {
-      // Try direct table check via REST
-      results.push({ sql: sql.slice(0, 50) + '...', status: 'skipped', note: error.message })
-    } else {
-      results.push({ sql: sql.slice(0, 50) + '...', status: 'ok' })
+    try {
+      const { error } = await supabaseAdmin.rpc('exec_sql', { sql })
+      if (error) {
+        results.push({ sql: sql.slice(0, 50) + '...', status: 'skipped', note: error.message })
+      } else {
+        results.push({ sql: sql.slice(0, 50) + '...', status: 'ok' })
+      }
+    } catch {
+      results.push({ sql: sql.slice(0, 50) + '...', status: 'skipped', note: 'rpc not available' })
     }
   }
 
