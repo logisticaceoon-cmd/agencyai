@@ -10,80 +10,110 @@ jobs:
       - name: Install pg
         run: npm install pg
 
+      - name: Debug connectivity
+        run: |
+          echo "=== DNS for direct ==="
+          nslookup db.rntpmsckiplrxfgubngt.supabase.co || true
+          echo "=== DNS for pooler regions ==="
+          for region in us-east-1 us-east-2 us-west-1 us-west-2 eu-central-1 ap-southeast-1 sa-east-1; do
+            echo -n "aws-0-$region.pooler.supabase.com: "
+            nslookup aws-0-$region.pooler.supabase.com 2>&1 | grep "Address:" | tail -1 || echo "failed"
+          done
+
       - name: Create performance tables in Supabase
         run: |
-          node -e "
+          node << 'SCRIPT'
           const { Client } = require('pg');
-          const client = new Client({
-            connectionString: '${{ secrets.DATABASE_URL }}',
-            ssl: { rejectUnauthorized: false }
-          });
 
-          async function run() {
-            await client.connect();
-            console.log('Connected to database');
+          const password = 'agenciaai2026';
+          const ref = 'rntpmsckiplrxfgubngt';
 
-            await client.query(\`
-              CREATE TABLE IF NOT EXISTS performance_logs (
-                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                workspace_id UUID NOT NULL,
-                user_id TEXT NOT NULL,
-                task_id UUID,
-                client_id UUID,
-                action_type TEXT NOT NULL DEFAULT 'task_completed',
-                title TEXT NOT NULL,
-                description TEXT,
-                hours_spent DECIMAL(8,2),
-                delay_hours DECIMAL(8,2),
-                was_on_time BOOLEAN DEFAULT true,
-                month INT NOT NULL,
-                year INT NOT NULL,
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
-              )
-            \`);
-            console.log('Created performance_logs');
+          const configs = [
+            // Try pooler in different regions
+            { host: 'aws-0-us-east-1.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: false } },
+            { host: 'aws-0-us-east-2.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: false } },
+            { host: 'aws-0-us-east-1.pooler.supabase.com', port: 5432, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: false } },
+            { host: 'aws-0-us-west-2.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: false } },
+            { host: 'aws-0-eu-central-1.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: false } },
+            // Direct with family:4
+            { host: `db.${ref}.supabase.co`, port: 5432, user: 'postgres', password, database: 'postgres', ssl: { rejectUnauthorized: false }, family: 4 },
+          ];
 
-            await client.query(\`
-              CREATE TABLE IF NOT EXISTS performance_reports (
-                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-                workspace_id UUID NOT NULL,
-                user_id TEXT NOT NULL,
-                report_type TEXT NOT NULL DEFAULT 'weekly',
-                period_start DATE NOT NULL,
-                period_end DATE NOT NULL,
-                month INT,
-                year INT,
-                week_number INT,
-                tasks_completed INT DEFAULT 0,
-                tasks_delayed INT DEFAULT 0,
-                tasks_pending INT DEFAULT 0,
-                on_time_rate DECIMAL(5,2) DEFAULT 0,
-                avg_hours_per_task DECIMAL(8,2),
-                summary TEXT,
-                strengths TEXT,
-                improvement_areas TEXT,
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
-              )
-            \`);
-            console.log('Created performance_reports');
+          const SQL_LOGS = `CREATE TABLE IF NOT EXISTS performance_logs (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            workspace_id UUID NOT NULL,
+            user_id TEXT NOT NULL,
+            task_id UUID,
+            client_id UUID,
+            action_type TEXT NOT NULL DEFAULT 'task_completed',
+            title TEXT NOT NULL,
+            description TEXT,
+            hours_spent DECIMAL(8,2),
+            delay_hours DECIMAL(8,2),
+            was_on_time BOOLEAN DEFAULT true,
+            month INT NOT NULL,
+            year INT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+          )`;
 
-            await client.query('CREATE INDEX IF NOT EXISTS idx_perf_logs_workspace ON performance_logs(workspace_id)');
-            await client.query('CREATE INDEX IF NOT EXISTS idx_perf_logs_user ON performance_logs(workspace_id, user_id)');
-            await client.query('CREATE INDEX IF NOT EXISTS idx_perf_logs_month ON performance_logs(workspace_id, month, year)');
-            await client.query('CREATE INDEX IF NOT EXISTS idx_perf_reports_workspace ON performance_reports(workspace_id)');
-            await client.query('CREATE INDEX IF NOT EXISTS idx_perf_reports_user ON performance_reports(workspace_id, user_id)');
-            console.log('Created indexes');
+          const SQL_REPORTS = `CREATE TABLE IF NOT EXISTS performance_reports (
+            id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+            workspace_id UUID NOT NULL,
+            user_id TEXT NOT NULL,
+            report_type TEXT NOT NULL DEFAULT 'weekly',
+            period_start DATE NOT NULL,
+            period_end DATE NOT NULL,
+            month INT, year INT, week_number INT,
+            tasks_completed INT DEFAULT 0,
+            tasks_delayed INT DEFAULT 0,
+            tasks_pending INT DEFAULT 0,
+            on_time_rate DECIMAL(5,2) DEFAULT 0,
+            avg_hours_per_task DECIMAL(8,2),
+            summary TEXT, strengths TEXT, improvement_areas TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+          )`;
 
-            const res = await client.query('SELECT COUNT(*) FROM performance_logs');
-            console.log('Verification - performance_logs rows:', res.rows[0].count);
-            const res2 = await client.query('SELECT COUNT(*) FROM performance_reports');
-            console.log('Verification - performance_reports rows:', res2.rows[0].count);
-
-            await client.end();
-            console.log('DONE - Tables created successfully');
+          async function tryConfig(config) {
+            const client = new Client({ ...config, connectionTimeoutMillis: 8000 });
+            try {
+              await client.connect();
+              console.log(`✅ Connected via ${config.host}:${config.port}`);
+              await client.query(SQL_LOGS);
+              console.log('Created performance_logs');
+              await client.query(SQL_REPORTS);
+              console.log('Created performance_reports');
+              for (const idx of [
+                'CREATE INDEX IF NOT EXISTS idx_perf_logs_workspace ON performance_logs(workspace_id)',
+                'CREATE INDEX IF NOT EXISTS idx_perf_logs_user ON performance_logs(workspace_id, user_id)',
+                'CREATE INDEX IF NOT EXISTS idx_perf_logs_month ON performance_logs(workspace_id, month, year)',
+                'CREATE INDEX IF NOT EXISTS idx_perf_reports_workspace ON performance_reports(workspace_id)',
+                'CREATE INDEX IF NOT EXISTS idx_perf_reports_user ON performance_reports(workspace_id, user_id)',
+              ]) {
+                await client.query(idx);
+              }
+              console.log('Created all indexes');
+              const r = await client.query('SELECT COUNT(*) FROM performance_logs');
+              console.log('Verified performance_logs exists:', r.rows[0].count, 'rows');
+              await client.end();
+              return true;
+            } catch (e) {
+              console.log(`❌ ${config.host}:${config.port} - ${e.message.split('\n')[0]}`);
+              try { await client.end(); } catch {}
+              return false;
+            }
           }
 
-          run().catch(e => { console.error(e); process.exit(1); });
-          "
+          (async () => {
+            for (const config of configs) {
+              const ok = await tryConfig(config);
+              if (ok) {
+                console.log('SUCCESS - Tables created!');
+                process.exit(0);
+              }
+            }
+            console.error('All connection attempts failed');
+            process.exit(1);
+          })();
+          SCRIPT
