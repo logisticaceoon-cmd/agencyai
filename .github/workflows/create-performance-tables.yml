@@ -1,0 +1,84 @@
+name: Create Performance Tables
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create performance tables in Supabase
+        run: |
+          node -e "
+          const { Client } = require('pg');
+          const client = new Client({
+            connectionString: '${{ secrets.DATABASE_URL }}',
+            ssl: { rejectUnauthorized: false }
+          });
+
+          async function run() {
+            await client.connect();
+            console.log('Connected to database');
+
+            await client.query(\`
+              CREATE TABLE IF NOT EXISTS performance_logs (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                workspace_id UUID NOT NULL,
+                user_id TEXT NOT NULL,
+                task_id UUID,
+                client_id UUID,
+                action_type TEXT NOT NULL DEFAULT 'task_completed',
+                title TEXT NOT NULL,
+                description TEXT,
+                hours_spent DECIMAL(8,2),
+                delay_hours DECIMAL(8,2),
+                was_on_time BOOLEAN DEFAULT true,
+                month INT NOT NULL,
+                year INT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+              )
+            \`);
+            console.log('Created performance_logs');
+
+            await client.query(\`
+              CREATE TABLE IF NOT EXISTS performance_reports (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                workspace_id UUID NOT NULL,
+                user_id TEXT NOT NULL,
+                report_type TEXT NOT NULL DEFAULT 'weekly',
+                period_start DATE NOT NULL,
+                period_end DATE NOT NULL,
+                month INT,
+                year INT,
+                week_number INT,
+                tasks_completed INT DEFAULT 0,
+                tasks_delayed INT DEFAULT 0,
+                tasks_pending INT DEFAULT 0,
+                on_time_rate DECIMAL(5,2) DEFAULT 0,
+                avg_hours_per_task DECIMAL(8,2),
+                summary TEXT,
+                strengths TEXT,
+                improvement_areas TEXT,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+              )
+            \`);
+            console.log('Created performance_reports');
+
+            await client.query('CREATE INDEX IF NOT EXISTS idx_perf_logs_workspace ON performance_logs(workspace_id)');
+            await client.query('CREATE INDEX IF NOT EXISTS idx_perf_logs_user ON performance_logs(workspace_id, user_id)');
+            await client.query('CREATE INDEX IF NOT EXISTS idx_perf_logs_month ON performance_logs(workspace_id, month, year)');
+            await client.query('CREATE INDEX IF NOT EXISTS idx_perf_reports_workspace ON performance_reports(workspace_id)');
+            await client.query('CREATE INDEX IF NOT EXISTS idx_perf_reports_user ON performance_reports(workspace_id, user_id)');
+            console.log('Created indexes');
+
+            const res = await client.query('SELECT COUNT(*) FROM performance_logs');
+            console.log('performance_logs exists, rows:', res.rows[0].count);
+
+            await client.end();
+            console.log('Done!');
+          }
+
+          run().catch(e => { console.error(e); process.exit(1); });
+          "
