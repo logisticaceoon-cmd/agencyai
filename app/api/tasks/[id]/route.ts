@@ -102,26 +102,30 @@ export async function PATCH(
       const currentMonth = now.getMonth() + 1
       const currentYear = now.getFullYear()
 
-      // Create a log entry for each assigned user
+      // Create a performance entry in activity_log for each assigned user
       for (const assignedUserId of assignedUsers) {
         await supabase
-          .from('performance_logs')
+          .from('activity_log')
           .insert({
-            workspace_id: workspaceId,
-            user_id: assignedUserId,
-            task_id: id,
-            client_id: completedTask.clientId || null,
-            action_type: 'task_completed',
-            title: `Tarea completada: ${completedTask.title}`,
-            description: completedTask.description || null,
-            hours_spent: completedTask.actualHours || null,
-            delay_hours: delayHours,
-            was_on_time: wasOnTime,
-            month: currentMonth,
-            year: currentYear,
+            organizationId: workspaceId,
+            userId: assignedUserId,
+            taskId: id,
+            actionType: 'performance_task_completed',
+            entityType: 'task',
+            entityId: id,
+            description: `Tarea completada: ${completedTask.title}`,
+            changes: {
+              wasOnTime,
+              delayHours,
+              hoursSpent: completedTask.actualHours || null,
+              clientId: completedTask.clientId || null,
+              month: currentMonth,
+              year: currentYear,
+              title: `Tarea completada: ${completedTask.title}`,
+            },
           })
           .then(({ error: logError }) => {
-            if (logError) console.error('Error auto-logging performance:', logError)
+            if (logError) console.error('Error auto-logging performance to activity_log:', logError)
           })
       }
     }
