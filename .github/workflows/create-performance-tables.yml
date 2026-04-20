@@ -7,6 +7,9 @@ jobs:
   migrate:
     runs-on: ubuntu-latest
     steps:
+      - name: Install pg
+        run: npm install pg
+
       - name: Create performance tables in Supabase
         run: |
           node -e "
@@ -74,10 +77,12 @@ jobs:
             console.log('Created indexes');
 
             const res = await client.query('SELECT COUNT(*) FROM performance_logs');
-            console.log('performance_logs exists, rows:', res.rows[0].count);
+            console.log('Verification - performance_logs rows:', res.rows[0].count);
+            const res2 = await client.query('SELECT COUNT(*) FROM performance_reports');
+            console.log('Verification - performance_reports rows:', res2.rows[0].count);
 
             await client.end();
-            console.log('Done!');
+            console.log('DONE - Tables created successfully');
           }
 
           run().catch(e => { console.error(e); process.exit(1); });
