@@ -30,6 +30,7 @@ import {
   CreditCard,
   HelpCircle,
   ChevronDown,
+  TrendingUp,
 } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
@@ -114,6 +115,7 @@ export function Sidebar() {
       label: 'Gestion',
       items: [
         { href: '/audits', label: 'Auditorias', icon: Search },
+        { href: '/performance', label: 'Rendimiento Equipo', icon: TrendingUp },
         { href: '/docs', label: 'Documentos', icon: BookOpen },
         { href: '/finances', label: 'Finanzas', icon: DollarSign },
         { href: '/recordings', label: 'Grabaciones', icon: Video },

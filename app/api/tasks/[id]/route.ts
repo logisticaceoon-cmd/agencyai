@@ -81,6 +81,51 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Auto-log bitácora entry when task is completed
+    if (body.status === 'completed' && currentTask.status !== 'completed') {
+      const completedTask = data
+      const assignedUsers: string[] = completedTask.assignedTo || []
+
+      // Check if task was on time
+      let wasOnTime = true
+      let delayHours: number | null = null
+      if (completedTask.deadline) {
+        const deadline = new Date(completedTask.deadline)
+        const now = new Date()
+        if (now > deadline) {
+          wasOnTime = false
+          delayHours = Math.round((now.getTime() - deadline.getTime()) / (1000 * 60 * 60))
+        }
+      }
+
+      const now = new Date()
+      const currentMonth = now.getMonth() + 1
+      const currentYear = now.getFullYear()
+
+      // Create a log entry for each assigned user
+      for (const assignedUserId of assignedUsers) {
+        await supabase
+          .from('performance_logs')
+          .insert({
+            workspace_id: workspaceId,
+            user_id: assignedUserId,
+            task_id: id,
+            client_id: completedTask.clientId || null,
+            action_type: 'task_completed',
+            title: `Tarea completada: ${completedTask.title}`,
+            description: completedTask.description || null,
+            hours_spent: completedTask.actualHours || null,
+            delay_hours: delayHours,
+            was_on_time: wasOnTime,
+            month: currentMonth,
+            year: currentYear,
+          })
+          .then(({ error: logError }) => {
+            if (logError) console.error('Error auto-logging performance:', logError)
+          })
+      }
+    }
+
     // Notifications are handled separately — skip complex logic to avoid errors
 
     return NextResponse.json(data)
