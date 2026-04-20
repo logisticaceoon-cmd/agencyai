@@ -670,3 +670,56 @@ model ActivityLog {
 
   @@map("activity_log")
 }
+
+// ─── PERFORMANCE LOGS ────────────────────────────────────────────────────────
+
+model PerformanceLog {
+  id          String   @id @default(uuid())
+  workspaceId String   @map("workspace_id")
+  userId      String   @map("user_id")
+  taskId      String?  @map("task_id")
+  clientId    String?  @map("client_id")
+  actionType  String   @default("task_completed") @map("action_type")
+  title       String
+  description String?
+  hoursSpent  Decimal? @db.Decimal(8, 2) @map("hours_spent")
+  delayHours  Decimal? @db.Decimal(8, 2) @map("delay_hours")
+  wasOnTime   Boolean  @default(true) @map("was_on_time")
+  month       Int
+  year        Int
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([workspaceId, userId])
+  @@index([workspaceId, month, year])
+  @@map("performance_logs")
+}
+
+// ─── PERFORMANCE REPORTS ─────────────────────────────────────────────────────
+
+model PerformanceReport {
+  id               String   @id @default(uuid())
+  workspaceId      String   @map("workspace_id")
+  userId           String   @map("user_id")
+  reportType       String   @default("weekly") @map("report_type")
+  periodStart      DateTime @db.Date @map("period_start")
+  periodEnd        DateTime @db.Date @map("period_end")
+  month            Int?
+  year             Int?
+  weekNumber       Int?     @map("week_number")
+  tasksCompleted   Int      @default(0) @map("tasks_completed")
+  tasksDelayed     Int      @default(0) @map("tasks_delayed")
+  tasksPending     Int      @default(0) @map("tasks_pending")
+  onTimeRate       Decimal  @default(0) @db.Decimal(5, 2) @map("on_time_rate")
+  avgHoursPerTask  Decimal? @db.Decimal(8, 2) @map("avg_hours_per_task")
+  summary          String?
+  strengths        String?
+  improvementAreas String?  @map("improvement_areas")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([workspaceId])
+  @@index([workspaceId, userId])
+  @@map("performance_reports")
+}
