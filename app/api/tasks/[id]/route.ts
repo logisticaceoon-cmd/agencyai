@@ -107,6 +107,7 @@ export async function PATCH(
         await supabase
           .from('activity_log')
           .insert({
+            id: crypto.randomUUID(),
             organizationId: workspaceId,
             userId: assignedUserId,
             taskId: id,
