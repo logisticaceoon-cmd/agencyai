@@ -57,7 +57,6 @@ export async function GET(request: Request) {
       .eq('workspace_id', workspaceId)
       .contains('assignedTo', [userId])
       .in('status', ['pending', 'in_progress'])
-      .is('deleted_at', null)
 
     const targetMonth = parseInt(month)
     const targetYear = parseInt(year)
@@ -126,7 +125,6 @@ export async function POST(request: Request) {
       .eq('workspace_id', workspaceId)
       .contains('assignedTo', [userId])
       .in('status', ['pending', 'in_progress'])
-      .is('deleted_at', null)
 
     const report = {
       id: `computed-${userId}-${targetMonth}-${targetYear}`,
