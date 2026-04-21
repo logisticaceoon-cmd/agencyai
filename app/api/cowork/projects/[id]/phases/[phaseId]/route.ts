@@ -9,7 +9,7 @@ export async function GET(
   try {
     const auth = await validateApiKey(request)
     if (isApiAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, organizationId: workspaceId } = auth
     const { id: projectId, phaseId } = await params
 
     // Get project phases
@@ -55,7 +55,7 @@ export async function PATCH(
   try {
     const auth = await validateApiKey(request)
     if (isApiAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, organizationId: workspaceId } = auth
     const { id: projectId, phaseId } = await params
 
     const body = await request.json()
@@ -124,14 +124,15 @@ export async function PATCH(
       const daysUntilDeadline = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
       if (daysUntilDeadline <= 3 && daysUntilDeadline > 0) {
-        await supabase.from('notifications').insert({
+        const { error: notifError } = await supabase.from('notifications').insert({
           workspace_id: workspaceId,
           title: `Phase approaching deadline: ${updatedPhase.title}`,
           message: `Phase "${updatedPhase.title}" expires in ${daysUntilDeadline} days`,
           type: 'warning',
           read: false,
           created_at: new Date().toISOString(),
-        }).catch(err => console.error('Error creating notification:', err))
+        })
+        if (notifError) console.error('Error creating notification:', notifError)
       }
     }
 
@@ -153,7 +154,7 @@ export async function DELETE(
   try {
     const auth = await validateApiKey(request)
     if (isApiAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, organizationId: workspaceId } = auth
     const { id: projectId, phaseId } = await params
 
     // Get project phases
@@ -209,7 +210,4 @@ export async function DELETE(
       timestamp: new Date().toISOString(),
     })
   } catch (err) {
-    console.error('Cowork phase DELETE error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
+    console.error('Cowork phase DELETE error:'
