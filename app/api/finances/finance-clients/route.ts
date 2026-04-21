@@ -110,6 +110,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Sync to clients table (upsert by name + workspace)
+    if (data) {
+      const { error: cError } = await supabase
+        .from('clients')
+        .upsert({
+          workspace_id: workspaceId,
+          name: data.client_name,
+          status: data.status === 'active' ? 'active' : 'inactive',
+          monthlyFee: data.contract_cost || null,
+          currency: data.currency || 'USD',
+        }, { onConflict: 'workspace_id,name', ignoreDuplicates: true })
+      if (cError) console.error('Sync to clients failed:', cError.message)
+    }
+
     return NextResponse.json({ data })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
