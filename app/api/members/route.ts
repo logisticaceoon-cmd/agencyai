@@ -12,7 +12,20 @@ export async function GET() {
       .select('*')
       .eq('workspace_id', workspaceId)
 
-    return NextResponse.json({ data: data || [] })
+    // Map flat columns to the shape expected by pages (performance, tasks)
+    const members = (data || []).map((row: Record<string, unknown>) => ({
+      userId: row.user_id as string,
+      role: row.role as string,
+      status: row.status as string,
+      user: {
+        id: row.user_id as string,
+        fullName: (row.name as string) || (row.email as string) || 'Sin nombre',
+        email: (row.email as string) || '',
+        avatarUrl: (row.avatar_url as string) || null,
+      },
+    }))
+
+    return NextResponse.json({ data: members })
   } catch {
     return NextResponse.json({ data: [] })
   }

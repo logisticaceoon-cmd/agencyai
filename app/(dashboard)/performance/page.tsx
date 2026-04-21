@@ -255,7 +255,8 @@ export default function PerformancePage() {
           <div className="flex items-center gap-2 flex-wrap">
             {members.map((m) => {
               const isActive = m.userId === selectedUserId
-              const initials = m.user.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+              const name = m.user?.fullName || m.user?.email || 'NN'
+              const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
               return (
                 <button
                   key={m.userId}
@@ -267,8 +268,8 @@ export default function PerformancePage() {
                       : 'bg-white text-[var(--text-secondary)] border-[var(--border-base)] hover:border-blue-300 hover:text-blue-600'
                   )}
                 >
-                  {m.user.avatarUrl ? (
-                    <img src={m.user.avatarUrl} alt={m.user.fullName} className="h-6 w-6 rounded-full object-cover" />
+                  {m.user?.avatarUrl ? (
+                    <img src={m.user.avatarUrl} alt={name} className="h-6 w-6 rounded-full object-cover" />
                   ) : (
                     <div className={cn(
                       'flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold',
@@ -277,7 +278,7 @@ export default function PerformancePage() {
                       {initials}
                     </div>
                   )}
-                  {m.user.fullName.split(' ')[0]}
+                  {name.split(' ')[0]}
                 </button>
               )
             })}
@@ -327,7 +328,7 @@ export default function PerformancePage() {
                   <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-base)]">
                     <div>
                       <h2 className="text-sm font-semibold text-[var(--text-primary)]">
-                        Bitácora — {selectedMember.user.fullName.split(' ')[0]}
+                        Bitácora — {(selectedMember.user?.fullName || selectedMember.user?.email || 'Miembro').split(' ')[0]}
                       </h2>
                       <p className="text-xs text-[var(--text-muted)] mt-0.5">{MONTHS_ES[filterMonth]} {filterYear}</p>
                     </div>
@@ -397,7 +398,7 @@ export default function PerformancePage() {
                         <CheckCircle2 className="h-10 w-10 text-green-200 mb-3" />
                         <p className="text-sm font-medium text-[var(--text-secondary)]">Sin alertas activas</p>
                         <p className="text-xs text-[var(--text-muted)] mt-1">
-                          {selectedMember.user.fullName.split(' ')[0]} esta al dia con sus tareas.
+                          {(selectedMember.user?.fullName || selectedMember.user?.email || 'Miembro').split(' ')[0]} esta al dia con sus tareas.
                         </p>
                       </div>
                     ) : (
@@ -418,7 +419,7 @@ export default function PerformancePage() {
                     <p className="text-xs text-blue-600 mt-0.5">
                       Los SOPs y manuales del equipo estan disponibles en{' '}
                       <a href="/docs" className="underline font-medium">Documentos → SOPs</a>.
-                      Asegurate de que {selectedMember.user.fullName.split(' ')[0]} los tenga actualizados.
+                      Asegurate de que {(selectedMember.user?.fullName || selectedMember.user?.email || 'Miembro').split(' ')[0]} los tenga actualizados.
                     </p>
                   </div>
                 </div>
