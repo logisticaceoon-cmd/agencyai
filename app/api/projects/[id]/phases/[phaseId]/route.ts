@@ -105,14 +105,15 @@ export async function PATCH(
       const daysUntilDeadline = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
       if (daysUntilDeadline <= 3 && daysUntilDeadline > 0) {
-        await supabase.from('notifications').insert({
+        const { error: notifError } = await supabase.from('notifications').insert({
           workspace_id: workspaceId,
           title: `Fase próxima a vencer: ${updatedPhase.title}`,
           message: `La fase "${updatedPhase.title}" vence en ${daysUntilDeadline} días`,
           type: 'warning',
           read: false,
           created_at: new Date().toISOString(),
-        }).catch(err => console.error('Error creating notification:', err))
+        })
+        if (notifError) console.error('Error creating notification:', notifError)
       }
     }
 
