@@ -74,6 +74,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Sync to finance_clients (upsert by client_name + workspace_id)
+    if (data) {
+      const { error: fcError } = await supabase
+        .from('finance_clients')
+        .upsert({
+          workspace_id: workspaceId,
+          client_name: data.name,
+          status: data.status === 'active' ? 'active' : 'inactive',
+          contract_cost: data.monthlyFee || 0,
+          currency: data.currency || 'USD',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'workspace_id,client_name', ignoreDuplicates: true })
+      if (fcError) console.error('Sync to finance_clients failed:', fcError.message)
+    }
+
     return NextResponse.json({ data }, { status: 201 })
   } catch (err) {
     console.error('Error in POST /api/clients:', err)
