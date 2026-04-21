@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   try {
     const auth = await validateApiKey(request)
     if (isApiAuthError(auth)) return auth
-    const { supabase, organizationId } = auth
+    const { supabase, organizationId, userId } = auth
 
     const body = await request.json()
 
@@ -69,12 +69,13 @@ export async function POST(request: Request) {
         title: body.title,
         description: body.description || null,
         clientId: body.client_id || null,
-        projectId: body.project_id || null,
+        projectId: body.project_id || body.projectId || null,
+        parentTaskId: body.parent_task_id || body.parentTaskId || null,
         assignedTo: body.assigned_to || [],
         deadline: body.deadline || null,
         priority: body.priority || 'medium',
-        status: 'pending',
-        createdById: body.created_by || null,
+        status: body.status || 'pending',
+        createdById: userId,
       })
       .select()
       .single()
