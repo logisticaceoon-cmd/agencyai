@@ -56,7 +56,7 @@ export async function POST(
   try {
     const auth = await validateApiKey(request)
     if (isApiAuthError(auth)) return auth
-    const { supabase, organizationId: workspaceId } = auth
+    const { supabase, organizationId: workspaceId, userId } = auth
     const { id: projectId } = await params
 
     const body = await request.json()
@@ -72,15 +72,6 @@ export async function POST(
       .eq('taskType', 'phase')
       .is('deleted_at', null)
 
-    // Get workspace owner for createdById
-    const { data: member } = await supabase
-      .from('organization_members')
-      .select('userId')
-      .eq('organizationId', workspaceId)
-      .eq('role', 'owner')
-      .single()
-    const createdById = member?.userId || workspaceId
-
     const { data, error } = await supabase
       .from('tasks')
       .insert({
@@ -95,7 +86,7 @@ export async function POST(
         taskType: 'phase',
         priority: body.priority || 'medium',
         position: count || 0,
-        createdById,
+        createdById: userId,
       })
       .select()
       .single()
