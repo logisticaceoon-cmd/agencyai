@@ -20,9 +20,11 @@ export async function GET(request: Request) {
       .limit(200)
       .order('createdAt', { ascending: false })
 
+    const parentTaskId = searchParams.get('parent_task_id') || searchParams.get('parentTaskId')
     if (status) query = query.eq('status', status)
     if (priority) query = query.eq('priority', priority)
     if (projectId) query = query.eq('projectId', projectId)
+    if (parentTaskId) query = query.eq('parentTaskId', parentTaskId)
 
     const { data, error } = await query
 
@@ -51,11 +53,13 @@ export async function POST(request: Request) {
       .insert({
         workspace_id: workspaceId,
         projectId: body.projectId || body.project_id || null,
+        parentTaskId: body.parentTaskId || body.parent_task_id || null,
         title: body.title,
         description: body.description || null,
         status: body.status || 'pending',
         priority: body.priority || 'medium',
         deadline: body.deadline || body.due_date || null,
+        assignedTo: body.assignedTo || [],
         createdById: userId,
       })
       .select()
@@ -68,7 +72,4 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data }, { status: 201 })
   } catch (err) {
-    console.error('Error in POST /api/tasks:', err)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
-  }
-}
+    console.error('Error in POST
