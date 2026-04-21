@@ -27,7 +27,9 @@ import {
   ChevronRight,
   MessageSquare,
   Send,
+  Zap,
 } from 'lucide-react'
+import ProjectPhases from '@/components/shared/ProjectPhases'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -502,9 +504,10 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* ── Tabs ───────────────────────────────────────────────────────── */}
-      <Tabs.Root defaultValue="tasks">
-        <Tabs.List className="flex border-b border-slate-200 mb-5">
+      <Tabs.Root defaultValue="phases">
+        <Tabs.List className="flex border-b border-slate-200 mb-5 overflow-x-auto">
           {[
+            { value: 'phases', icon: Zap, label: 'Fases' },
             { value: 'tasks', icon: CheckSquare, label: 'Tareas' },
             { value: 'milestones', icon: Target, label: 'Microobjetivos' },
             { value: 'timeline', icon: Calendar, label: 'Cronograma' },
@@ -514,13 +517,18 @@ export default function ProjectDetailPage() {
             <Tabs.Trigger
               key={tab.value}
               value={tab.value}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-500 border-b-2 border-transparent hover:text-slate-700 data-[state=active]:text-blue-600 data-[state=active]:border-blue-600 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-500 border-b-2 border-transparent hover:text-slate-700 data-[state=active]:text-blue-600 data-[state=active]:border-blue-600 transition-colors whitespace-nowrap"
             >
               <tab.icon className="h-4 w-4" />
               {tab.label}
             </Tabs.Trigger>
           ))}
         </Tabs.List>
+
+        {/* ── Phases Tab ──────────────────────────────────────────────── */}
+        <Tabs.Content value="phases">
+          <ProjectPhases projectId={projectId} />
+        </Tabs.Content>
 
         {/* ── Tasks Tab ──────────────────────────────────────────────── */}
         <Tabs.Content value="tasks">
