@@ -11,16 +11,16 @@ export async function GET(request: Request) {
     const status = searchParams.get('status')
     const priority = searchParams.get('priority')
     const projectId = searchParams.get('project_id') || searchParams.get('projectId')
+    const parentTaskId = searchParams.get('parent_task_id') || searchParams.get('parentTaskId')
 
     let query = supabase
       .from('tasks')
       .select('*')
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
-      .limit(200)
-      .order('createdAt', { ascending: false })
+      .limit(500)
+      .order('createdAt', { ascending: true })
 
-    const parentTaskId = searchParams.get('parent_task_id') || searchParams.get('parentTaskId')
     if (status) query = query.eq('status', status)
     if (priority) query = query.eq('priority', priority)
     if (projectId) query = query.eq('projectId', projectId)
@@ -72,4 +72,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data }, { status: 201 })
   } catch (err) {
-    console.error('Error in POST
+    console.error('Error in POST /api/tasks:', err)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  }
+}
