@@ -56,7 +56,7 @@ export async function POST(
   try {
     const auth = await validateApiKey(request)
     if (isApiAuthError(auth)) return auth
-    const { supabase, organizationId: workspaceId, userId } = auth
+    const { supabase, organizationId: workspaceId } = auth
     const { id: projectId } = await params
 
     const body = await request.json()
@@ -86,7 +86,7 @@ export async function POST(
         taskType: 'phase',
         priority: body.priority || 'medium',
         position: count || 0,
-        createdById: userId,
+        createdById: null,
       })
       .select()
       .single()
