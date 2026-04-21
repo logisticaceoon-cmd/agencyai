@@ -5,6 +5,7 @@ export interface ApiAuthContext {
   supabase: ReturnType<typeof createAdminClient>
   organizationId: string
   keyName: string
+  userId: string
 }
 
 /**
@@ -54,10 +55,21 @@ export async function validateApiKey(
     .eq('id', data.id)
     .then()
 
+  // Resolve a valid userId for this workspace (needed for FK constraints)
+  const { data: sampleTask } = await supabase
+    .from('tasks')
+    .select('createdById')
+    .eq('workspace_id', data.organization_id)
+    .not('createdById', 'is', null)
+    .limit(1)
+    .maybeSingle()
+  const userId = sampleTask?.createdById || data.organization_id
+
   return {
     supabase,
     organizationId: data.organization_id,
     keyName: data.name,
+    userId,
   }
 }
 
