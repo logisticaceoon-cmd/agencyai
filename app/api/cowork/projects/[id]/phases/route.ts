@@ -9,7 +9,7 @@ export async function GET(
   try {
     const auth = await validateApiKey(request)
     if (isApiAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, organizationId: workspaceId } = auth
     const { id: projectId } = await params
 
     // Get project with phases
@@ -47,7 +47,7 @@ export async function POST(
   try {
     const auth = await validateApiKey(request)
     if (isApiAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, organizationId: workspaceId } = auth
     const { id: projectId } = await params
 
     const body = await request.json()
@@ -131,6 +131,4 @@ export async function POST(
     }, { status: 201 })
   } catch (err) {
     console.error('Cowork phases POST error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
+    return NextResponse.json({ error: 'Internal server e
