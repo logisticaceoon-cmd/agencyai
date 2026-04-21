@@ -70,6 +70,19 @@ export async function PUT(
       return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 })
     }
 
+    // Sync to finance_clients (match by name in workspace)
+    if (body.name) {
+      await supabase
+        .from('finance_clients')
+        .update({
+          client_name: body.name,
+          status: body.status === 'active' ? 'active' : 'inactive',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('workspace_id', workspaceId)
+        .eq('client_name', data.name)
+    }
+
     return NextResponse.json(data)
   } catch (err) {
     console.error('Error in PUT /api/clients/[id]:', err)
@@ -87,6 +100,14 @@ export async function DELETE(
     const { supabase, workspaceId } = auth
     const { id } = await params
 
+    // Get client name before deleting (for sync)
+    const { data: existing } = await supabase
+      .from('clients')
+      .select('name')
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .single()
+
     const { data, error } = await supabase
       .from('clients')
       .update({ deleted_at: new Date().toISOString() })
@@ -97,6 +118,16 @@ export async function DELETE(
 
     if (error || !data) {
       return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 })
+    }
+
+    // Sync soft-delete to finance_clients
+    if (existing?.name) {
+      await supabase
+        .from('finance_clients')
+        .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq('workspace_id', workspaceId)
+        .eq('client_name', existing.name)
+        .is('deleted_at', null)
     }
 
     return NextResponse.json({ success: true })
