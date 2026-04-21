@@ -306,7 +306,8 @@ export default function TasksPage() {
     const res = await fetch(`/api/tasks/${taskId}`)
     if (res.ok) {
       const data = await res.json()
-      setDetailTask(data.data)
+      // API returns task directly at top level (not wrapped in { data: ... })
+      setDetailTask(data.data ?? data)
     }
   }
 
