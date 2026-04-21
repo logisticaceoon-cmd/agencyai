@@ -88,13 +88,15 @@ export async function PATCH(
     if (body.deadline && data.status !== 'done') {
       const daysLeft = Math.ceil((new Date(body.deadline).getTime() - Date.now()) / 86400000)
       if (daysLeft <= 3 && daysLeft > 0) {
-        await supabase.from('notifications').insert({
-          workspace_id: workspaceId,
-          title: `Fase próxima a vencer: ${data.title}`,
-          message: `La fase "${data.title}" vence en ${daysLeft} día${daysLeft !== 1 ? 's' : ''}`,
-          type: 'warning',
-          read: false,
-        }).catch(() => {})
+        try {
+          await supabase.from('notifications').insert({
+            workspace_id: workspaceId,
+            title: `Fase próxima a vencer: ${data.title}`,
+            message: `La fase "${data.title}" vence en ${daysLeft} día${daysLeft !== 1 ? 's' : ''}`,
+            type: 'warning',
+            read: false,
+          })
+        } catch (_) {}
       }
     }
 
