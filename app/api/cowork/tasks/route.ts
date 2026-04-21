@@ -18,6 +18,7 @@ export async function GET(request: Request) {
       .from('tasks')
       .select('id, title, description, status, priority, deadline, createdAt, clientId, projectId, assignedTo, createdById')
       .eq('workspace_id', organizationId)
+      .is('deleted_at', null)
       .order('deadline', { ascending: true })
       .limit(200)
 
