@@ -19,6 +19,7 @@ import {
   Check,
   MoreVertical,
   ChevronDown,
+  Eye,
 } from 'lucide-react'
 import {
   DndContext,
@@ -443,6 +444,7 @@ export default function TasksPage() {
           onAddToColumn={openCreateModal}
           onEdit={openEditModal}
           onDelete={handleDeleteTask}
+          onPreview={(task) => loadTaskDetail(task.id)}
         />
       )}
 
@@ -577,6 +579,7 @@ function KanbanView({
   onAddToColumn,
   onEdit,
   onDelete,
+  onPreview,
 }: {
   tasks: Task[]
   getMemberName: (id: string) => string
@@ -586,6 +589,7 @@ function KanbanView({
   onAddToColumn: (status: string) => void
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
+  onPreview: (task: Task) => void
 }) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
 
@@ -658,6 +662,7 @@ function KanbanView({
             onStatusChange={onStatusChange}
             onEdit={onEdit}
             onDelete={onDelete}
+            onPreview={onPreview}
           />
         ))}
       </div>
@@ -685,6 +690,7 @@ function KanbanColumn({
   onStatusChange,
   onEdit,
   onDelete,
+  onPreview,
 }: {
   id: string
   label: string
@@ -696,6 +702,7 @@ function KanbanColumn({
   onStatusChange: (taskId: string, status: string) => void
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
+  onPreview: (task: Task) => void
 }) {
   const { setNodeRef } = useDroppable({ id })
 
@@ -738,6 +745,7 @@ function KanbanColumn({
               onStatusChange={onStatusChange}
               onEdit={onEdit}
               onDelete={onDelete}
+              onPreview={onPreview}
             />
           ))}
         </SortableContext>
@@ -759,6 +767,7 @@ function KanbanCard({
   onStatusChange,
   onEdit,
   onDelete,
+  onPreview,
 }: {
   task: Task
   getMemberName: (id: string) => string
@@ -767,6 +776,7 @@ function KanbanCard({
   onStatusChange: (taskId: string, status: string) => void
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
+  onPreview: (task: Task) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -832,6 +842,12 @@ function KanbanCard({
                     </button>
                   ))}
                   <div className="border-t border-slate-100 my-1" />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onPreview(task); setMenuOpen(false) }}
+                    className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <Eye className="h-3 w-3" /> Vista previa
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onEdit(task); setMenuOpen(false) }}
                     className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-slate-600 hover:bg-slate-50 transition-colors"
@@ -987,7 +1003,7 @@ function TaskFormModal({
           projectId: task.projectId || '',
           status: task.status as TaskFormData['status'],
           priority: task.priority as TaskFormData['priority'],
-          assignedTo: task.assignedTo[0] || '',
+          assignedTo: task.assignedTo?.[0] || '',
           deadline: task.deadline ? task.deadline.slice(0, 10) : '',
           estimatedHours: task.estimatedHours || undefined,
           tags: '',
