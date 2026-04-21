@@ -8,7 +8,7 @@ function taskToPhase(task: any) {
     description: task.description || null,
     deadline: task.deadline || null,
     responsible_id: task.assignedTo || task.assignee_id || null,
-    status: task.status === 'done' ? 'completed' : task.status === 'in_progress' ? 'in_progress' : 'pending',
+    status: task.status === 'completed' ? 'completed' : task.status === 'in_progress' ? 'in_progress' : 'pending',
     order: task.position || 0,
     created_at: task.createdAt,
     updated_at: task.updatedAt,
@@ -66,7 +66,7 @@ export async function PATCH(
       updatePayload.assignee_id = body.responsible_id
     }
     if (body.status !== undefined) {
-      updatePayload.status = body.status === 'completed' ? 'done' : body.status === 'in_progress' ? 'in_progress' : 'todo'
+      updatePayload.status = body.status === 'completed' ? 'completed' : body.status === 'in_progress' ? 'in_progress' : 'pending'
     }
     if (body.order !== undefined) updatePayload.position = body.order
 
@@ -85,7 +85,7 @@ export async function PATCH(
     }
 
     // Notify if deadline within 3 days and not completed
-    if (body.deadline && data.status !== 'done') {
+    if (body.deadline && data.status !== 'completed') {
       const daysLeft = Math.ceil((new Date(body.deadline).getTime() - Date.now()) / 86400000)
       if (daysLeft <= 3 && daysLeft > 0) {
         try {
