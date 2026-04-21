@@ -93,6 +93,19 @@ export async function PUT(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Sync name/status to clients table
+    if (data && client_name) {
+      await supabase
+        .from('clients')
+        .update({
+          name: client_name,
+          status: status === 'active' ? 'active' : 'inactive',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('workspace_id', workspaceId)
+        .eq('name', data.client_name)
+    }
+
     return NextResponse.json({ data })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
@@ -118,6 +131,21 @@ export async function DELETE(
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Sync soft-delete to clients table
+    const { data: fc } = await supabase
+      .from('finance_clients')
+      .select('client_name')
+      .eq('id', id)
+      .single()
+    if (fc?.client_name) {
+      await supabase
+        .from('clients')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('workspace_id', workspaceId)
+        .eq('name', fc.client_name)
+        .is('deleted_at', null)
     }
 
     return NextResponse.json({ success: true })
