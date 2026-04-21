@@ -210,4 +210,7 @@ export async function DELETE(
       timestamp: new Date().toISOString(),
     })
   } catch (err) {
-    console.error('Cowork phase DELETE error:'
+    console.error('Cowork phase DELETE error:', err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
+}
