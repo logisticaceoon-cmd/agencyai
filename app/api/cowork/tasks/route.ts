@@ -73,7 +73,7 @@ export async function POST(request: Request) {
         deadline: body.deadline || null,
         priority: body.priority || 'medium',
         status: 'pending',
-        createdById: body.created_by || 'cowork-api',
+        createdById: body.created_by || null,
       })
       .select()
       .single()
