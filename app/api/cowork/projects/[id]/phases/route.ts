@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server'
 import { validateApiKey, isApiAuthError } from '@/lib/api-auth'
-import type { Phase } from '@/app/api/projects/[id]/phases/route'
+
+function taskToPhase(task: any) {
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description || null,
+    deadline: task.deadline || null,
+    responsible_id: task.assignedTo || task.assignee_id || null,
+    status: task.status === 'done' ? 'completed' : task.status === 'in_progress' ? 'in_progress' : 'pending',
+    order: task.position || 0,
+    created_at: task.createdAt,
+    updated_at: task.updatedAt,
+  }
+}
 
 export async function GET(
   request: Request,
@@ -12,31 +25,27 @@ export async function GET(
     const { supabase, organizationId: workspaceId } = auth
     const { id: projectId } = await params
 
-    // Get project with phases
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('phases')
-      .eq('id', projectId)
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('projectId', projectId)
       .eq('workspace_id', workspaceId)
-      .maybeSingle()
+      .eq('taskType', 'phase')
+      .is('deleted_at', null)
+      .order('position', { ascending: true })
 
-    if (projectError || !project) {
-      return NextResponse.json({
-        success: false,
-        error: 'Proyecto no encontrado',
-      }, { status: 404 })
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    const phases = ((project.phases as Phase[]) || []).sort((a, b) => (a.order || 0) - (b.order || 0))
-
+    const phases = (data || []).map(taskToPhase)
     return NextResponse.json({
       success: true,
       data: { phases, total: phases.length },
       timestamp: new Date().toISOString(),
     })
-  } catch (err) {
-    console.error('Cowork phases GET error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Error interno del servidor' }, { status: 500 })
   }
 }
 
@@ -47,91 +56,65 @@ export async function POST(
   try {
     const auth = await validateApiKey(request)
     if (isApiAuthError(auth)) return auth
-    const { supabase, organizationId: workspaceId } = auth
+    const { supabase, organizationId: workspaceId, userId } = auth
     const { id: projectId } = await params
 
     const body = await request.json()
-
     if (!body.title) {
-      return NextResponse.json(
-        { error: 'title is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'title es requerido' }, { status: 400 })
     }
 
-    // Get current project with phases
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('phases')
-      .eq('id', projectId)
+    const { count } = await supabase
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('projectId', projectId)
       .eq('workspace_id', workspaceId)
-      .maybeSingle()
+      .eq('taskType', 'phase')
+      .is('deleted_at', null)
 
-    if (projectError || !project) {
-      return NextResponse.json(
-        { success: false, error: 'Project not found' },
-        { status: 404 }
-      )
-    }
-
-    const phases = (project.phases as Phase[]) || []
-    const newPhase: Phase = {
-      id: crypto.randomUUID(),
-      title: body.title,
-      description: body.description || null,
-      deadline: body.deadline || null,
-      responsible_id: body.responsible_id || null,
-      status: body.status || 'pending',
-      order: phases.length,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-
-    const updatedPhases = [...phases, newPhase]
-
-    // Update project
-    const { error: updateError } = await supabase
-      .from('projects')
-      .update({ phases: updatedPhases, updated_at: new Date().toISOString() })
-      .eq('id', projectId)
-      .eq('workspace_id', workspaceId)
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        workspace_id: workspaceId,
+        projectId,
+        title: body.title,
+        description: body.description || null,
+        deadline: body.deadline || null,
+        assignedTo: body.responsible_id || null,
+        assignee_id: body.responsible_id || null,
+        status: body.status === 'completed' ? 'done' : body.status === 'in_progress' ? 'in_progress' : 'todo',
+        taskType: 'phase',
+        priority: body.priority || 'medium',
+        position: count || 0,
+        createdById: userId,
+      })
       .select()
       .single()
 
-    if (updateError) {
-      console.error('Error creating phase:', updateError)
-      return NextResponse.json(
-        { success: false, error: `Error creating phase: ${updateError.message}` },
-        { status: 500 }
-      )
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    // Create notification if deadline is within 3 days
-    if (newPhase.deadline) {
-      const deadlineDate = new Date(newPhase.deadline)
-      const now = new Date()
-      const daysUntilDeadline = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-
-      if (daysUntilDeadline <= 3 && daysUntilDeadline > 0) {
-        const { error: notifError } = await supabase.from('notifications').insert({
+    // Notify if deadline within 3 days
+    if (data?.deadline) {
+      const daysLeft = Math.ceil((new Date(data.deadline).getTime() - Date.now()) / 86400000)
+      if (daysLeft <= 3 && daysLeft > 0) {
+        await supabase.from('notifications').insert({
           workspace_id: workspaceId,
-          title: `Phase approaching deadline: ${newPhase.title}`,
-          message: `Phase "${newPhase.title}" expires in ${daysUntilDeadline} days`,
+          title: `Fase próxima a vencer: ${data.title}`,
+          message: `La fase "${data.title}" vence en ${daysLeft} día${daysLeft !== 1 ? 's' : ''}`,
           type: 'warning',
           read: false,
-          created_at: new Date().toISOString(),
-        })
-        if (notifError) console.error('Error creating notification:', notifError)
+        }).catch(() => {})
       }
     }
 
     return NextResponse.json({
       success: true,
-      data: { phase: newPhase, message: 'Phase created successfully' },
+      data: { phase: taskToPhase(data), message: 'Fase creada correctamente' },
       timestamp: new Date().toISOString(),
     }, { status: 201 })
-  } catch (err) {
-    console.error('Cowork phases POST error:', err)
-    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Error interno del servidor' }, { status: 500 })
   }
 }
