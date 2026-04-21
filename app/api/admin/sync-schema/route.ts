@@ -2,11 +2,10 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 // Ruta temporal de migración — ejecutar una vez, luego quitar
-// Protegida por API key de AgencyAi
+// Protegida por CRON_SECRET
 export async function POST(request: Request) {
-  const authHeader = request.headers.get('authorization') || ''
-  const apiKey = authHeader.replace('Bearer ', '')
-  if (!process.env.AGENCYAI_API_KEY || apiKey !== process.env.AGENCYAI_API_KEY) {
+  const secret = request.headers.get('x-migration-key')
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 

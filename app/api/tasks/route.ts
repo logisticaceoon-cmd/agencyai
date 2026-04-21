@@ -16,6 +16,7 @@ export async function GET(request: Request) {
       .from('tasks')
       .select('*')
       .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
       .limit(200)
       .order('createdAt', { ascending: false })
 
