@@ -1057,4 +1057,34 @@ export default function ProjectDetailPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Cliente</label>
                   <p className="text-sm text-slate-600 px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                    {project.client.nam
+                    {project.client.name}
+                  </p>
+                </div>
+              )}
+
+              {project.manager && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Responsable</label>
+                  <p className="text-sm text-slate-600 px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    {project.manager?.fullName || 'Sin asignar'}
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Guardar cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </Tabs.Content>
+      </Tabs.Root>
+    </div>
+  )
+}
