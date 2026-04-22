@@ -23,7 +23,13 @@ export async function GET(request: Request) {
 
     if (status) query = query.eq('status', status)
     if (priority) query = query.eq('priority', priority)
-    if (projectId) query = query.eq('projectId', projectId)
+    if (projectId) {
+      // Dentro de un proyecto: mostrar todas las tareas de ese proyecto
+      query = query.eq('projectId', projectId)
+    } else if (!parentTaskId) {
+      // Vista global de Tareas: solo tareas sueltas (sin proyecto asignado)
+      query = query.is('projectId', null)
+    }
     if (parentTaskId) query = query.eq('parentTaskId', parentTaskId)
 
     const { data, error } = await query
