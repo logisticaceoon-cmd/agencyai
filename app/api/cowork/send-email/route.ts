@@ -1,15 +1,23 @@
 import { NextResponse } from 'next/server'
 import { validateApiKey, isApiAuthError } from '@/lib/api-auth'
-import { Resend } from 'resend'
+import nodemailer from 'nodemailer'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Gmail SMTP transporter
+function getTransporter() {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER || 'logisticaceoon@gmail.com',
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  })
+}
 
-// FROM address — usa dominio verificado en Resend si está disponible, si no usa onboarding@resend.dev
-const FROM_ADDRESS = process.env.EMAIL_FROM || 'Ceonyx · Logística CEOON <onboarding@resend.dev>'
+const FROM_ADDRESS = process.env.EMAIL_FROM || 'Ceonyx · Logística CEOON <logisticaceoon@gmail.com>'
 
 export async function POST(request: Request) {
   try {
-    // Auth via API key (misma que usa el resto del cowork API)
+    // Auth via API key
     const auth = await validateApiKey(request)
     if (isApiAuthError(auth)) return auth
 
@@ -23,33 +31,29 @@ export async function POST(request: Request) {
       )
     }
 
-    // Normalizar destinatarios a array
     const toList: string[] = Array.isArray(to) ? to : [to]
     const ccList: string[] = cc ? (Array.isArray(cc) ? cc : [cc]) : []
     const bccList: string[] = bcc ? (Array.isArray(bcc) ? bcc : [bcc]) : []
 
-    const { data, error } = await resend.emails.send({
+    const transporter = getTransporter()
+
+    const info = await transporter.sendMail({
       from: FROM_ADDRESS,
-      to: toList,
-      cc: ccList.length > 0 ? ccList : undefined,
-      bcc: bccList.length > 0 ? bccList : undefined,
+      to: toList.join(', '),
+      cc: ccList.length > 0 ? ccList.join(', ') : undefined,
+      bcc: bccList.length > 0 ? bccList.join(', ') : undefined,
       subject,
       html: html || undefined,
       text: text || undefined,
     })
 
-    if (error) {
-      console.error('Resend error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
     return NextResponse.json({
       success: true,
-      id: data?.id,
+      id: info.messageId,
       message: `Email enviado a ${toList.join(', ')}`,
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error in POST /api/cowork/send-email:', err)
-    return NextResponse.json({ error: 'Error interno al enviar email' }, { status: 500 })
+    return NextResponse.json({ error: err.message || 'Error interno al enviar email' }, { status: 500 })
   }
 }
