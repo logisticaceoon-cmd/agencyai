@@ -11,8 +11,7 @@ async function getGoogleAccessToken(): Promise<string> {
     iss: creds.client_email,
     scope: 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive',
     aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600,
-    iat: now,
+    exp: now + 3600, iat: now,
   })).toString('base64url')
   const sign = createSign('SHA256')
   sign.update(`${header}.${payload}`)
@@ -77,18 +76,52 @@ const BITACORA_FOLDER = '1283ZE1vPFXmlBnt0nDQoZ2FNDGrwdsrt'
 const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const DAYS_ES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
 
-// Runs at 00:00 UTC = 21:00 (9 PM) Argentina
-export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+// ─── Task hygiene: auto-sync AgencyAi ────────────────────────────────────────
+async function syncAgencyAiTasks(supabaseUrl: string, supabaseKey: string, workspaceId: string, argNow: Date) {
+  const results = { flagged: 0, actions: [] as string[] }
+
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/tasks?workspace_id=eq.${workspaceId}&status=in.in_progress,pending,todo&select=id,title,status,due_date,updated_at&limit=500`,
+    { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+  )
+  const tasks = await res.json()
+  if (!Array.isArray(tasks)) return results
+
+  const now = argNow.getTime()
+  const threeDaysMs = 3 * 24 * 60 * 60 * 1000
+
+  for (const task of tasks) {
+    const updatedAt = new Date(task.updated_at).getTime()
+    const dueDate = task.due_date ? new Date(task.due_date + 'T00:00:00Z') : null
+    const isStale = (now - updatedAt) > threeDaysMs && task.status === 'in_progress'
+    const isPastDue = dueDate && dueDate < argNow && task.status !== 'completed' && task.status !== 'cancelled'
+
+    // Flag stale in_progress tasks — add a note but don't change status
+    if (isStale) {
+      results.flagged++
+      results.actions.push(`Tarea estancada (>3 días sin cambio): "${task.title}"`)
+    }
+    if (isPastDue && !isStale) {
+      results.flagged++
+      results.actions.push(`Tarea vencida sin cerrar: "${task.title}" (vencía ${task.due_date})`)
     }
   }
 
+  return results
+}
+
+// ─── GET /api/cron/daily-bitacora ─────────────────────────────────────────────
+export async function GET(request: Request) {
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret && request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
-    // Argentina = UTC-3. At 00:00 UTC it is 21:00 Argentina (same calendar day)
+    const supabaseUrl = process.env.SUPABASE_URL_REAL || ''
+    const supabaseKey = process.env.SUPABASE_SERVICE_KEY_REAL || ''
+    const workspaceId = '41b4b8ab-2483-418d-bb29-d39084ca36f0'
+
     const argNow = new Date(Date.now() - 3 * 60 * 60 * 1000)
     const dayName = DAYS_ES[argNow.getUTCDay()]
     const dayNum = argNow.getUTCDate()
@@ -98,15 +131,9 @@ export async function GET(request: Request) {
     const isWeekend = argNow.getUTCDay() === 0 || argNow.getUTCDay() === 6
 
     // Pull tasks from Supabase
-    const supabaseUrl = process.env.SUPABASE_URL_REAL || ''
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY_REAL || ''
-    const workspaceId = '41b4b8ab-2483-418d-bb29-d39084ca36f0'
-
-    // Argentina day boundaries converted to UTC for DB query
-    const argDayStart = new Date(argNow)
-    argDayStart.setUTCHours(0, 0, 0, 0)
-    const utcDayStart = new Date(argDayStart.getTime() + 3 * 60 * 60 * 1000)
-    const utcDayEnd = new Date(utcDayStart.getTime() + 24 * 60 * 60 * 1000)
+    const argDayStart = new Date(argNow); argDayStart.setUTCHours(0,0,0,0)
+    const utcDayStart = new Date(argDayStart.getTime() + 3*60*60*1000)
+    const utcDayEnd = new Date(utcDayStart.getTime() + 24*60*60*1000)
 
     const tasksRes = await fetch(
       `${supabaseUrl}/rest/v1/tasks?workspace_id=eq.${workspaceId}&select=title,status,updated_at`,
@@ -119,12 +146,14 @@ export async function GET(request: Request) {
         if (t.status !== 'completed') return false
         const updated = new Date(t.updated_at)
         return updated >= utcDayStart && updated < utcDayEnd
-      })
-      .map((t: any) => t.title)
+      }).map((t: any) => t.title)
 
     const inProgress = (Array.isArray(allTasks) ? allTasks : [])
       .filter((t: any) => t.status === 'in_progress')
       .map((t: any) => t.title)
+
+    // Task hygiene check
+    const hygiene = isWeekend ? { flagged: 0, actions: [] } : await syncAgencyAiTasks(supabaseUrl, supabaseKey, workspaceId, argNow)
 
     // Google Docs
     const token = await getGoogleAccessToken()
@@ -151,10 +180,14 @@ export async function GET(request: Request) {
         : `✅ COMPLETADO:\n  • Sin tareas cerradas en AgencyAi hoy\n\n`
 
       if (inProgress.length > 0) {
-        entry += `🔄 EN PROGRESO (continúa mañana):\n${inProgress.map((t: string) => `  • ${t}`).join('\n')}\n\n`
+        entry += `🔄 EN PROGRESO:\n${inProgress.map((t: string) => `  • ${t}`).join('\n')}\n\n`
       }
 
-      entry += `⚠️ Para detalles completos de sesión (decisiones, próximos pasos), ver cierre manual del día.\n\nCeonyx · Agente IA — Logística CEOON\n`
+      if (hygiene.flagged > 0) {
+        entry += `⚠️ REVISIÓN DE TAREAS (${hygiene.flagged} items):\n${hygiene.actions.map(a => `  • ${a}`).join('\n')}\n\n`
+      }
+
+      entry += `⚠️ Para decisiones y próximos pasos detallados, ver cierre manual de sesión.\n\nCeonyx · Agente IA — Logística CEOON\n`
     }
 
     await appendToDoc(docId, entry, token)
@@ -164,6 +197,8 @@ export async function GET(request: Request) {
       date: `${dayName} ${dayNum} de ${monthName} ${year}`,
       completedCount: completedToday.length,
       inProgressCount: inProgress.length,
+      hygieneFlagged: hygiene.flagged,
+      hygieneActions: hygiene.actions,
       docId,
     })
   } catch (err: any) {
