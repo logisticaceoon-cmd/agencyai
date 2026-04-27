@@ -5,12 +5,20 @@
       "schedule": "0 10 * * *"
     },
     {
+      "path": "/api/cron/daily-bitacora",
+      "schedule": "0 0 * * *"
+    },
+    {
       "path": "/api/cron/morning-briefing",
       "schedule": "0 13 * * *"
     },
     {
-      "path": "/api/cron/daily-bitacora",
-      "schedule": "0 0 * * *"
+      "path": "/api/cron/stephany-morning",
+      "schedule": "0 13 * * 1-5"
+    },
+    {
+      "path": "/api/cron/stephany-evening",
+      "schedule": "0 21 * * 1-5"
     },
     {
       "path": "/api/cron/task-alerts",
