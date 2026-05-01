@@ -14,24 +14,55 @@ export async function POST(request: Request) {
     const admin = createAdminClient()
     const results: string[] = []
 
-    // Use pg client with Supabase session pooler (IPv6-compatible, works from Vercel)
-    // Session pooler (port 5432 via pooler) supports DDL; transaction pooler (6543) does not
     const { Client } = await import('pg')
 
-    // Use DIRECT_URL (session pooler) — IPv6-compatible, works from Vercel, supports DDL
-    // DATABASE_URL uses transaction pooler which does NOT support DDL
-    const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL || ''
-    if (!connectionString) {
-      return NextResponse.json({ error: 'No database connection URL configured' }, { status: 500 })
+    // Try Supabase session pooler across all regions (IPv6-compatible, works from Vercel)
+    // Session pooler (port 5432 via pooler) supports DDL
+    // "Tenant or user not found" means wrong region — try each until one works
+    const projectRef = (process.env.NEXT_PUBLIC_SUPABASE_URL || '')
+      .replace('https://', '').replace('.supabase.co', '')
+    const dbPassword = process.env.DB_PASSWORD || 'agenciaai2026'
+
+    const REGIONS = [
+      'us-east-1', 'us-west-1', 'eu-west-1', 'eu-central-1',
+      'ap-southeast-1', 'ap-northeast-1', 'ca-central-1', 'sa-east-1',
+    ]
+
+    let client: import('pg').Client | null = null
+    let connectedRegion = ''
+
+    for (const region of REGIONS) {
+      const url = `postgresql://postgres.${projectRef}:${dbPassword}@aws-0-${region}.pooler.supabase.com:5432/postgres`
+      const tryClient = new Client({
+        connectionString: url,
+        ssl: { rejectUnauthorized: false },
+        connectionTimeoutMillis: 8000,
+      })
+      try {
+        await tryClient.connect()
+        client = tryClient
+        connectedRegion = region
+        break
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        // "Tenant or user not found" = wrong region, keep trying
+        // timeout = pooler unreachable, keep trying
+        if (msg.includes('Tenant or user not found') || msg.includes('timeout') || msg.includes('ECONNREFUSED')) {
+          continue
+        }
+        // Unexpected error
+        throw e
+      }
     }
 
-    const client = new Client({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: 15000,
-    })
+    if (!client) {
+      return NextResponse.json({
+        error: 'Could not connect to Supabase session pooler in any region. Check project region or DB password.',
+        triedRegions: REGIONS,
+      }, { status: 500 })
+    }
 
-    await client.connect()
+    results.push(`Connected via session pooler (${connectedRegion})`)
 
     try {
       // 1. Create workspace_roles table
