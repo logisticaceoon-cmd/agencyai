@@ -6,9 +6,7 @@ import { prisma } from '@/lib/prisma'
 // Desactiva la cuenta del usuario. Los datos se conservan 90 días.
 export async function POST(request: Request) {
   const auth = await getAuthContext()
-  if (isAuthError(auth)) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status })
-  }
+  if (isAuthError(auth)) return auth
 
   try {
     const org = await prisma.organization.findUnique({
