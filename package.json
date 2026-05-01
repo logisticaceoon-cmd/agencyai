@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma db push --accept-data-loss || true && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
@@ -61,18 +61,17 @@
     "zod": "^4.3.6",
     "zustand": "^5.0.12",
     "nodemailer": "^6.9.13",
-    "@sparticuz/chromium-min": "^123.0.0",
-    "puppeteer-core": "^22.0.0"
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.11.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
-    "pg": "^8.20.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "typescript": "^5",
