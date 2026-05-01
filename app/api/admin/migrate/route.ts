@@ -108,8 +108,8 @@ export async function POST(request: Request) {
           version_notes TEXT,
           tags TEXT[] DEFAULT '{}',
           external_url TEXT,
-          client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
-          project_id UUID REFERENCES public.projects(id) ON DELETE SET NULL,
+          client_id TEXT REFERENCES public.clients(id) ON DELETE SET NULL,
+          project_id TEXT REFERENCES public.projects(id) ON DELETE SET NULL,
           created_at TIMESTAMPTZ DEFAULT now(),
           updated_at TIMESTAMPTZ DEFAULT now()
         )
