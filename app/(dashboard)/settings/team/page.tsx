@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, Plus, X, Loader2, Shield, Trash2, Mail, Copy, Check, Link as LinkIcon, RefreshCw } from 'lucide-react'
+import { Users, Plus, X, Loader2, Shield, Trash2, Mail, Copy, Check, Link as LinkIcon, RefreshCw, Crown, Zap, Target, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ROLE_LABELS, ROLE_DESCRIPTIONS, type AppRole } from '@/lib/roles'
 
@@ -25,11 +25,11 @@ const ROLE_COLORS: Record<string, string> = {
   viewer:     'bg-slate-100 text-slate-600 border-slate-200',
 }
 
-const ROLE_ICONS: Record<string, string> = {
-  owner:      '👑',
-  admin:      '⚡',
-  trafficker: '🎯',
-  viewer:     '👁️',
+const ROLE_ICONS: Record<string, React.ReactNode> = {
+  owner:      <Crown className="h-3.5 w-3.5" />,
+  admin:      <Zap className="h-3.5 w-3.5" />,
+  trafficker: <Target className="h-3.5 w-3.5" />,
+  viewer:     <Eye className="h-3.5 w-3.5" />,
 }
 
 function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
@@ -228,7 +228,7 @@ export default function TeamPage() {
                       )}
                     >
                       <div className="flex items-center gap-1.5">
-                        <span className="text-base">{ROLE_ICONS[r]}</span>
+                        <span className={cn('flex-shrink-0', inviteRole === r ? 'text-blue-600' : 'text-slate-400')}>{ROLE_ICONS[r]}</span>
                         <span className={cn(
                           'text-xs font-bold',
                           inviteRole === r ? 'text-blue-700' : 'text-slate-700'
@@ -385,7 +385,7 @@ function MemberRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium text-slate-900 truncate">{displayName}</p>
-          {m.role === 'owner' && <span className="text-xs">👑</span>}
+          {m.role === 'owner' && <Crown className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />}
         </div>
         <p className="text-xs text-slate-400 truncate">{m.email}</p>
       </div>
@@ -400,18 +400,16 @@ function MemberRow({
             autoFocus
             className="text-xs border border-blue-300 rounded-lg px-2 py-1.5 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
-            <option value="admin">⚡ Admin</option>
-            <option value="trafficker">🎯 Trafficker</option>
-            <option value="viewer">👁️ Viewer</option>
+            <option value="admin">Admin</option>
+            <option value="trafficker">Trafficker</option>
+            <option value="viewer">Viewer</option>
           </select>
         ) : (
           <span className={cn(
             'inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold gap-1',
             ROLE_COLORS[m.role] || ROLE_COLORS.viewer
           )}>
-            {m.role !== 'owner' && <span className="text-[11px]">
-              {m.role === 'admin' ? '⚡' : m.role === 'trafficker' ? '🎯' : '👁️'}
-            </span>}
+            {ROLE_ICONS[m.role] && <span className="flex-shrink-0">{ROLE_ICONS[m.role]}</span>}
             {ROLE_LABELS[m.role as AppRole] || m.role}
           </span>
         )}

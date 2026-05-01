@@ -77,11 +77,30 @@ export async function GET() {
   }
 }
 
-export async function PATCH() {
+export async function PATCH(request: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const body = await request.json()
+
+    // Update display name in Supabase Auth metadata
+    if (body.fullName) {
+      await supabase.auth.updateUser({
+        data: { full_name: body.fullName },
+      })
+    }
+
+    // Also update name in workspace_members if user is a member (not owner)
+    if (body.fullName) {
+      const admin = createAdminClient()
+      await admin
+        .from('workspace_members')
+        .update({ name: body.fullName })
+        .eq('user_id', user.id)
+    }
+
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })

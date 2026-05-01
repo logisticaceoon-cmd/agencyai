@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { normalizeRole } from '@/lib/roles'
 
 export async function GET(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, workspaceId, role } = auth
+
+    const appRole = normalizeRole(role)
+    if (appRole === 'trafficker' || appRole === 'viewer') {
+      return NextResponse.json({ error: 'Sin permisos para ver finanzas' }, { status: 403 })
+    }
 
     const { searchParams } = new URL(request.url)
     const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1))
@@ -52,7 +58,12 @@ export async function POST(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, workspaceId, role } = auth
+
+    const appRole = normalizeRole(role)
+    if (appRole === 'trafficker' || appRole === 'viewer') {
+      return NextResponse.json({ error: 'Sin permisos para registrar transacciones' }, { status: 403 })
+    }
 
     const body = await request.json()
 

@@ -1,22 +1,75 @@
 'use client'
 
-import { useState } from 'react'
-import { User, Camera, Globe, Bell, Save, Key, ExternalLink } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { User, Camera, Globe, Bell, Save, Key, ExternalLink, Loader2, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useAuthStore } from '@/store/auth'
 
 export default function AccountPage() {
+  const { user, isLoading } = useCurrentUser()
+  const { setUser } = useAuthStore()
+
   const [nombre, setNombre] = useState('')
-  const [email] = useState('usuario@ejemplo.com')
+  const [email, setEmail] = useState('')
   const [timezone, setTimezone] = useState('America/Argentina/Buenos_Aires')
   const [idioma, setIdioma] = useState('es')
   const [notifEmail, setNotifEmail] = useState(true)
   const [notifApp, setNotifApp] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
-  function handleSave(e: React.FormEvent) {
+  // Load real user data
+  useEffect(() => {
+    if (user) {
+      setNombre(user.fullName || '')
+      setEmail(user.email || '')
+    }
+  }, [user])
+
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    setTimeout(() => setSaving(false), 1000)
+    setSaved(false)
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fullName: nombre }),
+      })
+      if (res.ok) {
+        setSaved(true)
+        // Update local store so Header and other components reflect the change
+        if (user) {
+          setUser({ ...user, fullName: nombre })
+        }
+        setTimeout(() => setSaved(false), 3000)
+      }
+    } catch {
+      // silently fail — toast would be better but keeping it simple
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <div className="h-8 w-40 bg-slate-100 rounded-lg animate-pulse" />
+          <div className="h-4 w-64 bg-slate-100 rounded mt-2 animate-pulse" />
+        </div>
+        {[1, 2, 3].map(i => (
+          <div key={i} className="rounded-xl border border-slate-200 bg-white p-6">
+            <div className="h-6 w-48 bg-slate-100 rounded animate-pulse mb-4" />
+            <div className="space-y-3">
+              <div className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+              <div className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -38,18 +91,27 @@ export default function AccountPage() {
           </div>
 
           <div className="space-y-5">
-            {/* Avatar upload */}
+            {/* Avatar */}
             <div>
               <label className="block text-sm font-medium text-slate-500 mb-2">Foto de perfil</label>
               <div className="flex items-center gap-4">
-                <div className="h-20 w-20 rounded-full bg-slate-100 border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
-                  <Camera className="h-6 w-6 text-slate-400" />
-                </div>
+                {user?.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={nombre}
+                    className="h-20 w-20 rounded-full object-cover border-2 border-slate-200"
+                  />
+                ) : (
+                  <div className="h-20 w-20 rounded-full bg-blue-600 flex items-center justify-center text-white text-2xl font-bold border-2 border-slate-200">
+                    {nombre?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                )}
                 <div>
                   <button
                     type="button"
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                    className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                   >
+                    <Camera className="h-3.5 w-3.5" />
                     Subir imagen
                   </button>
                   <p className="text-xs text-slate-400 mt-1">JPG, PNG. Máximo 2MB.</p>
@@ -59,7 +121,9 @@ export default function AccountPage() {
 
             {/* Nombre */}
             <div>
-              <label className="block text-sm font-medium text-slate-500 mb-1.5">Nombre completo</label>
+              <label className="block text-sm font-medium text-slate-500 mb-1.5">
+                Nombre completo
+              </label>
               <input
                 type="text"
                 value={nombre}
@@ -69,7 +133,7 @@ export default function AccountPage() {
               />
             </div>
 
-            {/* Email */}
+            {/* Email — read only */}
             <div>
               <label className="block text-sm font-medium text-slate-500 mb-1.5">Email</label>
               <input
@@ -82,6 +146,16 @@ export default function AccountPage() {
                 Gestionado por tu proveedor de auth. No se puede modificar desde aquí.
               </p>
             </div>
+
+            {/* Role badge */}
+            {user?.role && (
+              <div>
+                <label className="block text-sm font-medium text-slate-500 mb-1.5">Rol en el workspace</label>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-700 capitalize">
+                  {user.role}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -138,7 +212,6 @@ export default function AccountPage() {
           </div>
 
           <div className="space-y-4">
-            {/* Email toggle */}
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-900">Notificaciones por email</p>
@@ -163,7 +236,6 @@ export default function AccountPage() {
 
             <div className="border-t border-slate-100" />
 
-            {/* In-app toggle */}
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-slate-900">Notificaciones in-app</p>
@@ -189,19 +261,25 @@ export default function AccountPage() {
         </div>
 
         {/* Save button */}
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-3">
+          {saved && (
+            <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
+              <CheckCircle className="h-4 w-4" />
+              Cambios guardados
+            </span>
+          )}
           <button
             type="submit"
             disabled={saving}
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            <Save className="h-4 w-4" />
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {saving ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
       </form>
 
-      {/* API Keys for Cowork */}
+      {/* API Keys section */}
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
