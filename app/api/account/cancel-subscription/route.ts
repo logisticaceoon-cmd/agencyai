@@ -50,7 +50,10 @@ export async function POST(request: Request) {
           cancel_at_period_end: true,
         })
 
-        periodEnd = new Date(sub.current_period_end * 1000)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const subAny = sub as any
+        const periodEndTs = subAny.current_period_end ?? subAny.items?.data?.[0]?.billing_cycle_anchor
+        periodEnd = periodEndTs ? new Date(periodEndTs * 1000) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 
         await prisma.organization.update({
           where: { id: auth.workspaceId },
