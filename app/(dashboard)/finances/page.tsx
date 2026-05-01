@@ -11,6 +11,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import * as Tabs from '@radix-ui/react-tabs'
 import { AgentWidget } from '@/components/ai/AgentWidget'
 import { InfoBanner } from '@/components/shared/InfoBanner'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { ProGate, UpgradeBanner } from '@/components/shared/ProGate'
+import { Lock, Sparkles } from 'lucide-react'
+import Link from 'next/link'
 
 // ═══════════════════════════════════════
 // TYPES
@@ -145,7 +149,8 @@ function hexToRgba(hex: string, alpha: number) {
 // ═══════════════════════════════════════
 
 export default function FinancesPage() {
-  const [tab, setTab] = useState('resumen')
+  const { hasFinanceResumen, hasFinanceNominas, hasFinanceGastos } = usePlanLimits()
+  const [tab, setTab] = useState('clientes') // free siempre empieza en clientes
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<ServiceCategory[]>([])
   const [financeClients, setFinanceClients] = useState<FinanceClient[]>([])
@@ -505,11 +510,16 @@ export default function FinancesPage() {
   const topExpenseCategory = Object.entries(expenseByCategory).sort((a, b) => b[1] - a[1])[0]
 
   const tabItems = [
-    { id: 'resumen', label: 'Resumen', icon: BarChart3 },
-    { id: 'clientes', label: 'Clientes', icon: Briefcase },
-    { id: 'nominas', label: 'Nominas', icon: Users },
-    { id: 'gastos', label: 'Gastos', icon: Receipt },
+    { id: 'clientes', label: 'Clientes', icon: Briefcase, locked: false },
+    { id: 'resumen',  label: 'Resumen',  icon: BarChart3, locked: !hasFinanceResumen },
+    { id: 'nominas',  label: 'Nominas',  icon: Users,     locked: !hasFinanceNominas },
+    { id: 'gastos',   label: 'Gastos',   icon: Receipt,   locked: !hasFinanceGastos },
   ]
+
+  function handleTabClick(id: string, locked: boolean) {
+    if (locked) return // no cambiar tab si está bloqueado
+    setTab(id)
+  }
 
   return (
     <div className="space-y-6">
@@ -529,17 +539,35 @@ export default function FinancesPage() {
       <Tabs.Root value={tab} onValueChange={setTab}>
         <Tabs.List className="flex gap-1 border-b border-slate-200 mb-6">
           {tabItems.map(t => (
-            <Tabs.Trigger key={t.id} value={t.id} className={cn(
-              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
-              tab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-            )}>
-              <t.icon className="h-4 w-4" /> {t.label}
-            </Tabs.Trigger>
+            t.locked ? (
+              /* Tab bloqueada — link a billing en lugar de cambiar tab */
+              <Link
+                key={t.id}
+                href="/settings/billing"
+                title="Función Pro — Activar por $30/mes"
+                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-indigo-500 transition-colors -mb-px"
+              >
+                <t.icon className="h-4 w-4" />
+                {t.label}
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 text-indigo-500 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide">
+                  <Lock className="h-2 w-2" />
+                  Pro
+                </span>
+              </Link>
+            ) : (
+              <Tabs.Trigger key={t.id} value={t.id} className={cn(
+                'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
+                tab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+              )}>
+                <t.icon className="h-4 w-4" /> {t.label}
+              </Tabs.Trigger>
+            )
           ))}
         </Tabs.List>
 
         {/* ═══ TAB RESUMEN ═══ */}
         <Tabs.Content value="resumen" className="space-y-6">
+          {!hasFinanceResumen && <UpgradeBanner feature="Resumen financiero" />}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <KPICard icon={DollarSign} label="Ingresos del mes" value={`$${totalIncome.toLocaleString()}`} color="text-green-600" bg="bg-green-50" border="border-green-200" />
             <KPICard icon={TrendingDown} label="Gastos del mes" value={`$${totalExpenses.toLocaleString()}`} color="text-red-600" bg="bg-red-50" border="border-red-200" />
@@ -905,6 +933,7 @@ export default function FinancesPage() {
 
         {/* ═══ TAB NOMINAS ═══ */}
         <Tabs.Content value="nominas" className="space-y-4">
+          {!hasFinanceNominas && <UpgradeBanner feature="Nóminas" />}
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-slate-900">Nominas - {MONTHS[month - 1]} {year}</h2>
             <button onClick={() => setShowPayrollForm(!showPayrollForm)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
@@ -1082,6 +1111,7 @@ export default function FinancesPage() {
 
         {/* ═══ TAB GASTOS ═══ */}
         <Tabs.Content value="gastos" className="space-y-4">
+          {!hasFinanceGastos && <UpgradeBanner feature="Gastos" />}
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-slate-900">Gastos - {MONTHS[month - 1]} {year}</h2>
             <div className="flex items-center gap-2">
