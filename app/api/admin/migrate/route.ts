@@ -23,45 +23,46 @@ export async function POST(request: Request) {
       .replace('https://', '').replace('.supabase.co', '')
     const dbPassword = process.env.DB_PASSWORD || 'agenciaai2026'
 
-    const REGIONS = [
-      'us-east-1', 'us-west-1', 'eu-west-1', 'eu-central-1',
-      'ap-southeast-1', 'ap-northeast-1', 'ca-central-1', 'sa-east-1',
+    // Connection attempts: session pooler in all regions + direct connection
+    const CONNECTION_ATTEMPTS = [
+      // Direct connection (might work from some Vercel regions)
+      { url: `postgresql://postgres:${dbPassword}@db.${projectRef}.supabase.co:5432/postgres`, label: 'direct' },
+      // Session pooler in all Supabase regions (IPv6-compatible)
+      ...['us-east-1', 'us-west-1', 'eu-west-1', 'eu-central-1', 'ap-southeast-1', 'ap-northeast-1', 'ca-central-1', 'sa-east-1']
+        .map(r => ({ url: `postgresql://postgres.${projectRef}:${dbPassword}@aws-0-${r}.pooler.supabase.com:5432/postgres`, label: `pooler-${r}` })),
     ]
 
     let client: import('pg').Client | null = null
-    let connectedRegion = ''
+    let connectedLabel = ''
+    const errors: string[] = []
 
-    for (const region of REGIONS) {
-      const url = `postgresql://postgres.${projectRef}:${dbPassword}@aws-0-${region}.pooler.supabase.com:5432/postgres`
+    for (const attempt of CONNECTION_ATTEMPTS) {
       const tryClient = new Client({
-        connectionString: url,
+        connectionString: attempt.url,
         ssl: { rejectUnauthorized: false },
         connectionTimeoutMillis: 8000,
       })
       try {
         await tryClient.connect()
         client = tryClient
-        connectedRegion = region
+        connectedLabel = attempt.label
         break
       } catch (e) {
         const msg = (e instanceof Error ? e.message : String(e)).toLowerCase()
-        // tenant/user not found = wrong region; timeout/refused = unreachable — keep trying
-        const isRetryable = msg.includes('tenant') || msg.includes('user not found')
-          || msg.includes('timeout') || msg.includes('econnrefused') || msg.includes('enotfound')
-        if (isRetryable) continue
-        // Unexpected error — stop
-        throw e
+        errors.push(`${attempt.label}: ${msg.slice(0, 80)}`)
+        // All connection errors are retryable — keep trying all options
+        continue
       }
     }
 
     if (!client) {
       return NextResponse.json({
-        error: 'Could not connect to Supabase session pooler in any region. Check project region or DB password.',
-        triedRegions: REGIONS,
+        error: 'Could not connect to database. None of the connection methods worked.',
+        details: errors,
       }, { status: 500 })
     }
 
-    results.push(`Connected via session pooler (${connectedRegion})`)
+    results.push(`Connected via: ${connectedLabel}`)
 
     try {
       // 1. Create workspace_roles table
