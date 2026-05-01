@@ -32,6 +32,7 @@ import {
   ChevronDown,
   TrendingUp,
   Lock,
+  Shield,
 } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
@@ -70,6 +71,7 @@ type NavItem = {
 const adminItems: NavItem[] = [
   { href: '/settings', label: 'Workspace', icon: Building2 },
   { href: '/settings/team', label: 'Equipo', icon: Users },
+  { href: '/settings/roles', label: 'Roles', icon: Shield },
   { href: '/settings/billing', label: 'Facturacion', icon: CreditCard },
 ]
 
