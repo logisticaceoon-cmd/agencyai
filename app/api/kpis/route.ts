@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { normalizeRole, getDataScope } from '@/lib/roles'
 
 export async function GET(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, workspaceId, userId, role } = auth
 
     const { searchParams } = new URL(request.url)
     const clientId = searchParams.get('clientId')
+
+    const appRole = normalizeRole(role)
+    const scope = getDataScope('kpis', appRole)
 
     let query = supabase
       .from('kpis')
@@ -17,6 +21,11 @@ export async function GET(request: Request) {
       .order('createdAt', { ascending: false })
 
     if (clientId) query = query.eq('client_id', clientId)
+
+    // Trafficker/viewer: solo ven sus propios KPIs
+    if (scope === 'assigned') {
+      query = query.eq('owner_id', userId)
+    }
 
     const { data, error } = await query
 

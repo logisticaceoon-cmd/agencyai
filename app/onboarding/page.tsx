@@ -17,6 +17,8 @@ const STORAGE_KEY = 'agencyai_onboarding'
 
 interface OnboardingData {
   step: number
+  mode: '' | 'create' | 'join'
+  joinCode: string
   fullName: string
   cargo: string
   agencyType: string
@@ -32,6 +34,8 @@ interface OnboardingData {
 
 const defaultData: OnboardingData = {
   step: 1,
+  mode: '',
+  joinCode: '',
   fullName: '',
   cargo: '',
   agencyType: '',
@@ -94,9 +98,9 @@ export default function OnboardingPage() {
     }
   }, [data])
 
-  // Fire confetti on step 7
+  // Fire confetti on step 8
   useEffect(() => {
-    if (data.step === 7 && !confettiFired.current) {
+    if (data.step === 8 && !confettiFired.current) {
       confettiFired.current = true
       const duration = 2000
       const end = Date.now() + duration
@@ -204,16 +208,18 @@ export default function OnboardingPage() {
 
         localStorage.setItem('agencyai_workspace_id', workspace.id)
 
-        // Send invites if any
+        // Send invites via the team API (generates real tokens + sends emails)
         for (const invite of data.invites) {
           if (invite.email.trim()) {
-            await supabase.from('workspace_members').insert({
-              workspace_id: workspace.id,
-              user_id: invite.email, // placeholder until they register
-              role: invite.role,
-              email: invite.email,
-              status: 'invited',
-            })
+            try {
+              await fetch('/api/team', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: invite.email, role: invite.role }),
+              })
+            } catch {
+              // Non-blocking — invites can be sent later from Settings
+            }
           }
         }
       }
@@ -221,7 +227,7 @@ export default function OnboardingPage() {
       localStorage.removeItem(STORAGE_KEY)
       setFadeIn(false)
       setTimeout(() => {
-        update({ step: 7 })
+        update({ step: 8 })
         setFadeIn(true)
       }, 150)
     } catch (err) {
@@ -253,6 +259,7 @@ export default function OnboardingPage() {
   }
 
   const stepLabels = [
+    'Inicio',
     'Bienvenida',
     'Perfil',
     'Tipo agencia',
@@ -262,14 +269,25 @@ export default function OnboardingPage() {
     'Listo',
   ]
 
+  const totalSteps = 8
+
   const canProceed = () => {
     switch (data.step) {
-      case 2: return data.fullName.trim() && data.cargo
-      case 3: return !!data.agencyType
-      case 4: return data.teamSize && data.clientCount && data.projectTool
-      case 5: return data.workspaceName.trim()
+      case 1: return data.mode === 'create'
+      case 3: return !!(data.fullName.trim() && data.cargo)
+      case 4: return !!data.agencyType
+      case 5: return !!(data.teamSize && data.clientCount && data.projectTool)
+      case 6: return !!data.workspaceName.trim()
       default: return true
     }
+  }
+
+  function handleJoinRedirect() {
+    const code = data.joinCode.trim()
+    if (!code) return
+    // Accept full URL or just the token
+    const token = code.includes('/invite/') ? code.split('/invite/')[1].split('?')[0] : code
+    router.push(`/invite/${token}`)
   }
 
   return (
@@ -286,13 +304,13 @@ export default function OnboardingPage() {
         {/* Progress bar */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-slate-500">Paso {data.step} de 7</span>
+            <span className="text-xs font-medium text-slate-500">Paso {data.step} de {totalSteps}</span>
             <span className="text-xs font-medium text-slate-400">{stepLabels[data.step - 1]}</span>
           </div>
           <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
             <div
               className="h-full rounded-full bg-blue-600 transition-all duration-500 ease-out"
-              style={{ width: `${(data.step / 7) * 100}%` }}
+              style={{ width: `${(data.step / totalSteps) * 100}%` }}
             />
           </div>
         </div>
@@ -304,17 +322,117 @@ export default function OnboardingPage() {
             fadeIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
           )}
         >
-          {/* Step 1: Welcome */}
+          {/* Step 1: Choose path */}
           {data.step === 1 && (
+            <div className="p-8">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-blue-50 border border-blue-100 mb-4">
+                  <Sparkles className="h-8 w-8 text-blue-600" />
+                </div>
+                <h1 className="text-2xl font-bold text-slate-900 mb-2">Bienvenido a AgencyAI</h1>
+                <p className="text-slate-500 text-sm">¿Qué querés hacer?</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                {/* Option A: Crear */}
+                <button
+                  type="button"
+                  onClick={() => { update({ mode: 'create', joinCode: '' }); setTimeout(nextStep, 80) }}
+                  className={cn(
+                    'flex flex-col items-start gap-3 rounded-2xl border-2 p-5 text-left transition-all hover:shadow-md',
+                    data.mode === 'create'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-slate-200 bg-white hover:border-blue-300'
+                  )}
+                >
+                  <div className="h-12 w-12 rounded-xl bg-blue-600 flex items-center justify-center">
+                    <Building2 className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-base font-bold text-slate-900">Crear mi agencia</p>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      Configuro un nuevo workspace para mi equipo desde cero
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {['Clientes', 'Proyectos', 'Finanzas', 'Equipo'].map((f) => (
+                      <span key={f} className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">{f}</span>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-blue-600 font-semibold text-sm mt-auto">
+                    Empezar <ArrowRight className="h-4 w-4" />
+                  </div>
+                </button>
+
+                {/* Option B: Join */}
+                <button
+                  type="button"
+                  onClick={() => update({ mode: 'join', joinCode: '' })}
+                  className={cn(
+                    'flex flex-col items-start gap-3 rounded-2xl border-2 p-5 text-left transition-all hover:shadow-md',
+                    data.mode === 'join'
+                      ? 'border-violet-500 bg-violet-50'
+                      : 'border-slate-200 bg-white hover:border-violet-300'
+                  )}
+                >
+                  <div className="h-12 w-12 rounded-xl bg-violet-600 flex items-center justify-center">
+                    <UserPlus className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-base font-bold text-slate-900">Unirme a una agencia</p>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      Me invitaron a un workspace existente y quiero unirme
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-violet-600 font-semibold text-sm mt-auto">
+                    Tengo un código de invitación <ArrowRight className="h-4 w-4" />
+                  </div>
+                </button>
+              </div>
+
+              {/* Join form — expands when mode === 'join' */}
+              {data.mode === 'join' && (
+                <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                  <label className="block text-sm font-semibold text-violet-900 mb-2">
+                    Código o enlace de invitación
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={data.joinCode}
+                      onChange={(e) => update({ joinCode: e.target.value })}
+                      onKeyDown={(e) => e.key === 'Enter' && handleJoinRedirect()}
+                      placeholder="https://agencyai.app/invite/... o solo el código"
+                      className="flex-1 rounded-lg border border-violet-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleJoinRedirect}
+                      disabled={!data.joinCode.trim()}
+                      className="rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-40 transition-colors"
+                    >
+                      Ir
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-violet-600">
+                    Pedile el enlace o token a quien te invitó. Si no lo tenés, pediles que te re-envíen la invitación desde Configuración → Equipo.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 2: Welcome */}
+          {data.step === 2 && (
             <div className="p-8 text-center">
               <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-blue-50 border border-blue-100 mb-6">
                 <Sparkles className="h-8 w-8 text-blue-600" />
               </div>
               <h1 className="text-2xl font-bold text-slate-900 mb-3">
-                Bienvenido a AgencyAI
+                Vamos a crear tu agencia
               </h1>
               <p className="text-slate-500 mb-6 max-w-md mx-auto">
-                Vamos a configurar tu workspace en unos minutos. Gestiona clientes, proyectos, finanzas y equipo desde un solo lugar.
+                Te llevará menos de 3 minutos. Configuramos tu workspace con todo lo que necesitás para arrancar.
               </p>
               <div className="grid grid-cols-2 gap-3 mb-8 text-left max-w-sm mx-auto">
                 {[
@@ -338,8 +456,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 2: Profile */}
-          {data.step === 2 && (
+          {/* Step 3: Profile */}
+          {data.step === 3 && (
             <div className="p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
@@ -385,8 +503,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3: Agency Type */}
-          {data.step === 3 && (
+          {/* Step 4: Agency Type */}
+          {data.step === 4 && (
             <div className="p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
@@ -447,8 +565,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 4: Team context */}
-          {data.step === 4 && (
+          {/* Step 5: Team context */}
+          {data.step === 5 && (
             <div className="p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
@@ -533,8 +651,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 5: Workspace */}
-          {data.step === 5 && (
+          {/* Step 6: Workspace */}
+          {data.step === 6 && (
             <div className="p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
@@ -602,8 +720,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 6: Invite team */}
-          {data.step === 6 && (
+          {/* Step 7: Invite team */}
+          {data.step === 7 && (
             <div className="p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="h-10 w-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
@@ -633,7 +751,7 @@ export default function OnboardingPage() {
                       className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none transition-colors"
                     >
                       <option value="admin">Admin</option>
-                      <option value="member">Miembro</option>
+                      <option value="trafficker">Trafficker</option>
                       <option value="viewer">Viewer</option>
                     </select>
                     {data.invites.length > 1 && (
@@ -668,8 +786,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 7: Done */}
-          {data.step === 7 && (
+          {/* Step 8: Done */}
+          {data.step === 8 && (
             <div className="p-8 text-center">
               <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-green-50 border border-green-200 mb-6">
                 <Check className="h-8 w-8 text-green-600" />
@@ -708,8 +826,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Navigation buttons (steps 2-6) */}
-          {data.step >= 2 && data.step <= 6 && (
+          {/* Navigation buttons — steps 1 (only for create mode) and 3-7 */}
+          {((data.step === 1 && data.mode === 'create') || (data.step >= 3 && data.step <= 7)) && (
             <div className="flex items-center justify-between border-t border-slate-100 px-8 py-4">
               <button
                 type="button"
@@ -721,7 +839,7 @@ export default function OnboardingPage() {
               </button>
 
               <div className="flex items-center gap-3">
-                {data.step === 6 && (
+                {data.step === 7 && (
                   <button
                     type="button"
                     onClick={createWorkspace}
@@ -734,11 +852,11 @@ export default function OnboardingPage() {
                 )}
                 <button
                   type="button"
-                  onClick={data.step === 6 ? createWorkspace : nextStep}
-                  disabled={(data.step === 6 && loading) || !canProceed()}
+                  onClick={data.step === 7 ? createWorkspace : nextStep}
+                  disabled={(data.step === 7 && loading) || !canProceed()}
                   className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {data.step === 6
+                  {data.step === 7
                     ? loading
                       ? 'Creando workspace...'
                       : 'Crear workspace'

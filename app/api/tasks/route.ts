@@ -1,17 +1,21 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { normalizeRole, getDataScope } from '@/lib/roles'
 
 export async function GET(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, workspaceId, userId, role } = auth
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const priority = searchParams.get('priority')
     const projectId = searchParams.get('project_id') || searchParams.get('projectId')
     const parentTaskId = searchParams.get('parent_task_id') || searchParams.get('parentTaskId')
+
+    const appRole = normalizeRole(role)
+    const scope = getDataScope('tasks', appRole)
 
     let query = supabase
       .from('tasks')
@@ -20,6 +24,11 @@ export async function GET(request: Request) {
       .is('deleted_at', null)
       .limit(500)
       .order('createdAt', { ascending: true })
+
+    // Filtrar por asignado si el rol no tiene acceso total
+    if (scope === 'assigned') {
+      query = query.contains('assignedTo', [userId])
+    }
 
     if (status) query = query.eq('status', status)
     if (priority) query = query.eq('priority', priority)

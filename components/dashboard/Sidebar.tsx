@@ -7,6 +7,7 @@ import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useProfessionalType } from '@/hooks/useProfessionalType'
 import { Avatar } from '@/components/shared/Avatar'
 import { toast } from '@/hooks/use-toast'
+import { normalizeRole, canAccessSection, ROLE_LABELS, type AppRole } from '@/lib/roles'
 import {
   LayoutDashboard,
   CheckSquare,
@@ -25,31 +26,23 @@ import {
   Calendar,
   FolderKanban,
   Building2,
-  Lock,
   User,
   CreditCard,
   HelpCircle,
   ChevronDown,
   TrendingUp,
+  Lock,
 } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
 type OrgPlan = 'free' | 'starter' | 'pro' | 'agency' | 'scale'
 
 const PLAN_RANK: Record<OrgPlan, number> = {
-  free: 0,
-  starter: 1,
-  pro: 2,
-  agency: 3,
-  scale: 4,
+  free: 0, starter: 1, pro: 2, agency: 3, scale: 4,
 }
 
 const PLAN_LABEL: Record<OrgPlan, string> = {
-  free: 'Free',
-  starter: 'Starter',
-  pro: 'Pro',
-  agency: 'Agency',
-  scale: 'Scale',
+  free: 'Free', starter: 'Starter', pro: 'Pro', agency: 'Agency', scale: 'Scale',
 }
 
 const PLAN_STYLE: Record<OrgPlan, string> = {
@@ -58,6 +51,13 @@ const PLAN_STYLE: Record<OrgPlan, string> = {
   pro: 'bg-indigo-50 text-indigo-600',
   agency: 'bg-purple-50 text-purple-600',
   scale: 'bg-amber-50 text-amber-600',
+}
+
+const ROLE_BADGE_STYLE: Record<AppRole, string> = {
+  owner:      'bg-amber-50 text-amber-700',
+  admin:      'bg-purple-50 text-purple-700',
+  trafficker: 'bg-blue-50 text-blue-700',
+  viewer:     'bg-slate-100 text-slate-500',
 }
 
 type NavItem = {
@@ -85,6 +85,9 @@ export function Sidebar() {
   const { config } = useProfessionalType()
 
   const orgPlan: OrgPlan = (org?.plan as OrgPlan) ?? 'free'
+  const role: AppRole = normalizeRole(user?.role)
+  const isOwner = role === 'owner'
+  const canAdmin = role === 'owner' || role === 'admin'
 
   const navGroups: { label: string | null; items: NavItem[] }[] = [
     {
@@ -96,30 +99,30 @@ export function Sidebar() {
     {
       label: 'Operaciones',
       items: [
-        { href: '/clients', label: config.terminology.clients, icon: Users },
-        { href: '/projects', label: config.terminology.projects, icon: FolderKanban },
-        { href: '/tasks', label: config.terminology.tasks, icon: CheckSquare },
-        { href: '/minutes', label: 'Minutas', icon: MessageSquare },
-        { href: '/calendar', label: 'Calendario', icon: Calendar },
+        { href: '/clients',   label: config.terminology.clients,  icon: Users },
+        { href: '/projects',  label: config.terminology.projects, icon: FolderKanban },
+        { href: '/tasks',     label: config.terminology.tasks,    icon: CheckSquare },
+        { href: '/minutes',   label: 'Minutas',                   icon: MessageSquare },
+        { href: '/calendar',  label: 'Calendario',                icon: Calendar },
       ],
     },
     {
       label: 'Reportes',
       items: [
-        { href: '/reports', label: config.terminology.reports, icon: FileText },
-        { href: '/kpis', label: 'KPIs y Metricas', icon: BarChart2 },
-        { href: '/objectives', label: 'Objetivos', icon: Target },
+        { href: '/reports',    label: config.terminology.reports, icon: FileText },
+        { href: '/kpis',       label: 'KPIs y Metricas',          icon: BarChart2 },
+        { href: '/objectives', label: 'Objetivos',                icon: Target },
       ],
     },
     {
       label: 'Gestion',
       items: [
-        { href: '/audits', label: 'Auditorias', icon: Search },
-        { href: '/performance', label: 'Rendimiento Equipo', icon: TrendingUp },
-        { href: '/docs', label: 'Documentos', icon: BookOpen },
-        { href: '/finances', label: 'Finanzas', icon: DollarSign },
-        { href: '/recordings', label: 'Grabaciones', icon: Video },
-        { href: '/alerts', label: 'IA & Alertas', icon: Zap },
+        { href: '/audits',      label: 'Auditorias',       icon: Search },
+        { href: '/performance', label: 'Rendimiento',      icon: TrendingUp },
+        { href: '/docs',        label: 'Documentos',       icon: BookOpen },
+        { href: '/finances',    label: 'Finanzas',         icon: DollarSign },
+        { href: '/recordings',  label: 'Grabaciones',      icon: Video },
+        { href: '/alerts',      label: 'IA & Alertas',     icon: Zap },
       ],
     },
   ]
@@ -137,7 +140,6 @@ export function Sidebar() {
     return pathname.startsWith(href)
   }
 
-  const isAdmin = user && (user.role === 'CEO' || user.role === 'Manager')
   const displayName = user?.fullName || 'Usuario'
   const displayEmail = user?.email || ''
 
@@ -161,55 +163,64 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
-        {navGroups.map((group) => (
-          <div key={group.label ?? 'main'} className="mb-1">
-            {group.label && (
-              <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase" style={{ letterSpacing: '0.08em' }}>
-                {group.label}
-              </p>
-            )}
-            {group.items.map((item) => {
-              const unlocked = isUnlocked(item.minPlan, orgPlan)
-              const active = isActive(item.href)
+        {navGroups.map((group) => {
+          // Filtrar items accesibles para este rol
+          const visibleItems = group.items.filter((item) =>
+            canAccessSection(role, item.href)
+          )
+          if (visibleItems.length === 0) return null
 
-              if (!unlocked) {
+          return (
+            <div key={group.label ?? 'main'} className="mb-1">
+              {group.label && (
+                <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase" style={{ letterSpacing: '0.08em' }}>
+                  {group.label}
+                </p>
+              )}
+              {visibleItems.map((item) => {
+                const unlocked = isUnlocked(item.minPlan, orgPlan)
+                const active = isActive(item.href)
+
+                if (!unlocked) {
+                  return (
+                    <Link
+                      key={item.href}
+                      href="/settings"
+                      title={`Requiere plan ${PLAN_LABEL[item.minPlan!]} — Actualizar plan`}
+                      className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-muted)] opacity-50 hover:opacity-70 transition-all"
+                    >
+                      <item.icon size={16} strokeWidth={1.5} className="flex-shrink-0" />
+                      <span className="flex-1">{item.label}</span>
+                      <Lock size={12} strokeWidth={1.5} className="flex-shrink-0" />
+                    </Link>
+                  )
+                }
+
                 return (
                   <Link
                     key={item.href}
-                    href="/settings"
-                    title={`Requiere plan ${PLAN_LABEL[item.minPlan!]} — Actualizar plan`}
-                    className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-muted)] opacity-50 hover:opacity-70 transition-all group"
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150 relative',
+                      active
+                        ? 'bg-[var(--blue-light)] text-[var(--blue)] font-semibold'
+                        : 'text-[var(--text-secondary)] font-medium hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]'
+                    )}
                   >
+                    {active && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[60%] bg-[var(--blue)] rounded-r" />
+                    )}
                     <item.icon size={16} strokeWidth={1.5} className="flex-shrink-0" />
-                    <span className="flex-1">{item.label}</span>
-                    <Lock size={12} strokeWidth={1.5} className="flex-shrink-0" />
+                    {item.label}
                   </Link>
                 )
-              }
+              })}
+            </div>
+          )
+        })}
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150 relative',
-                    active
-                      ? 'bg-[var(--blue-light)] text-[var(--blue)] font-semibold'
-                      : 'text-[var(--text-secondary)] font-medium hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]'
-                  )}
-                >
-                  {active && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[60%] bg-[var(--blue)] rounded-r" />
-                  )}
-                  <item.icon size={16} strokeWidth={1.5} className="flex-shrink-0" />
-                  {item.label}
-                </Link>
-              )
-            })}
-          </div>
-        ))}
-
-        {isAdmin && (
+        {/* Sección Admin — solo owner */}
+        {isOwner && (
           <div>
             <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase" style={{ letterSpacing: '0.08em' }}>
               Admin
@@ -234,15 +245,47 @@ export function Sidebar() {
             ))}
           </div>
         )}
+
+        {/* Configuración rápida para admins (sin billing) */}
+        {canAdmin && !isOwner && (
+          <div>
+            <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase" style={{ letterSpacing: '0.08em' }}>
+              Admin
+            </p>
+            <Link
+              href="/settings/team"
+              className={cn(
+                'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150 relative',
+                isActive('/settings/team')
+                  ? 'bg-[var(--blue-light)] text-[var(--blue)] font-semibold'
+                  : 'text-[var(--text-secondary)] font-medium hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]'
+              )}
+            >
+              {isActive('/settings/team') && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-[60%] bg-[var(--blue)] rounded-r" />
+              )}
+              <Users size={16} strokeWidth={1.5} className="flex-shrink-0" />
+              Equipo
+            </Link>
+          </div>
+        )}
       </nav>
 
-      {/* User profile section */}
+      {/* User profile */}
       <div className="border-t border-[var(--border-base)] p-3">
         {user ? (
           <div className="flex items-center gap-2.5">
             <Avatar name={displayName} avatarUrl={user.avatarUrl} size="sm" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-[var(--text-primary)] truncate">{displayName}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-medium text-[var(--text-primary)] truncate">{displayName}</p>
+                <span className={cn(
+                  'text-[9px] font-semibold rounded-full px-1.5 py-0.5 flex-shrink-0',
+                  ROLE_BADGE_STYLE[role]
+                )}>
+                  {ROLE_LABELS[role]}
+                </span>
+              </div>
               <p className="text-[10px] text-[var(--text-muted)] truncate">{displayEmail}</p>
             </div>
             <DropdownMenu.Root>
@@ -263,16 +306,20 @@ export function Sidebar() {
                       <User size={16} strokeWidth={1.5} /> Mi cuenta
                     </Link>
                   </DropdownMenu.Item>
-                  <DropdownMenu.Item asChild>
-                    <Link href="/settings/workspace" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer outline-none">
-                      <Building2 size={16} strokeWidth={1.5} /> Workspace
-                    </Link>
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item asChild>
-                    <Link href="/settings/billing" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer outline-none">
-                      <CreditCard size={16} strokeWidth={1.5} /> Plan y facturacion
-                    </Link>
-                  </DropdownMenu.Item>
+                  {isOwner && (
+                    <>
+                      <DropdownMenu.Item asChild>
+                        <Link href="/settings/workspace" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer outline-none">
+                          <Building2 size={16} strokeWidth={1.5} /> Workspace
+                        </Link>
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item asChild>
+                        <Link href="/settings/billing" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer outline-none">
+                          <CreditCard size={16} strokeWidth={1.5} /> Plan y facturacion
+                        </Link>
+                      </DropdownMenu.Item>
+                    </>
+                  )}
                   <DropdownMenu.Item asChild>
                     <a href="mailto:soporte@agencyai.com" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] cursor-pointer outline-none">
                       <HelpCircle size={16} strokeWidth={1.5} /> Ayuda

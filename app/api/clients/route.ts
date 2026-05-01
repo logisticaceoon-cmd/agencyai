@@ -1,15 +1,43 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { normalizeRole, getDataScope } from '@/lib/roles'
 
 export async function GET(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, workspaceId, userId, role } = auth
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const search = searchParams.get('search')
+
+    const appRole = normalizeRole(role)
+    const scope = getDataScope('clients', appRole)
+
+    // Para trafficker/viewer: solo los clientes donde tienen proyectos o tareas asignadas
+    let clientIds: string[] | null = null
+    if (scope === 'assigned') {
+      // Obtener IDs de proyectos asignados
+      const { data: myProjects } = await supabase
+        .from('projects')
+        .select('clientId')
+        .eq('workspace_id', workspaceId)
+        .eq('owner_id', userId)
+        .not('clientId', 'is', null)
+
+      // Obtener IDs de clientes de tareas asignadas
+      const { data: myTasks } = await supabase
+        .from('tasks')
+        .select('clientId')
+        .eq('workspace_id', workspaceId)
+        .contains('assignedTo', [userId])
+        .not('clientId', 'is', null)
+
+      const fromProjects = (myProjects || []).map((p: { clientId: string }) => p.clientId).filter(Boolean)
+      const fromTasks = (myTasks || []).map((t: { clientId: string }) => t.clientId).filter(Boolean)
+      clientIds = [...new Set([...fromProjects, ...fromTasks])]
+    }
 
     let query = supabase
       .from('clients')
@@ -19,13 +47,13 @@ export async function GET(request: Request) {
       .limit(200)
       .order('createdAt', { ascending: false })
 
-    if (status) {
-      query = query.eq('status', status)
+    if (clientIds !== null) {
+      if (clientIds.length === 0) return NextResponse.json({ data: [] })
+      query = query.in('id', clientIds)
     }
 
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,brand.ilike.%${search}%,email.ilike.%${search}%`)
-    }
+    if (status) query = query.eq('status', status)
+    if (search) query = query.or(`name.ilike.%${search}%,brand.ilike.%${search}%,email.ilike.%${search}%`)
 
     const { data, error } = await query
 
@@ -45,7 +73,12 @@ export async function POST(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, workspaceId, role } = auth
+
+    const appRole = normalizeRole(role)
+    if (appRole === 'trafficker' || appRole === 'viewer') {
+      return NextResponse.json({ error: 'Sin permisos para crear clientes' }, { status: 403 })
+    }
 
     const body = await request.json()
 

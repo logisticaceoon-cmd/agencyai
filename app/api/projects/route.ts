@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { normalizeRole, getDataScope } from '@/lib/roles'
 
 export async function GET(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, workspaceId, userId, role } = auth
 
     const { searchParams } = new URL(request.url)
     const clientId = searchParams.get('client_id')
     const status = searchParams.get('status')
+
+    const appRole = normalizeRole(role)
+    const scope = getDataScope('projects', appRole)
 
     let query = supabase
       .from('projects')
@@ -18,6 +22,31 @@ export async function GET(request: Request) {
       .is('deleted_at', null)
       .limit(200)
       .order('createdAt', { ascending: false })
+
+    // Trafficker/viewer: solo proyectos donde son owner o tienen tareas asignadas
+    if (scope === 'assigned') {
+      // Proyectos donde son owner_id
+      const { data: myProjectIds } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('owner_id', userId)
+
+      // Proyectos con tareas asignadas al usuario
+      const { data: myTaskProjects } = await supabase
+        .from('tasks')
+        .select('projectId')
+        .eq('workspace_id', workspaceId)
+        .contains('assignedTo', [userId])
+        .not('projectId', 'is', null)
+
+      const fromOwner = (myProjectIds || []).map((p: { id: string }) => p.id)
+      const fromTasks = (myTaskProjects || []).map((t: { projectId: string }) => t.projectId).filter(Boolean)
+      const ids = [...new Set([...fromOwner, ...fromTasks])]
+
+      if (ids.length === 0) return NextResponse.json({ data: [] })
+      query = query.in('id', ids)
+    }
 
     if (clientId) query = query.eq('clientId', clientId)
     if (status) query = query.eq('status', status)
@@ -40,7 +69,12 @@ export async function POST(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, workspaceId, role } = auth
+
+    const appRole = normalizeRole(role)
+    if (appRole === 'viewer') {
+      return NextResponse.json({ error: 'Sin permisos para crear proyectos' }, { status: 403 })
+    }
 
     const body = await request.json()
 

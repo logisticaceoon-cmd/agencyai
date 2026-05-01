@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -23,9 +23,28 @@ type RegisterForm = z.infer<typeof registerSchema>
 
 export default function SignUpPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteToken = searchParams.get('invite')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [inviteInfo, setInviteInfo] = useState<{ workspaceName: string; role: string } | null>(null)
+
+  // Si hay token de invitación, cargar info del workspace
+  useEffect(() => {
+    if (!inviteToken) return
+    fetch(`/api/invitations/${inviteToken}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.data) {
+          setInviteInfo({
+            workspaceName: d.data.workspaces?.name || 'un workspace',
+            role: d.data.role || 'member',
+          })
+        }
+      })
+      .catch(() => {})
+  }, [inviteToken])
 
   const {
     register,
@@ -52,8 +71,9 @@ export default function SignUpPage() {
         toast({ title: 'Error al crear cuenta', description: error.message, variant: 'destructive' })
         return
       }
-      toast({ title: 'Cuenta creada', description: 'Revisá tu email para confirmar tu cuenta, o continuá al onboarding.' })
-      router.push('/onboarding')
+      toast({ title: 'Cuenta creada', description: inviteToken ? 'Aceptando invitacion...' : 'Redirigiendo al onboarding...' })
+      // Si vino con invitación, ir a aceptarla; si no, al onboarding
+      router.push(inviteToken ? `/invite/${inviteToken}` : '/onboarding')
       router.refresh()
     } catch {
       toast({ title: 'Error inesperado', variant: 'destructive' })
@@ -95,8 +115,20 @@ export default function SignUpPage() {
 
         {/* Card */}
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900 mb-1">Crear cuenta</h2>
-          <p className="text-sm text-slate-500 mb-6">Registrate gratis y empezá a gestionar tu agencia</p>
+          {inviteInfo ? (
+            <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 mb-5">
+              <p className="text-sm font-semibold text-blue-900">Te invitaron a unirte</p>
+              <p className="text-sm text-blue-700 mt-0.5">
+                Serás <strong>{inviteInfo.role}</strong> en <strong>{inviteInfo.workspaceName}</strong>
+              </p>
+            </div>
+          ) : null}
+          <h2 className="text-xl font-semibold text-slate-900 mb-1">
+            {inviteInfo ? 'Crear tu cuenta' : 'Crear cuenta'}
+          </h2>
+          <p className="text-sm text-slate-500 mb-6">
+            {inviteInfo ? 'Completá tu registro para aceptar la invitación' : 'Registrate gratis y empezá a gestionar tu agencia'}
+          </p>
 
           {/* Google OAuth */}
           <button
