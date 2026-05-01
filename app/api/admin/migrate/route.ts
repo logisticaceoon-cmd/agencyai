@@ -16,18 +16,22 @@ export async function POST(request: Request) {
 
     const { Client } = await import('pg')
 
-    // Try Supabase session pooler across all regions (IPv6-compatible, works from Vercel)
-    // Session pooler (port 5432 via pooler) supports DDL
-    // "Tenant or user not found" means wrong region — try each until one works
     const projectRef = (process.env.NEXT_PUBLIC_SUPABASE_URL || '')
       .replace('https://', '').replace('.supabase.co', '')
     const dbPassword = process.env.DB_PASSWORD || 'agenciaai2026'
 
-    // Connection attempts: session pooler in all regions + direct connection
+    // CONNECTION PRIORITY:
+    // 1. process.env.DATABASE_URL — Vercel may have this set to the pooler/direct URL
+    // 2. process.env.DIRECT_URL — Vercel sometimes sets both
+    // 3. Direct Supabase connection (IPv6, works from Vercel but not local sandbox)
+    // 4. Session pooler in all regions as fallback
     const CONNECTION_ATTEMPTS = [
-      // Direct connection (might work from some Vercel regions)
-      { url: `postgresql://postgres:${dbPassword}@db.${projectRef}.supabase.co:5432/postgres`, label: 'direct' },
-      // Session pooler in all Supabase regions (IPv6-compatible)
+      // Vercel-configured connection strings (highest priority — may work when others don't)
+      ...(process.env.DATABASE_URL ? [{ url: process.env.DATABASE_URL, label: 'env-DATABASE_URL' }] : []),
+      ...(process.env.DIRECT_URL ? [{ url: process.env.DIRECT_URL, label: 'env-DIRECT_URL' }] : []),
+      // Direct connection (IPv6 — works from Vercel serverless, not from local)
+      { url: `postgresql://postgres:${dbPassword}@db.${projectRef}.supabase.co:5432/postgres`, label: 'direct-ipv6' },
+      // Session pooler in all Supabase regions
       ...['us-east-1', 'us-west-1', 'eu-west-1', 'eu-central-1', 'ap-southeast-1', 'ap-northeast-1', 'ca-central-1', 'sa-east-1']
         .map(r => ({ url: `postgresql://postgres.${projectRef}:${dbPassword}@aws-0-${r}.pooler.supabase.com:5432/postgres`, label: `pooler-${r}` })),
     ]
@@ -90,12 +94,32 @@ export async function POST(request: Request) {
       `)
       results.push('workspace_roles index: OK')
 
-      // 2. Ensure comments table has workspace_id column
+      // 2. Create docs table
       await client.query(`
-        ALTER TABLE public.comments
-        ADD COLUMN IF NOT EXISTS workspace_id UUID REFERENCES public.workspaces(id) ON DELETE CASCADE
+        CREATE TABLE IF NOT EXISTS public.docs (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          content TEXT,
+          category TEXT DEFAULT 'general',
+          status TEXT DEFAULT 'draft',
+          author_id TEXT,
+          version INT DEFAULT 1,
+          version_notes TEXT,
+          tags TEXT[] DEFAULT '{}',
+          external_url TEXT,
+          client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
+          project_id UUID REFERENCES public.projects(id) ON DELETE SET NULL,
+          created_at TIMESTAMPTZ DEFAULT now(),
+          updated_at TIMESTAMPTZ DEFAULT now()
+        )
       `)
-      results.push('comments.workspace_id column: OK')
+      results.push('docs table: OK')
+
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_docs_workspace ON public.docs(workspace_id)
+      `)
+      results.push('docs index: OK')
 
       // 3. Seed default roles for all existing workspaces
       const { data: workspaces } = await admin.from('workspaces').select('id')
