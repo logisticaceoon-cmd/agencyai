@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
-import chromium from '@sparticuz/chromium-min'
-import puppeteer from 'puppeteer-core'
 
 export const maxDuration = 60
 
@@ -51,23 +49,7 @@ function lineChart(labels: string[], datasets: { label: string; data: number[]; 
   })
 }
 
-// ─── PDF via Puppeteer ────────────────────────────────────────────────────────
-async function htmlToPdf(html: string): Promise<Buffer> {
-  const executablePath = await chromium.executablePath(
-    'https://github.com/Sparticuz/chromium/releases/download/v123.0.0/chromium-v123.0.0-pack.tar'
-  )
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    defaultViewport: { width: 1200, height: 900 },
-    executablePath,
-    headless: true,
-  })
-  const page = await browser.newPage()
-  await page.setContent(html, { waitUntil: 'networkidle0' })
-  const pdf = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '0', bottom: '0', left: '0', right: '0' } })
-  await browser.close()
-  return Buffer.from(pdf)
-}
+// PDF generation removed — report sent as HTML email
 
 // ─── HTML template ────────────────────────────────────────────────────────────
 function buildHtml(data: {
@@ -429,10 +411,7 @@ export async function GET(request: Request) {
     // Generate HTML
     const html = buildHtml({ weekLabel, members })
 
-    // Convert to PDF
-    const pdfBuffer = await htmlToPdf(html)
-
-    // Send email with PDF attachment
+    // Send email with HTML report directly
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com', port: 465, secure: true,
       auth: { user: 'logisticaceoon@gmail.com', pass: process.env.GMAIL_APP_PASSWORD },
@@ -445,17 +424,7 @@ export async function GET(request: Request) {
       from: '"Ceonyx · CEOON" <logisticaceoon@gmail.com>',
       to: 'logisticaceoon@gmail.com',
       subject: `📊 Reporte Semanal Equipo — ${weekLabel} | ${totalCompleted} cerradas · ${totalOverdue} vencidas`,
-      html: `<div style="font-family:sans-serif;padding:24px;max-width:500px">
-        <h2>📊 Reporte Semanal del Equipo</h2>
-        <p style="color:#64748b">${weekLabel}</p>
-        <p>Adjunto encontrás el reporte completo con análisis por miembro y gráficas.</p>
-        <p style="color:#64748b;font-size:13px;margin-top:24px">Ceonyx · Agente IA — Logística CEOON</p>
-      </div>`,
-      attachments: [{
-        filename: `Reporte-Semanal-CEOON-${weekEnd.getUTCFullYear()}-${String(weekEnd.getUTCMonth()+1).padStart(2,'0')}-${String(weekEnd.getUTCDate()).padStart(2,'0')}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf',
-      }],
+      html,
     })
 
     return NextResponse.json({ success: true, weekLabel, members: members.length, totalCompleted, totalOverdue })
