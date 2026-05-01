@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Users, Plus, X, Loader2, Shield, Trash2, Mail, Copy, Check, Link as LinkIcon, RefreshCw, Crown, Zap, Target, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ROLE_LABELS, ROLE_DESCRIPTIONS, type AppRole } from '@/lib/roles'
+import { ROLE_LABELS, type AppRole } from '@/lib/roles'
 
 interface Member {
   id: string
@@ -16,7 +16,15 @@ interface Member {
   created_at: string
 }
 
-const INVITE_ROLES: AppRole[] = ['admin', 'trafficker', 'viewer']
+interface WorkspaceRole {
+  id: string
+  key: string
+  label: string
+  description: string | null
+  color: string
+  base_role: string
+  is_system: boolean
+}
 
 const ROLE_COLORS: Record<string, string> = {
   owner:      'bg-amber-50 text-amber-700 border-amber-200',
@@ -32,6 +40,21 @@ const ROLE_ICONS: Record<string, React.ReactNode> = {
   viewer:     <Eye className="h-3.5 w-3.5" />,
 }
 
+// Fallback static roles if API fails
+const FALLBACK_ROLES: WorkspaceRole[] = [
+  { id: 'admin', key: 'admin', label: 'Admin', description: 'Acceso operativo completo. Sin acceso a billing.', color: '#7c3aed', base_role: 'admin', is_system: true },
+  { id: 'trafficker', key: 'trafficker', label: 'Trafficker', description: 'Ve sus clientes, campañas, tareas y KPIs asignados.', color: '#2563eb', base_role: 'trafficker', is_system: true },
+  { id: 'viewer', key: 'viewer', label: 'Solo lectura', description: 'Solo puede ver reportes y KPIs. Sin edición.', color: '#64748b', base_role: 'viewer', is_system: true },
+]
+
+function getRoleColor(baseRole: string): string {
+  return ROLE_COLORS[baseRole] || ROLE_COLORS.viewer
+}
+
+function getRoleIcon(baseRole: string): React.ReactNode {
+  return ROLE_ICONS[baseRole] || ROLE_ICONS.viewer
+}
+
 function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
   const colors = ['bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500']
   const color = colors[name.charCodeAt(0) % colors.length]
@@ -45,7 +68,9 @@ function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
 
 export default function TeamPage() {
   const [members, setMembers] = useState<Member[]>([])
+  const [workspaceRoles, setWorkspaceRoles] = useState<WorkspaceRole[]>(FALLBACK_ROLES)
   const [loading, setLoading] = useState(true)
+  const [rolesLoading, setRolesLoading] = useState(true)
   const [showInvite, setShowInvite] = useState(false)
   const [saving, setSaving] = useState(false)
   const [editingRole, setEditingRole] = useState<string | null>(null)
@@ -54,7 +79,7 @@ export default function TeamPage() {
   // Form state
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteName, setInviteName] = useState('')
-  const [inviteRole, setInviteRole] = useState<AppRole>('trafficker')
+  const [inviteRole, setInviteRole] = useState('trafficker')
   const [inviteResult, setInviteResult] = useState<{ link?: string; error?: string } | null>(null)
 
   async function fetchMembers() {
@@ -67,7 +92,30 @@ export default function TeamPage() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchMembers() }, [])
+  async function fetchRoles() {
+    setRolesLoading(true)
+    try {
+      const res = await fetch('/api/roles')
+      if (res.ok) {
+        const j = await res.json()
+        // Exclude owner role from invite options
+        const invitable = (j.data || []).filter((r: WorkspaceRole) => r.key !== 'owner')
+        if (invitable.length > 0) {
+          setWorkspaceRoles(invitable)
+          // Set default selection to first non-owner role
+          setInviteRole(invitable[0]?.key || 'trafficker')
+        }
+      }
+    } catch {
+      // Keep fallback roles
+    }
+    setRolesLoading(false)
+  }
+
+  useEffect(() => {
+    fetchMembers()
+    fetchRoles()
+  }, [])
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
@@ -121,11 +169,14 @@ export default function TeamPage() {
     setInviteResult(null)
     setInviteEmail('')
     setInviteName('')
-    setInviteRole('trafficker')
+    setInviteRole(workspaceRoles[0]?.key || 'trafficker')
   }
 
   const active = members.filter(m => m.status === 'active')
   const pending = members.filter(m => m.status === 'invited')
+
+  // Cols: 2 if ≤2 roles, 3 otherwise (max 4 per row)
+  const roleCols = workspaceRoles.length <= 2 ? 'grid-cols-2' : workspaceRoles.length <= 4 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -156,7 +207,7 @@ export default function TeamPage() {
             </button>
           </div>
 
-          {/* Resultado de invitación exitosa */}
+          {/* Invite success */}
           {inviteResult?.link && (
             <div className="p-5">
               <div className="rounded-xl bg-green-50 border border-green-200 p-4 mb-4">
@@ -206,42 +257,60 @@ export default function TeamPage() {
             </div>
           )}
 
-          {/* Form (hidden after success) */}
+          {/* Form */}
           {!inviteResult?.link && (
             <form onSubmit={handleInvite} className="p-5 space-y-4">
-              {/* Role selector first — lo más importante */}
+              {/* Role selector */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Rol del miembro
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {INVITE_ROLES.map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setInviteRole(r)}
-                      className={cn(
-                        'flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all',
-                        inviteRole === r
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      )}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className={cn('flex-shrink-0', inviteRole === r ? 'text-blue-600' : 'text-slate-400')}>{ROLE_ICONS[r]}</span>
-                        <span className={cn(
-                          'text-xs font-bold',
-                          inviteRole === r ? 'text-blue-700' : 'text-slate-700'
-                        )}>
-                          {ROLE_LABELS[r]}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-500 leading-tight line-clamp-2">
-                        {ROLE_DESCRIPTIONS[r]}
-                      </p>
-                    </button>
-                  ))}
-                </div>
+                {rolesLoading ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-20 rounded-xl bg-slate-100 animate-pulse" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className={cn('grid gap-2', roleCols)}>
+                    {workspaceRoles.map((r) => (
+                      <button
+                        key={r.key}
+                        type="button"
+                        onClick={() => setInviteRole(r.key)}
+                        className={cn(
+                          'flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-all',
+                          inviteRole === r.key
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-slate-200 bg-white hover:border-slate-300'
+                        )}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn(
+                            'flex-shrink-0',
+                            inviteRole === r.key ? 'text-blue-600' : 'text-slate-400'
+                          )}>
+                            {getRoleIcon(r.base_role)}
+                          </span>
+                          <span className={cn(
+                            'text-xs font-bold',
+                            inviteRole === r.key ? 'text-blue-700' : 'text-slate-700'
+                          )}>
+                            {r.label}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 leading-tight line-clamp-2">
+                          {r.description || `Permisos de ${r.base_role}`}
+                        </p>
+                        {!r.is_system && (
+                          <span className="text-[9px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full">
+                            Personalizado
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -312,6 +381,7 @@ export default function TeamPage() {
                   <MemberRow
                     key={m.id}
                     member={m}
+                    workspaceRoles={workspaceRoles}
                     editingRole={editingRole}
                     onEditRole={setEditingRole}
                     onChangeRole={handleChangeRole}
@@ -335,6 +405,7 @@ export default function TeamPage() {
                   <MemberRow
                     key={m.id}
                     member={m}
+                    workspaceRoles={workspaceRoles}
                     editingRole={editingRole}
                     onEditRole={setEditingRole}
                     onChangeRole={handleChangeRole}
@@ -361,6 +432,7 @@ export default function TeamPage() {
 
 function MemberRow({
   member: m,
+  workspaceRoles,
   editingRole,
   onEditRole,
   onChangeRole,
@@ -368,6 +440,7 @@ function MemberRow({
   isPending = false,
 }: {
   member: Member
+  workspaceRoles: WorkspaceRole[]
   editingRole: string | null
   onEditRole: (id: string | null) => void
   onChangeRole: (id: string, role: string) => void
@@ -375,6 +448,8 @@ function MemberRow({
   isPending?: boolean
 }) {
   const displayName = m.name || m.email.split('@')[0]
+  // Find workspace role for display
+  const wsRole = workspaceRoles.find(r => r.key === m.role)
 
   return (
     <div className={cn('flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors', isPending && 'opacity-75')}>
@@ -390,7 +465,7 @@ function MemberRow({
         <p className="text-xs text-slate-400 truncate">{m.email}</p>
       </div>
 
-      {/* Role */}
+      {/* Role badge */}
       <div className="flex-shrink-0">
         {editingRole === m.id ? (
           <select
@@ -400,9 +475,9 @@ function MemberRow({
             autoFocus
             className="text-xs border border-blue-300 rounded-lg px-2 py-1.5 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
-            <option value="admin">Admin</option>
-            <option value="trafficker">Trafficker</option>
-            <option value="viewer">Viewer</option>
+            {workspaceRoles.map(r => (
+              <option key={r.key} value={r.key}>{r.label}</option>
+            ))}
           </select>
         ) : (
           <span className={cn(
@@ -410,7 +485,7 @@ function MemberRow({
             ROLE_COLORS[m.role] || ROLE_COLORS.viewer
           )}>
             {ROLE_ICONS[m.role] && <span className="flex-shrink-0">{ROLE_ICONS[m.role]}</span>}
-            {ROLE_LABELS[m.role as AppRole] || m.role}
+            {wsRole?.label || ROLE_LABELS[m.role as AppRole] || m.role}
           </span>
         )}
       </div>
