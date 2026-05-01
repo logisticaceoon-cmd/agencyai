@@ -44,13 +44,12 @@ export async function POST(request: Request) {
         connectedRegion = region
         break
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        // "Tenant or user not found" = wrong region, keep trying
-        // timeout = pooler unreachable, keep trying
-        if (msg.includes('Tenant or user not found') || msg.includes('timeout') || msg.includes('ECONNREFUSED')) {
-          continue
-        }
-        // Unexpected error
+        const msg = (e instanceof Error ? e.message : String(e)).toLowerCase()
+        // tenant/user not found = wrong region; timeout/refused = unreachable — keep trying
+        const isRetryable = msg.includes('tenant') || msg.includes('user not found')
+          || msg.includes('timeout') || msg.includes('econnrefused') || msg.includes('enotfound')
+        if (isRetryable) continue
+        // Unexpected error — stop
         throw e
       }
     }
