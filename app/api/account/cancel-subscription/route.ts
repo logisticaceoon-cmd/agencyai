@@ -32,7 +32,8 @@ export async function POST(request: Request) {
 
     // Si hay Stripe configurado, cancelar al final del período
     if (process.env.STRIPE_SECRET_KEY && org.stripeCustomerId) {
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string)
 
       // Obtener suscripción activa del cliente
       const subscriptions = await stripe.subscriptions.list({
