@@ -1,28 +1,43 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 
-// One-time migration endpoint — protected by AGENCYAI_CRON_SECRET
+// One-time migration endpoint — protected by CRON_SECRET
 // Call: POST /api/admin/migrate {"secret": "..."}
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const cronSecret = process.env.CRON_SECRET || process.env.AGENCYAI_CRON_SECRET || 'ceoon-migrate-2026'
+    const cronSecret = process.env.CRON_SECRET || 'ceoon-migrate-2026'
     if (body.secret !== cronSecret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const admin = createAdminClient()
-
-    // We run each DDL statement via supabase.rpc calls through pg
-    // Since Supabase doesn't support raw DDL via REST, we use Prisma
-    const { PrismaClient } = await import('@prisma/client')
-    const prisma = new PrismaClient()
-
     const results: string[] = []
+
+    // Use pg client with Supabase session pooler (IPv6-compatible, works from Vercel)
+    // Session pooler (port 5432 via pooler) supports DDL; transaction pooler (6543) does not
+    const { Client } = await import('pg')
+
+    // Build pooler URL from env or construct from known project ref
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    const projectRef = supabaseUrl.replace('https://', '').replace('.supabase.co', '')
+    const dbPassword = process.env.DB_PASSWORD || 'agenciaai2026'
+
+    // Supabase session pooler — IPv6 ready, works from Vercel
+    const connectionString = process.env.DATABASE_URL_DIRECT
+      || `postgresql://postgres.${projectRef}:${dbPassword}@aws-0-us-east-1.pooler.supabase.com:5432/postgres`
+
+    const client = new Client({
+      connectionString,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 15000,
+    })
+
+    await client.connect()
 
     try {
       // 1. Create workspace_roles table
-      await prisma.$executeRawUnsafe(`
+      await client.query(`
         CREATE TABLE IF NOT EXISTS public.workspace_roles (
           id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
           workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
@@ -40,20 +55,20 @@ export async function POST(request: Request) {
       `)
       results.push('workspace_roles table: OK')
 
-      await prisma.$executeRawUnsafe(`
+      await client.query(`
         CREATE INDEX IF NOT EXISTS idx_workspace_roles_workspace
         ON public.workspace_roles(workspace_id)
       `)
       results.push('workspace_roles index: OK')
 
       // 2. Ensure comments table has workspace_id column
-      await prisma.$executeRawUnsafe(`
+      await client.query(`
         ALTER TABLE public.comments
         ADD COLUMN IF NOT EXISTS workspace_id UUID REFERENCES public.workspaces(id) ON DELETE CASCADE
       `)
       results.push('comments.workspace_id column: OK')
 
-      // 3. Seed default roles for all existing workspaces that don't have them
+      // 3. Seed default roles for all existing workspaces
       const { data: workspaces } = await admin.from('workspaces').select('id')
       if (workspaces) {
         for (const ws of workspaces) {
@@ -74,7 +89,7 @@ export async function POST(request: Request) {
       }
 
     } finally {
-      await prisma.$disconnect()
+      await client.end()
     }
 
     return NextResponse.json({ success: true, results })
