@@ -54,7 +54,7 @@ export async function PATCH(
     // Get current task to check status change
     const { data: currentTask } = await supabase
       .from('tasks')
-      .select('status, deadline, projectId, title')
+      .select('status, deadline, projectId, title, assignedTo')
       .eq('id', id)
       .eq('workspace_id', workspaceId)
       .single()
@@ -131,7 +131,29 @@ export async function PATCH(
       }
     }
 
-    // Notifications are handled separately — skip complex logic to avoid errors
+    // Fire notifications when assignedTo changes
+    if (body.assignedTo && Array.isArray(body.assignedTo)) {
+      const prevAssigned: string[] = currentTask.assignedTo || []
+      const newAssigned: string[] = body.assignedTo
+      const newlyAdded = newAssigned.filter((uid: string) => !prevAssigned.includes(uid))
+
+      for (const recipientId of newlyAdded) {
+        await supabase
+          .from('notifications')
+          .insert({
+            workspace_id: workspaceId,
+            user_id: recipientId,
+            type: 'task_assigned',
+            title: 'Nueva tarea asignada',
+            message: `Se te asignó: ${currentTask.title}`,
+            data: { taskId: id, taskTitle: currentTask.title },
+            read: false,
+          })
+          .then(({ error: nErr }) => {
+            if (nErr) console.error('Notification insert error:', nErr.message)
+          })
+      }
+    }
 
     return NextResponse.json(data)
   } catch (err) {
