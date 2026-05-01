@@ -161,20 +161,25 @@ enum ObjectiveStatus {
 // ─── MULTI-TENANT MODELS ───────────────────────────────────────────────────────
 
 model Organization {
-  id         String   @id @default(uuid())
-  name       String
-  slug       String   @unique
-  ownerId    String
-  plan       OrgPlan  @default(free)
-  maxUsers   Int      @default(1)
-  maxClients Int      @default(2)
-  logoUrl    String?
-  website    String?
-  industry   String?
-  country    String?
-  currency   String   @default("USD")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                        String    @id @default(uuid())
+  name                      String
+  slug                      String    @unique
+  ownerId                   String
+  plan                      OrgPlan   @default(free)
+  maxUsers                  Int       @default(1)
+  maxClients                Int       @default(2)
+  logoUrl                   String?
+  website                   String?
+  industry                  String?
+  country                   String?
+  currency                  String    @default("USD")
+  status                    String    @default("active")
+  stripeCustomerId          String?
+  deactivatedAt             DateTime?
+  deleteAfter               DateTime?
+  cancellationScheduledAt   DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
   members       OrganizationMember[]
   invitations   Invitation[]
