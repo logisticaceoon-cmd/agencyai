@@ -6,9 +6,7 @@ import { prisma } from '@/lib/prisma'
 // Retorna el estado actual de la cuenta del usuario.
 export async function GET() {
   const auth = await getAuthContext()
-  if (isAuthError(auth)) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status })
-  }
+  if (isAuthError(auth)) return auth
 
   try {
     const org = await prisma.organization.findUnique({
