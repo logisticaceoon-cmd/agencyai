@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { normalizeRole, getDataScope } from '@/lib/roles'
 
 export async function GET(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, workspaceId, userId, role } = auth
 
     const { searchParams } = new URL(request.url)
     const quarter = searchParams.get('quarter')
     const year = searchParams.get('year')
+
+    const appRole = normalizeRole(role)
+    const scope = getDataScope('objectives', appRole)
 
     let query = supabase
       .from('objectives')
@@ -19,6 +23,11 @@ export async function GET(request: Request) {
 
     if (quarter) query = query.eq('quarter', quarter)
     if (year) query = query.eq('year', parseInt(year))
+
+    // Trafficker/viewer: solo ven sus propios objetivos
+    if (scope === 'assigned') {
+      query = query.eq('owner_id', userId)
+    }
 
     const { data, error } = await query
 
