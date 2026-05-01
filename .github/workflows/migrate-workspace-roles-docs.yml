@@ -1,135 +1,148 @@
-name: DB Migration - workspace_roles and docs
+name: DB Migration - workspace_roles and docs v2
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [run-migration]
 
 jobs:
   migrate:
     runs-on: ubuntu-latest
     steps:
-      - name: Test IPv6 connectivity to Supabase
+      - name: Connectivity check
         run: |
-          echo "=== nslookup direct ==="
-          nslookup db.rntpmsckiplrxfgubngt.supabase.co || true
-          echo "=== Ping test ==="
-          ping6 -c 2 db.rntpmsckiplrxfgubngt.supabase.co 2>&1 || true
-          echo "=== nc test port 5432 ==="
-          nc -zv -w5 db.rntpmsckiplrxfgubngt.supabase.co 5432 2>&1 || true
+          echo "=== Pooler DNS ==="
+          nslookup aws-0-sa-east-1.pooler.supabase.com || true
+          nslookup aws-0-us-east-1.pooler.supabase.com || true
+          echo "=== Port check pooler ==="
+          timeout 5 bash -c 'cat < /dev/null > /dev/tcp/aws-0-sa-east-1.pooler.supabase.com/5432' && echo "sa-east-1:5432 OPEN" || echo "sa-east-1:5432 closed"
+          timeout 5 bash -c 'cat < /dev/null > /dev/tcp/aws-0-us-east-1.pooler.supabase.com/5432' && echo "us-east-1:5432 OPEN" || echo "us-east-1:5432 closed"
 
       - name: Install pg
         run: npm install pg
 
-      - name: Run SQL migrations
-        env:
-          DB_URL: ${{ secrets.DATABASE_URL }}
+      - name: Run migration
         run: |
-          node << 'SCRIPT'
+          node - << 'JSEOF'
           const { Client } = require("pg");
 
           const ref = "rntpmsckiplrxfgubngt";
           const password = "agenciaai2026";
-          
-          // Connection attempts: direct IPv6 first (no family restriction), then pooler
+
+          // Use explicit host/port/user/password - NO connectionString with sslmode
+          // This avoids pg v8's "sslmode=require => verify-full" bug
           const configs = [
-            // Direct connection - IPv6 (no family restriction - let Node resolve)
-            { connectionString: `postgresql://postgres:${password}@db.${ref}.supabase.co:5432/postgres?sslmode=require`, ssl: { rejectUnauthorized: false } },
-            // Use DATABASE_URL from env if set
-            ...(process.env.DB_URL ? [{ connectionString: process.env.DB_URL, ssl: { rejectUnauthorized: false } }] : []),
-            // Pooler session - various regions
-            { connectionString: `postgresql://postgres.${ref}:${password}@aws-0-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require`, ssl: { rejectUnauthorized: false } },
-            { connectionString: `postgresql://postgres.${ref}:${password}@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require`, ssl: { rejectUnauthorized: false } },
-            { connectionString: `postgresql://postgres.${ref}:${password}@aws-0-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require`, ssl: { rejectUnauthorized: false } },
+            // Pooler - sa-east-1 (closest to Rafael in Argentina)
+            { host: "aws-0-sa-east-1.pooler.supabase.com", port: 5432, user: `postgres.${ref}`, password, database: "postgres", ssl: { rejectUnauthorized: false } },
+            { host: "aws-0-sa-east-1.pooler.supabase.com", port: 6543, user: `postgres.${ref}`, password, database: "postgres", ssl: { rejectUnauthorized: false } },
+            // Pooler - us regions
+            { host: "aws-0-us-east-1.pooler.supabase.com", port: 5432, user: `postgres.${ref}`, password, database: "postgres", ssl: { rejectUnauthorized: false } },
+            { host: "aws-0-us-east-1.pooler.supabase.com", port: 6543, user: `postgres.${ref}`, password, database: "postgres", ssl: { rejectUnauthorized: false } },
+            { host: "aws-0-us-east-2.pooler.supabase.com", port: 5432, user: `postgres.${ref}`, password, database: "postgres", ssl: { rejectUnauthorized: false } },
+            { host: "aws-0-eu-central-1.pooler.supabase.com", port: 5432, user: `postgres.${ref}`, password, database: "postgres", ssl: { rejectUnauthorized: false } },
+            { host: "aws-0-ap-southeast-1.pooler.supabase.com", port: 5432, user: `postgres.${ref}`, password, database: "postgres", ssl: { rejectUnauthorized: false } },
+            // Also try with ssl:false (some poolers allow unencrypted)
+            { host: "aws-0-sa-east-1.pooler.supabase.com", port: 5432, user: `postgres.${ref}`, password, database: "postgres", ssl: false },
           ];
 
-          const MIGRATIONS = [
-            `CREATE TABLE IF NOT EXISTS public.workspace_roles (
-              id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-              workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
-              key TEXT NOT NULL,
-              label TEXT NOT NULL,
-              description TEXT,
-              color TEXT DEFAULT '#6366f1',
-              base_role TEXT NOT NULL DEFAULT 'trafficker'
-                CHECK (base_role IN ('owner','admin','trafficker','viewer')),
-              is_system BOOLEAN DEFAULT FALSE,
-              is_active BOOLEAN DEFAULT TRUE,
-              created_at TIMESTAMPTZ DEFAULT now(),
-              UNIQUE(workspace_id, key)
-            )`,
-            `CREATE INDEX IF NOT EXISTS idx_workspace_roles_workspace ON public.workspace_roles(workspace_id)`,
-            `CREATE TABLE IF NOT EXISTS public.docs (
-              id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-              workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
-              title TEXT NOT NULL,
-              content TEXT,
-              category TEXT DEFAULT 'general',
-              status TEXT DEFAULT 'draft',
-              author_id TEXT,
-              version INT DEFAULT 1,
-              version_notes TEXT,
-              tags TEXT[] DEFAULT '{}',
-              external_url TEXT,
-              client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
-              project_id UUID REFERENCES public.projects(id) ON DELETE SET NULL,
-              created_at TIMESTAMPTZ DEFAULT now(),
-              updated_at TIMESTAMPTZ DEFAULT now()
-            )`,
-            `CREATE INDEX IF NOT EXISTS idx_docs_workspace ON public.docs(workspace_id)`,
-            `ALTER TABLE public.docs ENABLE ROW LEVEL SECURITY`,
-            `DO $$ BEGIN
+          const migrations = [
+            ["workspace_roles table", `
+              CREATE TABLE IF NOT EXISTS public.workspace_roles (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+                key TEXT NOT NULL,
+                label TEXT NOT NULL,
+                description TEXT,
+                color TEXT DEFAULT '#6366f1',
+                base_role TEXT NOT NULL DEFAULT 'trafficker'
+                  CHECK (base_role IN ('owner','admin','trafficker','viewer')),
+                is_system BOOLEAN DEFAULT FALSE,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(workspace_id, key)
+              )`],
+            ["workspace_roles index", `CREATE INDEX IF NOT EXISTS idx_workspace_roles_workspace ON public.workspace_roles(workspace_id)`],
+            ["docs table", `
+              CREATE TABLE IF NOT EXISTS public.docs (
+                id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+                workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                content TEXT,
+                category TEXT DEFAULT 'general',
+                status TEXT DEFAULT 'draft',
+                author_id TEXT,
+                version INT DEFAULT 1,
+                version_notes TEXT,
+                tags TEXT[] DEFAULT '{}',
+                external_url TEXT,
+                client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
+                project_id UUID REFERENCES public.projects(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now()
+              )`],
+            ["docs index", `CREATE INDEX IF NOT EXISTS idx_docs_workspace ON public.docs(workspace_id)`],
+            ["docs RLS", `ALTER TABLE public.docs ENABLE ROW LEVEL SECURITY`],
+            ["docs policy", `DO $$ BEGIN
               CREATE POLICY "enable_all_for_authenticated" ON public.docs
               FOR ALL USING (auth.uid() IS NOT NULL)
               WITH CHECK (auth.uid() IS NOT NULL);
             EXCEPTION WHEN duplicate_object THEN NULL;
-            END $$`,
-            `INSERT INTO public.workspace_roles (workspace_id, key, label, description, color, base_role, is_system)
-            SELECT w.id, r.key, r.label, r.description, r.color, r.base_role, true
-            FROM public.workspaces w
-            CROSS JOIN (VALUES
-              ('owner','Dueño','Acceso total. Ve finanzas, equipo y toda la agencia.','#f59e0b','owner'),
-              ('admin','Admin','Acceso operativo completo. Sin acceso a billing.','#8b5cf6','admin'),
-              ('trafficker','Trafficker','Ve sus clientes, campanas, tareas y KPIs asignados.','#3b82f6','trafficker'),
-              ('viewer','Solo lectura','Solo puede ver reportes y KPIs. Sin edicion.','#64748b','viewer')
-            ) AS r(key, label, description, color, base_role)
-            ON CONFLICT (workspace_id, key) DO NOTHING`,
+            END $$`],
+            ["seed default roles", `
+              INSERT INTO public.workspace_roles (workspace_id, key, label, description, color, base_role, is_system)
+              SELECT w.id, r.key, r.label, r.description, r.color, r.base_role, true
+              FROM public.workspaces w
+              CROSS JOIN (VALUES
+                ('owner','Dueno','Acceso total. Ve finanzas, equipo y toda la agencia.','#f59e0b','owner'),
+                ('admin','Admin','Acceso operativo completo. Sin acceso a billing.','#8b5cf6','admin'),
+                ('trafficker','Trafficker','Ve sus clientes, campanas, tareas y KPIs asignados.','#3b82f6','trafficker'),
+                ('viewer','Solo lectura','Solo puede ver reportes y KPIs. Sin edicion.','#64748b','viewer')
+              ) AS r(key, label, description, color, base_role)
+              ON CONFLICT (workspace_id, key) DO NOTHING`],
           ];
 
-          async function run() {
-            for (const config of configs) {
-              const label = (config.connectionString || "").split("@")[1]?.split("/")[0] || "unknown";
-              const client = new Client({ ...config, connectionTimeoutMillis: 10000 });
-              try {
-                await client.connect();
-                console.log(`✅ Connected to: ${label}`);
-                for (const sql of MIGRATIONS) {
-                  const preview = sql.replace(/\s+/g, " ").slice(0, 60);
-                  try {
-                    await client.query(sql);
-                    console.log(`  ✓ ${preview}...`);
-                  } catch (e) {
-                    if (e.message.includes("already exists") || e.message.includes("duplicate")) {
-                      console.log(`  ~ Already exists: ${preview}...`);
-                    } else {
-                      throw e;
-                    }
+          async function tryConnect(config) {
+            const label = `${config.host}:${config.port}`;
+            const client = new Client({ ...config, connectionTimeoutMillis: 12000 });
+            try {
+              await client.connect();
+              console.log("✅ CONNECTED: " + label);
+              for (const [name, sql] of migrations) {
+                try {
+                  await client.query(sql);
+                  console.log("  ✓ " + name);
+                } catch (e) {
+                  if (e.message.match(/already exist|duplicate/i)) {
+                    console.log("  ~ Already exists: " + name);
+                  } else {
+                    throw new Error(name + ": " + e.message);
                   }
                 }
-                const r = await client.query(`SELECT 'workspace_roles' AS t, COUNT(*) FROM public.workspace_roles UNION ALL SELECT 'docs', COUNT(*) FROM public.docs`);
-                console.log("\\n=== Verification ===");
-                r.rows.forEach(row => console.log(`  ${row.t}: ${row.count} rows`));
-                await client.end();
-                console.log("\\n🎉 ALL MIGRATIONS COMPLETED SUCCESSFULLY");
+              }
+              const r = await client.query(
+                "SELECT 'workspace_roles' as t, COUNT(*) FROM public.workspace_roles " +
+                "UNION ALL SELECT 'docs', COUNT(*) FROM public.docs"
+              );
+              console.log("\n=== Verification ===");
+              r.rows.forEach(row => console.log("  " + row.t + ": " + row.count + " rows"));
+              await client.end();
+              return true;
+            } catch (e) {
+              const msg = e.message.split("\n")[0].slice(0, 120);
+              console.log("❌ " + label + ": " + msg);
+              try { await client.end(); } catch {}
+              return false;
+            }
+          }
+
+          (async () => {
+            for (const config of configs) {
+              const ok = await tryConnect(config);
+              if (ok) {
+                console.log("\n🎉 MIGRATION COMPLETE!");
                 process.exit(0);
-              } catch (e) {
-                console.log(`❌ ${label}: ${e.message.split("\\n")[0].slice(0,100)}`);
-                try { await client.end(); } catch {}
               }
             }
             console.error("All connection attempts failed");
             process.exit(1);
-          }
+          })();
+          JSEOF
 
-          run();
-          SCRIPT
