@@ -1,0 +1,135 @@
+name: DB Migration - workspace_roles and docs
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [run-migration]
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test IPv6 connectivity to Supabase
+        run: |
+          echo "=== nslookup direct ==="
+          nslookup db.rntpmsckiplrxfgubngt.supabase.co || true
+          echo "=== Ping test ==="
+          ping6 -c 2 db.rntpmsckiplrxfgubngt.supabase.co 2>&1 || true
+          echo "=== nc test port 5432 ==="
+          nc -zv -w5 db.rntpmsckiplrxfgubngt.supabase.co 5432 2>&1 || true
+
+      - name: Install pg
+        run: npm install pg
+
+      - name: Run SQL migrations
+        env:
+          DB_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          node << 'SCRIPT'
+          const { Client } = require("pg");
+
+          const ref = "rntpmsckiplrxfgubngt";
+          const password = "agenciaai2026";
+          
+          // Connection attempts: direct IPv6 first (no family restriction), then pooler
+          const configs = [
+            // Direct connection - IPv6 (no family restriction - let Node resolve)
+            { connectionString: `postgresql://postgres:${password}@db.${ref}.supabase.co:5432/postgres?sslmode=require`, ssl: { rejectUnauthorized: false } },
+            // Use DATABASE_URL from env if set
+            ...(process.env.DB_URL ? [{ connectionString: process.env.DB_URL, ssl: { rejectUnauthorized: false } }] : []),
+            // Pooler session - various regions
+            { connectionString: `postgresql://postgres.${ref}:${password}@aws-0-sa-east-1.pooler.supabase.com:5432/postgres?sslmode=require`, ssl: { rejectUnauthorized: false } },
+            { connectionString: `postgresql://postgres.${ref}:${password}@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require`, ssl: { rejectUnauthorized: false } },
+            { connectionString: `postgresql://postgres.${ref}:${password}@aws-0-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require`, ssl: { rejectUnauthorized: false } },
+          ];
+
+          const MIGRATIONS = [
+            `CREATE TABLE IF NOT EXISTS public.workspace_roles (
+              id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+              workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+              key TEXT NOT NULL,
+              label TEXT NOT NULL,
+              description TEXT,
+              color TEXT DEFAULT '#6366f1',
+              base_role TEXT NOT NULL DEFAULT 'trafficker'
+                CHECK (base_role IN ('owner','admin','trafficker','viewer')),
+              is_system BOOLEAN DEFAULT FALSE,
+              is_active BOOLEAN DEFAULT TRUE,
+              created_at TIMESTAMPTZ DEFAULT now(),
+              UNIQUE(workspace_id, key)
+            )`,
+            `CREATE INDEX IF NOT EXISTS idx_workspace_roles_workspace ON public.workspace_roles(workspace_id)`,
+            `CREATE TABLE IF NOT EXISTS public.docs (
+              id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+              workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+              title TEXT NOT NULL,
+              content TEXT,
+              category TEXT DEFAULT 'general',
+              status TEXT DEFAULT 'draft',
+              author_id TEXT,
+              version INT DEFAULT 1,
+              version_notes TEXT,
+              tags TEXT[] DEFAULT '{}',
+              external_url TEXT,
+              client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
+              project_id UUID REFERENCES public.projects(id) ON DELETE SET NULL,
+              created_at TIMESTAMPTZ DEFAULT now(),
+              updated_at TIMESTAMPTZ DEFAULT now()
+            )`,
+            `CREATE INDEX IF NOT EXISTS idx_docs_workspace ON public.docs(workspace_id)`,
+            `ALTER TABLE public.docs ENABLE ROW LEVEL SECURITY`,
+            `DO $$ BEGIN
+              CREATE POLICY "enable_all_for_authenticated" ON public.docs
+              FOR ALL USING (auth.uid() IS NOT NULL)
+              WITH CHECK (auth.uid() IS NOT NULL);
+            EXCEPTION WHEN duplicate_object THEN NULL;
+            END $$`,
+            `INSERT INTO public.workspace_roles (workspace_id, key, label, description, color, base_role, is_system)
+            SELECT w.id, r.key, r.label, r.description, r.color, r.base_role, true
+            FROM public.workspaces w
+            CROSS JOIN (VALUES
+              ('owner','Dueño','Acceso total. Ve finanzas, equipo y toda la agencia.','#f59e0b','owner'),
+              ('admin','Admin','Acceso operativo completo. Sin acceso a billing.','#8b5cf6','admin'),
+              ('trafficker','Trafficker','Ve sus clientes, campanas, tareas y KPIs asignados.','#3b82f6','trafficker'),
+              ('viewer','Solo lectura','Solo puede ver reportes y KPIs. Sin edicion.','#64748b','viewer')
+            ) AS r(key, label, description, color, base_role)
+            ON CONFLICT (workspace_id, key) DO NOTHING`,
+          ];
+
+          async function run() {
+            for (const config of configs) {
+              const label = (config.connectionString || "").split("@")[1]?.split("/")[0] || "unknown";
+              const client = new Client({ ...config, connectionTimeoutMillis: 10000 });
+              try {
+                await client.connect();
+                console.log(`✅ Connected to: ${label}`);
+                for (const sql of MIGRATIONS) {
+                  const preview = sql.replace(/\s+/g, " ").slice(0, 60);
+                  try {
+                    await client.query(sql);
+                    console.log(`  ✓ ${preview}...`);
+                  } catch (e) {
+                    if (e.message.includes("already exists") || e.message.includes("duplicate")) {
+                      console.log(`  ~ Already exists: ${preview}...`);
+                    } else {
+                      throw e;
+                    }
+                  }
+                }
+                const r = await client.query(`SELECT 'workspace_roles' AS t, COUNT(*) FROM public.workspace_roles UNION ALL SELECT 'docs', COUNT(*) FROM public.docs`);
+                console.log("\\n=== Verification ===");
+                r.rows.forEach(row => console.log(`  ${row.t}: ${row.count} rows`));
+                await client.end();
+                console.log("\\n🎉 ALL MIGRATIONS COMPLETED SUCCESSFULLY");
+                process.exit(0);
+              } catch (e) {
+                console.log(`❌ ${label}: ${e.message.split("\\n")[0].slice(0,100)}`);
+                try { await client.end(); } catch {}
+              }
+            }
+            console.error("All connection attempts failed");
+            process.exit(1);
+          }
+
+          run();
+          SCRIPT
