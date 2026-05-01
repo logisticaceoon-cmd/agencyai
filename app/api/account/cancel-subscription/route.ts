@@ -8,9 +8,7 @@ import Stripe from 'stripe'
 // El usuario sigue activo hasta la fecha de vencimiento, luego baja a Free.
 export async function POST(request: Request) {
   const auth = await getAuthContext()
-  if (isAuthError(auth)) {
-    return NextResponse.json({ error: auth.error }, { status: auth.status })
-  }
+  if (isAuthError(auth)) return auth
 
   try {
     const org = await prisma.organization.findUnique({
