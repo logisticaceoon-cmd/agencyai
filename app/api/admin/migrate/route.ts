@@ -18,14 +18,12 @@ export async function POST(request: Request) {
     // Session pooler (port 5432 via pooler) supports DDL; transaction pooler (6543) does not
     const { Client } = await import('pg')
 
-    // Build pooler URL from env or construct from known project ref
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-    const projectRef = supabaseUrl.replace('https://', '').replace('.supabase.co', '')
-    const dbPassword = process.env.DB_PASSWORD || 'agenciaai2026'
-
-    // Supabase session pooler — IPv6 ready, works from Vercel
-    const connectionString = process.env.DATABASE_URL_DIRECT
-      || `postgresql://postgres.${projectRef}:${dbPassword}@aws-0-us-east-1.pooler.supabase.com:5432/postgres`
+    // Use DIRECT_URL (session pooler) — IPv6-compatible, works from Vercel, supports DDL
+    // DATABASE_URL uses transaction pooler which does NOT support DDL
+    const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL || ''
+    if (!connectionString) {
+      return NextResponse.json({ error: 'No database connection URL configured' }, { status: 500 })
+    }
 
     const client = new Client({
       connectionString,
