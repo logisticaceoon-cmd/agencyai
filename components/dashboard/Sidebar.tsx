@@ -8,6 +8,7 @@ import { useProfessionalType } from '@/hooks/useProfessionalType'
 import { Avatar } from '@/components/shared/Avatar'
 import { toast } from '@/hooks/use-toast'
 import { normalizeRole, canAccessSection, ROLE_LABELS, type AppRole } from '@/lib/roles'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   LayoutDashboard,
   CheckSquare,
@@ -66,6 +67,7 @@ type NavItem = {
   label: string
   icon: React.ElementType
   minPlan?: OrgPlan
+  proRequired?: boolean   // nuevo: se bloquea en free, visible con badge PRO
 }
 
 const adminItems: NavItem[] = [
@@ -90,6 +92,7 @@ export function Sidebar() {
   const role: AppRole = normalizeRole(user?.role)
   const isOwner = role === 'owner'
   const canAdmin = role === 'owner' || role === 'admin'
+  const { isPro } = usePlanLimits()
 
   const navGroups: { label: string | null; items: NavItem[] }[] = [
     {
@@ -104,7 +107,7 @@ export function Sidebar() {
         { href: '/clients',   label: config.terminology.clients,  icon: Users },
         { href: '/projects',  label: config.terminology.projects, icon: FolderKanban },
         { href: '/tasks',     label: config.terminology.tasks,    icon: CheckSquare },
-        { href: '/minutes',   label: 'Minutas',                   icon: MessageSquare },
+        { href: '/minutes',   label: 'Minutas',                   icon: MessageSquare, proRequired: !isPro },
         { href: '/calendar',  label: 'Calendario',                icon: Calendar },
       ],
     },
@@ -112,19 +115,19 @@ export function Sidebar() {
       label: 'Reportes',
       items: [
         { href: '/reports',    label: config.terminology.reports, icon: FileText },
-        { href: '/kpis',       label: 'KPIs y Metricas',          icon: BarChart2 },
-        { href: '/objectives', label: 'Objetivos',                icon: Target },
+        { href: '/kpis',       label: 'KPIs y Metricas',          icon: BarChart2,  proRequired: !isPro },
+        { href: '/objectives', label: 'Objetivos',                icon: Target,     proRequired: !isPro },
       ],
     },
     {
       label: 'Gestion',
       items: [
-        { href: '/audits',      label: 'Auditorias',       icon: Search },
-        { href: '/performance', label: 'Rendimiento',      icon: TrendingUp },
-        { href: '/docs',        label: 'Documentos',       icon: BookOpen },
-        { href: '/finances',    label: 'Finanzas',         icon: DollarSign },
-        { href: '/recordings',  label: 'Grabaciones',      icon: Video },
-        { href: '/alerts',      label: 'IA & Alertas',     icon: Zap },
+        { href: '/audits',      label: 'Auditorias',   icon: Search,    proRequired: !isPro },
+        { href: '/performance', label: 'Rendimiento',  icon: TrendingUp, proRequired: !isPro },
+        { href: '/docs',        label: 'Documentos',   icon: BookOpen,  proRequired: !isPro },
+        { href: '/finances',    label: 'Finanzas',     icon: DollarSign },
+        { href: '/recordings',  label: 'Grabaciones',  icon: Video,     proRequired: !isPro },
+        { href: '/alerts',      label: 'IA & Alertas', icon: Zap,       proRequired: !isPro },
       ],
     },
   ]
@@ -182,12 +185,32 @@ export function Sidebar() {
               {visibleItems.map((item) => {
                 const unlocked = isUnlocked(item.minPlan, orgPlan)
                 const active = isActive(item.href)
+                // Item bloqueado por plan Pro
+                const isProLocked = item.proRequired === true
+
+                if (isProLocked) {
+                  return (
+                    <Link
+                      key={item.href}
+                      href="/settings/billing"
+                      title="Función Pro — Activar por $30/mes"
+                      className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-secondary)] transition-all group"
+                    >
+                      <item.icon size={16} strokeWidth={1.5} className="flex-shrink-0 opacity-50" />
+                      <span className="flex-1 opacity-50">{item.label}</span>
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 text-indigo-500 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide flex-shrink-0">
+                        <Lock size={7} />
+                        Pro
+                      </span>
+                    </Link>
+                  )
+                }
 
                 if (!unlocked) {
                   return (
                     <Link
                       key={item.href}
-                      href="/settings"
+                      href="/settings/billing"
                       title={`Requiere plan ${PLAN_LABEL[item.minPlan!]} — Actualizar plan`}
                       className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-muted)] opacity-50 hover:opacity-70 transition-all"
                     >
