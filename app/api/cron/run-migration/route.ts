@@ -8,85 +8,40 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const results: Record<string, unknown> = {}
-
   try {
-    // Agregar columnas una por una para mejor diagnóstico
+    // Test 1: ORM query (should work)
+    const orgCount = await prisma.organization.count()
+
+    // Test 2: Raw SELECT (test raw connection)
+    let rawTest: any = null
+    let rawError: string | null = null
     try {
-      await prisma.$executeRawUnsafe(
-        `ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`
-      )
-      results['status_col'] = 'ok'
+      const result = await prisma.$queryRawUnsafe(`SELECT count(*) as n FROM public.organizations`)
+      rawTest = result
     } catch (e: any) {
-      results['status_col'] = e.message
+      rawError = e.message
     }
 
-    try {
-      await prisma.$executeRawUnsafe(
-        `ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ`
-      )
-      results['deactivated_at_col'] = 'ok'
-    } catch (e: any) {
-      results['deactivated_at_col'] = e.message
+    // Test 3: Try ALTER TABLE
+    let ddlResult: string = 'not_tried'
+    if (!rawError) {
+      try {
+        await prisma.$executeRawUnsafe(
+          `ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`
+        )
+        ddlResult = 'ok'
+      } catch (e: any) {
+        ddlResult = e.message.slice(0, 200)
+      }
     }
 
-    try {
-      await prisma.$executeRawUnsafe(
-        `ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS delete_after TIMESTAMPTZ`
-      )
-      results['delete_after_col'] = 'ok'
-    } catch (e: any) {
-      results['delete_after_col'] = e.message
-    }
-
-    try {
-      await prisma.$executeRawUnsafe(
-        `ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS cancellation_scheduled_at TIMESTAMPTZ`
-      )
-      results['cancellation_col'] = 'ok'
-    } catch (e: any) {
-      results['cancellation_col'] = e.message
-    }
-
-    try {
-      await prisma.$executeRawUnsafe(
-        `ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`
-      )
-      results['stripe_customer_id_col'] = 'ok'
-    } catch (e: any) {
-      results['stripe_customer_id_col'] = e.message
-    }
-
-    try {
-      await prisma.$executeRawUnsafe(
-        `CREATE INDEX IF NOT EXISTS idx_org_delete_after ON public.organizations(delete_after) WHERE delete_after IS NOT NULL`
-      )
-      results['idx_delete_after'] = 'ok'
-    } catch (e: any) {
-      results['idx_delete_after'] = e.message
-    }
-
-    try {
-      await prisma.$executeRawUnsafe(
-        `CREATE INDEX IF NOT EXISTS idx_org_status ON public.organizations(status)`
-      )
-      results['idx_status'] = 'ok'
-    } catch (e: any) {
-      results['idx_status'] = e.message
-    }
-
-    // Verify columns exist
-    const cols = await prisma.$queryRawUnsafe(`
-      SELECT column_name, data_type
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'organizations'
-        AND column_name IN ('status','deactivated_at','delete_after','cancellation_scheduled_at','stripe_customer_id')
-      ORDER BY column_name
-    `)
-
-    return NextResponse.json({ success: true, results, columns: cols })
+    return NextResponse.json({
+      orm_count: orgCount,
+      raw_select: rawTest,
+      raw_error: rawError,
+      ddl: ddlResult,
+    })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message, results }, { status: 500 })
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
