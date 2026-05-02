@@ -1,21 +1,23 @@
 'use client'
 
 import { useWorkspace } from './useWorkspace'
+import { FOUNDER_WORKSPACE_IDS } from '@/lib/plans'
 
 export interface PlanLimits {
   plan: string
-  isPro: boolean          // true si plan >= pro
+  isPro: boolean
+  isFounder: boolean
   maxClients: number
   maxProjects: number
-  maxUsers: number
+  maxUsers: number        // total incluyendo owner
   // Features granulares
   hasAI: boolean
   hasPortal: boolean
   hasReportsPDF: boolean
-  hasFinances: boolean          // finanzas > clientes (disponible en free)
-  hasFinanceNominas: boolean    // finanzas > nóminas (solo pro)
-  hasFinanceGastos: boolean     // finanzas > gastos (solo pro)
-  hasFinanceResumen: boolean    // finanzas > resumen (solo pro)
+  hasFinances: boolean          // Tab Clientes — siempre disponible
+  hasFinanceNominas: boolean    // Tab Nóminas — pro+
+  hasFinanceGastos: boolean     // Tab Gastos — pro+
+  hasFinanceResumen: boolean    // Tab Resumen — pro+
   hasKPIs: boolean
   hasObjectives: boolean
   hasAudits: boolean
@@ -26,38 +28,64 @@ export interface PlanLimits {
   hasApiKeys: boolean
 }
 
+// Planes que desbloquean features pro
 const PRO_PLANS = new Set(['pro', 'agency', 'scale'])
+// Planes que desbloquean features de agency+
+const AGENCY_PLANS = new Set(['agency', 'scale'])
 
-function buildLimits(plan: string): PlanLimits {
-  const pro = PRO_PLANS.has(plan)
+// Límites por plan
+const PLAN_LIMITS: Record<string, { maxClients: number; maxUsers: number }> = {
+  free:    { maxClients: 3,        maxUsers: 2   },  // owner + 1
+  pro:     { maxClients: 8,        maxUsers: 4   },  // owner + 3
+  agency:  { maxClients: 20,       maxUsers: 11  },  // owner + 10
+  scale:   { maxClients: Infinity, maxUsers: Infinity },
+  // Legacy
+  starter: { maxClients: 10,       maxUsers: 4   },
+}
+
+// Límites founder — todo ilimitado
+const FOUNDER_LIMITS = { maxClients: Infinity, maxUsers: Infinity }
+
+function buildLimits(plan: string, workspaceId: string): PlanLimits {
+  const founder = FOUNDER_WORKSPACE_IDS.has(workspaceId)
+  const pro = founder || PRO_PLANS.has(plan)
+  const agency = founder || AGENCY_PLANS.has(plan)
+
+  const limits = founder
+    ? FOUNDER_LIMITS
+    : (PLAN_LIMITS[plan] ?? PLAN_LIMITS.free)
+
   return {
     plan,
     isPro: pro,
-    maxClients: pro ? Infinity : 3,
+    isFounder: founder,
+    maxClients: limits.maxClients,
     maxProjects: pro ? Infinity : 10,
-    maxUsers: pro ? Infinity : 1,
+    maxUsers: limits.maxUsers,
     // Finanzas
     hasFinances: true,              // Tab "Clientes" siempre disponible
-    hasFinanceNominas: pro,         // Tab "Nóminas" solo pro
-    hasFinanceGastos: pro,          // Tab "Gastos" solo pro
-    hasFinanceResumen: pro,         // Tab "Resumen" solo pro
-    // Todo lo demás
+    hasFinanceNominas: pro,
+    hasFinanceGastos: pro,
+    hasFinanceResumen: pro,
+    // Features pro
     hasAI: pro,
-    hasPortal: pro,
     hasReportsPDF: pro,
     hasKPIs: pro,
     hasObjectives: pro,
-    hasAudits: pro,
-    hasRecordings: pro,
-    hasAlerts: pro,
     hasPerformance: pro,
     hasDocs: pro,
-    hasApiKeys: pro,
+    hasAlerts: pro,
+    // Features agency+
+    hasPortal: agency,
+    hasAudits: agency,
+    hasRecordings: agency,
+    hasApiKeys: agency,
   }
 }
 
 export function usePlanLimits(): PlanLimits & { loading: boolean } {
   const { workspace, loading } = useWorkspace()
   const plan = workspace?.plan || 'free'
-  return { ...buildLimits(plan), loading }
+  const workspaceId = workspace?.id || ''
+  return { ...buildLimits(plan, workspaceId), loading }
 }
