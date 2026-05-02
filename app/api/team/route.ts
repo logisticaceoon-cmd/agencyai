@@ -3,6 +3,7 @@ import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 import { createAdminClient } from '@/lib/supabase/server'
 import { randomUUID } from 'crypto'
 import nodemailer from 'nodemailer'
+import { FOUNDER_WORKSPACE_IDS, PLAN_MAP } from '@/lib/plans'
 
 // ─── Email helper (internal, no API key needed) ────────────────────────────
 async function sendInviteEmail({
@@ -124,6 +125,45 @@ export async function POST(request: Request) {
     const { email, role: invitedRole = 'trafficker', name } = body
 
     if (!email) return NextResponse.json({ error: 'Email requerido' }, { status: 400 })
+
+    // ─── Verificar límite de miembros según el plan ──────────────────────────
+    if (!FOUNDER_WORKSPACE_IDS.has(workspaceId)) {
+      const adminClient = createAdminClient()
+
+      // Obtener el plan del workspace
+      const { data: ws } = await adminClient
+        .from('workspaces')
+        .select('plan')
+        .eq('id', workspaceId)
+        .single()
+
+      const plan = ws?.plan || 'free'
+      const planDef = PLAN_MAP[plan as keyof typeof PLAN_MAP] ?? PLAN_MAP.free
+      const maxUsers = planDef.maxUsers
+
+      if (maxUsers !== Infinity) {
+        // Contar miembros activos actuales
+        const { count } = await adminClient
+          .from('workspace_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .eq('status', 'active')
+
+        if ((count ?? 0) >= maxUsers) {
+          const planNames: Record<string, string> = {
+            free: 'Free (owner + 1)',
+            pro: 'Pro (owner + 3)',
+            agency: 'Agency (owner + 10)',
+          }
+          return NextResponse.json({
+            error: `Límite de usuarios alcanzado. Tu plan ${planNames[plan] || plan} permite máximo ${maxUsers} miembros. Actualizá tu plan para agregar más.`,
+            limitReached: true,
+            maxUsers,
+          }, { status: 403 })
+        }
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     const adminClient = createAdminClient()
 
