@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 import { normalizeRole, getDataScope } from '@/lib/roles'
+import { FOUNDER_WORKSPACE_IDS, PLAN_MAP } from '@/lib/plans'
 
 export async function GET(request: Request) {
   try {
@@ -79,6 +80,41 @@ export async function POST(request: Request) {
     if (appRole === 'trafficker' || appRole === 'viewer') {
       return NextResponse.json({ error: 'Sin permisos para crear clientes' }, { status: 403 })
     }
+
+    // ─── Verificar límite de clientes según el plan ──────────────────────────
+    if (!FOUNDER_WORKSPACE_IDS.has(workspaceId)) {
+      const { data: ws } = await supabase
+        .from('workspaces')
+        .select('plan')
+        .eq('id', workspaceId)
+        .single()
+
+      const plan = ws?.plan || 'free'
+      const planDef = PLAN_MAP[plan as keyof typeof PLAN_MAP] ?? PLAN_MAP.free
+      const maxClients = planDef.maxClients
+
+      if (maxClients !== Infinity) {
+        const { count } = await supabase
+          .from('clients')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .is('deleted_at', null)
+
+        if ((count ?? 0) >= maxClients) {
+          const planNames: Record<string, string> = {
+            free: 'Free (3 clientes)',
+            pro: 'Pro (8 clientes)',
+            agency: 'Agency (20 clientes)',
+          }
+          return NextResponse.json({
+            error: `Límite de clientes alcanzado. Tu plan ${planNames[plan] || plan} permite máximo ${maxClients} clientes. Actualizá tu plan para agregar más.`,
+            limitReached: true,
+            maxClients,
+          }, { status: 403 })
+        }
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     const body = await request.json()
 
