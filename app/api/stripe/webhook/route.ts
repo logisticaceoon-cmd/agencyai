@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServiceRoleClient } from '@/lib/supabase-server'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
   const stripeKey = process.env.STRIPE_SECRET_KEY
@@ -22,7 +21,7 @@ export async function POST(request: Request) {
     }
 
     const event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
-    const supabase = await createServiceRoleClient()
+    const supabase = createAdminClient()
 
     // ── Pago exitoso: activar plan ─────────────────────────────────────────────
     if (event.type === 'checkout.session.completed') {
@@ -35,27 +34,26 @@ export async function POST(request: Request) {
       const customerId = typeof session.customer === 'string' ? session.customer : undefined
 
       if (workspaceId && planId) {
+        const planExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
         // Actualizar workspaces (Cowork API)
         await supabase
           .from('workspaces')
-          .update({
-            plan: planId,
-            plan_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          })
+          .update({ plan: planId, plan_expires_at: planExpiry })
           .eq('id', workspaceId)
 
-        // Actualizar organizations (Prisma/app)
-        await prisma.organization.updateMany({
-          where: { id: workspaceId },
-          data: {
-            plan: planId as never,
+        // Actualizar organizations (app)
+        await supabase
+          .from('organizations')
+          .update({
+            plan: planId,
             status: 'active',
-            deactivatedAt: null,
-            deleteAfter: null,
-            cancellationScheduledAt: null,
-            ...(customerId ? { stripeCustomerId: customerId } : {}),
-          },
-        })
+            deactivated_at: null,
+            delete_after: null,
+            cancellation_scheduled_at: null,
+            ...(customerId ? { stripe_customer_id: customerId } : {}),
+          })
+          .eq('id', workspaceId)
       }
     }
 
@@ -68,17 +66,11 @@ export async function POST(request: Request) {
       }
       const customerId = typeof subscription.customer === 'string' ? subscription.customer : undefined
 
-      if (customerId) {
-        // Si se reactivó (cancel_at_period_end pasó a false)
-        if (subscription.cancel_at_period_end === false && subscription.status === 'active') {
-          await prisma.organization.updateMany({
-            where: { stripeCustomerId: customerId },
-            data: {
-              status: 'active',
-              cancellationScheduledAt: null,
-            },
-          })
-        }
+      if (customerId && subscription.cancel_at_period_end === false && subscription.status === 'active') {
+        await supabase
+          .from('organizations')
+          .update({ status: 'active', cancellation_scheduled_at: null })
+          .eq('stripe_customer_id', customerId)
       }
     }
 
@@ -88,38 +80,28 @@ export async function POST(request: Request) {
       const customerId = typeof subscription.customer === 'string' ? subscription.customer : undefined
 
       if (customerId) {
-        // Actualizar workspaces (Cowork API)
         await supabase
           .from('workspaces')
           .update({ plan: 'free', plan_expires_at: null })
           .eq('stripe_customer_id', customerId)
 
-        // Actualizar organizations (Prisma/app) — bajar a Free, marcar como cancelled
-        await prisma.organization.updateMany({
-          where: { stripeCustomerId: customerId },
-          data: {
-            plan: 'free',
-            status: 'active', // cancelled → ahora baja a free y sigue activo como free
-            cancellationScheduledAt: null,
-          },
-        })
+        await supabase
+          .from('organizations')
+          .update({ plan: 'free', status: 'active', cancellation_scheduled_at: null })
+          .eq('stripe_customer_id', customerId)
       }
     }
 
-    // ── Pago fallido: avisar (no bloquear cuenta aún) ─────────────────────────
+    // ── Pago fallido 3 veces: marcar como cancelado ───────────────────────────
     if (event.type === 'invoice.payment_failed') {
       const invoice = event.data.object as { customer?: string; attempt_count?: number }
       const customerId = typeof invoice.customer === 'string' ? invoice.customer : undefined
 
       if (customerId && (invoice.attempt_count ?? 0) >= 3) {
-        // Después de 3 intentos fallidos, marcar como cancelado
-        await prisma.organization.updateMany({
-          where: { stripeCustomerId: customerId },
-          data: {
-            status: 'cancelled',
-            cancellationScheduledAt: new Date(),
-          },
-        })
+        await supabase
+          .from('organizations')
+          .update({ status: 'cancelled', cancellation_scheduled_at: new Date().toISOString() })
+          .eq('stripe_customer_id', customerId)
       }
     }
 
