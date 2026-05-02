@@ -766,7 +766,7 @@ export default function FinancesPage() {
                                         </a>
                                       )}
                                     </td>
-                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{Number(c.contract_cost).toLocaleString()}</td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{(() => { const rec = getMonthlyRecord(c.id); return <>{sym}{Number(rec ? rec.billed_amount : c.contract_cost).toLocaleString()}</>; })()}</td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                       {Number(c.commission_percent) > 0 ? (
                                         <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span>
