@@ -4,27 +4,30 @@ export interface Plan {
   id: PlanId
   name: string
   price: number
-  maxUsers: number
+  maxUsers: number       // incluye al owner (ej: 2 = owner + 1)
   maxClients: number
   description: string
   features: string[]
   highlighted?: boolean
 }
 
-// ─── SIMPLIFICADO: Free + Pro ──────────────────────────────────────────────────
-// Los planes legacy (starter, agency, scale) se mantienen para compatibilidad
-// pero el producto solo ofrece Free y Pro activamente.
+// ─── Founder accounts — acceso ilimitado sin importar el plan ─────────────────
+// Agregar workspace IDs de cuentas founder acá
+export const FOUNDER_WORKSPACE_IDS = new Set([
+  '41b4b8ab-2483-418d-bb29-d39084ca36f0', // Rafael — Logística CEOON
+])
 
+// ─── Planes activos ───────────────────────────────────────────────────────────
 export const PLANS: Plan[] = [
   {
     id: 'free',
     name: 'Free',
     price: 0,
-    maxUsers: 1,
+    maxUsers: 2,          // owner + 1
     maxClients: 3,
     description: 'Para empezar a organizarte',
     features: [
-      '1 usuario',
+      'Owner + 1 usuario',
       'Hasta 3 clientes',
       'Proyectos y tareas',
       'Gestión de clientes (fees + comisiones)',
@@ -33,52 +36,65 @@ export const PLANS: Plan[] = [
   {
     id: 'pro',
     name: 'Pro',
-    price: 30,
-    maxUsers: 999,
-    maxClients: 999,
-    description: 'Todo lo que necesitás para crecer',
+    price: 29,
+    maxUsers: 4,          // owner + 3
+    maxClients: 8,
+    description: 'Para agencias pequeñas establecidas',
+    highlighted: true,
     features: [
-      'Clientes ilimitados',
-      'Usuarios ilimitados',
+      'Owner + 3 usuarios',
+      'Hasta 8 clientes',
+      'Proyectos ilimitados',
       'Finanzas completas (nóminas, gastos, resumen)',
       'KPIs y métricas',
       'Objetivos y OKRs',
-      'Portal del cliente',
-      'Auditorías',
       'IA integrada',
-      'API Keys (Cowork)',
-      'Grabaciones',
-      'Sin branding',
+      'Soporte por email',
     ],
-    highlighted: true,
   },
-  // Legacy — compatibilidad con cuentas antiguas
+  {
+    id: 'agency',
+    name: 'Agency',
+    price: 59,
+    maxUsers: 11,         // owner + 10
+    maxClients: 20,
+    description: 'Para agencias en crecimiento',
+    features: [
+      'Owner + 10 usuarios',
+      'Hasta 20 clientes',
+      'Todo lo de Pro',
+      'Portal del cliente',
+      'Acceso API (Cowork)',
+      'Grabaciones',
+      'Auditorías',
+      'Soporte prioritario',
+    ],
+  },
+  {
+    id: 'scale',
+    name: 'Scale',
+    price: 99,
+    maxUsers: Infinity,
+    maxClients: Infinity,
+    description: 'Para agencias grandes',
+    features: [
+      'Usuarios ilimitados',
+      'Clientes ilimitados',
+      'Todo lo de Agency',
+      'Onboarding personalizado',
+      'Reportes white-label',
+      'SLA garantizado',
+    ],
+  },
+  // Legacy — solo compatibilidad con cuentas antiguas
   {
     id: 'starter',
     name: 'Starter',
     price: 12,
     maxUsers: 4,
     maxClients: 10,
-    description: 'Para freelancers',
-    features: ['4 usuarios', '10 clientes', 'Finanzas básicas'],
-  },
-  {
-    id: 'agency',
-    name: 'Agency',
-    price: 99,
-    maxUsers: 10,
-    maxClients: 20,
-    description: 'Para agencias establecidas',
-    features: ['10 usuarios', '20 clientes', 'Todo Pro', 'Portal cliente'],
-  },
-  {
-    id: 'scale',
-    name: 'Scale',
-    price: 149,
-    maxUsers: 20,
-    maxClients: 40,
-    description: 'Para agencias grandes',
-    features: ['20 usuarios', '40 clientes', 'Todo Agency'],
+    description: 'Legacy',
+    features: ['4 usuarios', '10 clientes'],
   },
 ]
 
