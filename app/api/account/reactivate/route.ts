@@ -1,24 +1,26 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/server'
 
 // POST /api/account/reactivate
-// Reactiva una cuenta desactivada (el usuario pagó de nuevo).
 export async function POST(request: Request) {
   const auth = await getAuthContext()
   if (isAuthError(auth)) return auth
 
-  try {
-    const org = await prisma.organization.findUnique({
-      where: { id: auth.workspaceId },
-      select: { id: true, status: true, ownerId: true, deleteAfter: true },
-    })
+  const supabase = createAdminClient()
 
-    if (!org) {
+  try {
+    const { data: org, error: fetchErr } = await supabase
+      .from('organizations')
+      .select('id, status, owner_id, delete_after')
+      .eq('id', auth.workspaceId)
+      .single()
+
+    if (fetchErr || !org) {
       return NextResponse.json({ error: 'Organización no encontrada' }, { status: 404 })
     }
 
-    if (org.ownerId !== auth.userId) {
+    if (org.owner_id !== auth.userId) {
       return NextResponse.json({ error: 'Solo el dueño puede reactivar la cuenta' }, { status: 403 })
     }
 
@@ -26,22 +28,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'La cuenta ya está activa' }, { status: 400 })
     }
 
-    // Verificar que no haya pasado la fecha de borrado
-    if (org.deleteAfter && new Date() > org.deleteAfter) {
+    if (org.delete_after && new Date() > new Date(org.delete_after)) {
       return NextResponse.json({
         error: 'El período de retención expiró. Los datos ya no están disponibles.',
       }, { status: 410 })
     }
 
-    await prisma.organization.update({
-      where: { id: auth.workspaceId },
-      data: {
-        status: 'active',
-        deactivatedAt: null,
-        deleteAfter: null,
-        cancellationScheduledAt: null,
-      },
-    })
+    const { error: updateErr } = await supabase
+      .from('organizations')
+      .update({ status: 'active', deactivated_at: null, delete_after: null, cancellation_scheduled_at: null })
+      .eq('id', auth.workspaceId)
+
+    if (updateErr) {
+      return NextResponse.json({ error: 'Error al reactivar: ' + updateErr.message }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,
