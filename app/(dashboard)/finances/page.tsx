@@ -679,7 +679,10 @@ export default function FinancesPage() {
                 const catClients = clientsByCategory[cat.id] || []
                 const expanded = expandedCats[cat.id]
                 const catRecords = monthlyRecords.filter(r => catClients.some(c => c.id === r.client_id))
-                const catTotal = catClients.filter(c => !c.deleted_at).reduce((s, c) => s + Number(c.contract_cost), 0)
+                const catTotal = catClients.filter(c => !c.deleted_at).reduce((s, c) => {
+                  const rec = catRecords.find(r => r.client_id === c.id)
+                  return s + (rec ? Number(rec.billed_amount) : Number(c.contract_cost))
+                }, 0)
                 const catCommissions = catRecords.reduce((s, r) => s + Number(r.commission_amount), 0)
                 const catCancelled = catClients.filter(c => !c.deleted_at).reduce((s, c) => s + Number(c.cancelled_amount), 0)
 
@@ -799,7 +802,8 @@ export default function FinancesPage() {
                                     <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>
                                       {(() => {
                                         const rec = getMonthlyRecord(c.id)
-                                        const rowTotal = Number(c.contract_cost) + (rec ? Number(rec.commission_amount) : 0)
+                                        const feeAmt = rec ? Number(rec.billed_amount) : Number(c.contract_cost)
+                                        const rowTotal = feeAmt + (rec ? Number(rec.commission_amount) : 0)
                                         return <>{sym}{rowTotal.toLocaleString()}</>
                                       })()}
                                     </td>
