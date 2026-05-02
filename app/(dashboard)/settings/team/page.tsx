@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Users, Plus, X, Loader2, Shield, Trash2, Mail, Copy, Check, Link as LinkIcon, RefreshCw, Crown, Zap, Target, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ROLE_LABELS, type AppRole } from '@/lib/roles'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
 
 interface Member {
   id: string
@@ -67,6 +68,7 @@ function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
 }
 
 export default function TeamPage() {
+  const { maxUsers, isFounder } = usePlanLimits()
   const [members, setMembers] = useState<Member[]>([])
   const [workspaceRoles, setWorkspaceRoles] = useState<WorkspaceRole[]>(FALLBACK_ROLES)
   const [loading, setLoading] = useState(true)
@@ -75,6 +77,7 @@ export default function TeamPage() {
   const [saving, setSaving] = useState(false)
   const [editingRole, setEditingRole] = useState<string | null>(null)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
+  const [upgradeModal, setUpgradeModal] = useState(false)
 
   // Form state
   const [inviteEmail, setInviteEmail] = useState('')
@@ -134,7 +137,12 @@ export default function TeamPage() {
         setInviteEmail('')
         setInviteName('')
       } else {
-        setInviteResult({ error: data.error })
+        if (data.limitReached) {
+          setShowInvite(false)
+          setUpgradeModal(true)
+        } else {
+          setInviteResult({ error: data.error })
+        }
       }
     } catch {
       setInviteResult({ error: 'Error de conexión' })
@@ -178,8 +186,40 @@ export default function TeamPage() {
   // Cols: 2 if ≤2 roles, 3 otherwise (max 4 per row)
   const roleCols = workspaceRoles.length <= 2 ? 'grid-cols-2' : workspaceRoles.length <= 4 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'
 
+  const activeCount = members.filter(m => m.status === 'active').length
+  const atLimit = !isFounder && maxUsers !== Infinity && activeCount >= maxUsers
+  const usagePercent = maxUsers !== Infinity ? Math.min((activeCount / maxUsers) * 100, 100) : 0
+
   return (
     <div className="space-y-6 max-w-4xl">
+      {/* Modal upgrade */}
+      {upgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <Zap className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">Límite de equipo alcanzado</h3>
+                <p className="text-sm text-slate-500">Tu plan actual permite máximo {maxUsers} miembros</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 mb-6">
+              Para agregar más miembros al equipo, actualizá tu plan. Con Agency podés tener hasta 11 personas y con Scale es ilimitado.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setUpgradeModal(false)} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <a href="/settings/billing" className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white text-center hover:bg-blue-700">
+                Ver planes →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -188,13 +228,29 @@ export default function TeamPage() {
             {active.length} activos · {pending.length} con invitación pendiente
           </p>
         </div>
-        <button
-          onClick={() => { setShowInvite(true); setInviteResult(null) }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20"
-        >
-          <Plus className="h-4 w-4" />
-          Invitar miembro
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Indicador de uso */}
+          {!isFounder && maxUsers !== Infinity && (
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium ${atLimit ? 'text-red-600' : 'text-slate-500'}`}>
+                {activeCount}/{maxUsers} miembros
+              </span>
+              <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${atLimit ? 'bg-red-500' : usagePercent > 75 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                  style={{ width: `${usagePercent}%` }}
+                />
+              </div>
+            </div>
+          )}
+          <button
+            onClick={atLimit ? () => setUpgradeModal(true) : () => { setShowInvite(true); setInviteResult(null) }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors shadow-sm ${atLimit ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/20' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/20'}`}
+          >
+            {atLimit ? <Zap className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {atLimit ? 'Límite alcanzado' : 'Invitar miembro'}
+          </button>
+        </div>
       </div>
 
       {/* Invite form */}
