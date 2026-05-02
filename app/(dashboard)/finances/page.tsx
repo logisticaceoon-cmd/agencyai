@@ -568,11 +568,18 @@ export default function FinancesPage() {
         {/* ═══ TAB RESUMEN ═══ */}
         <Tabs.Content value="resumen" className="space-y-6">
           {!hasFinanceResumen && <UpgradeBanner feature="Resumen financiero" />}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KPICard icon={DollarSign} label="Ingresos del mes" value={`$${totalIncome.toLocaleString()}`} color="text-green-600" bg="bg-green-50" border="border-green-200" />
-            <KPICard icon={TrendingDown} label="Gastos del mes" value={`$${totalExpenses.toLocaleString()}`} color="text-red-600" bg="bg-red-50" border="border-red-200" />
-            <KPICard icon={TrendingUp} label="Ganancia neta" value={`$${netProfit.toLocaleString()}`} color={netProfit >= 0 ? 'text-blue-600' : 'text-red-600'} bg={netProfit >= 0 ? 'bg-blue-50' : 'bg-red-50'} border={netProfit >= 0 ? 'border-blue-200' : 'border-red-200'} />
-            <KPICard icon={Briefcase} label="Clientes activos" value={`$${totalContractCost.toLocaleString()}/mes`} color="text-purple-600" bg="bg-purple-50" border="border-purple-200" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { label: 'Ingresos del mes', value: `$${totalIncome.toLocaleString()}`, color: '#16a34a' },
+              { label: 'Gastos del mes', value: `$${totalExpenses.toLocaleString()}`, color: '#dc2626' },
+              { label: 'Ganancia neta', value: `$${netProfit.toLocaleString()}`, color: netProfit >= 0 ? '#2563eb' : '#dc2626' },
+              { label: 'Contratos activos', value: `$${totalContractCost.toLocaleString()}/mes`, color: '#0f172a' },
+            ].map((k, i) => (
+              <div key={i} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px 18px' }}>
+                <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>{k.label}</p>
+                <p style={{ fontSize: '20px', fontWeight: 800, color: k.color, fontVariantNumeric: 'tabular-nums' }}>{k.value}</p>
+              </div>
+            ))}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -635,27 +642,26 @@ export default function FinancesPage() {
           {/* Resume cards */}
           {!loading && activeClients.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="rounded-xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-4">
-                <p className="text-xs text-green-700 font-semibold uppercase tracking-wide">Facturado total del mes</p>
-                <p className="text-2xl font-bold text-green-700 mt-1">${totalBilled.toLocaleString()}</p>
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 20px 16px', borderTop: '3px solid #0f172a' }}>
+                <p style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Facturado del mes</p>
+                <p style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>${totalBilled.toLocaleString()}</p>
                 {prevBilled > 0 && (
-                  <p className={cn('text-xs mt-1 flex items-center gap-1', billedChange >= 0 ? 'text-green-600' : 'text-red-600')}>
-                    {billedChange >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    {billedChange.toFixed(1)}% vs mes anterior
+                  <p style={{ fontSize: '11px', marginTop: '6px', color: billedChange >= 0 ? '#16a34a' : '#dc2626', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    {billedChange >= 0 ? '↑' : '↓'} {Math.abs(billedChange).toFixed(1)}% vs mes anterior
                   </p>
                 )}
               </div>
-              <div className="rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 p-4">
-                <p className="text-xs text-purple-700 font-semibold uppercase tracking-wide">Comisiones totales del mes</p>
-                <p className="text-2xl font-bold text-purple-700 mt-1">${totalCommissions.toLocaleString()}</p>
-                <p className="text-xs text-purple-600 mt-1">
-                  {monthlyRecords.filter(r => r.status === 'paid').length} pagadas | {monthlyRecords.filter(r => r.status !== 'paid').length} pendientes
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 20px 16px', borderTop: '3px solid #0f172a' }}>
+                <p style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Comisiones del mes</p>
+                <p style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>${totalCommissions.toLocaleString()}</p>
+                <p style={{ fontSize: '11px', color: '#64748b', marginTop: '6px' }}>
+                  {monthlyRecords.filter(r => r.status === 'paid').length} cobradas · {monthlyRecords.filter(r => r.status !== 'paid').length} pendientes
                 </p>
               </div>
-              <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-sky-50 p-4">
-                <p className="text-xs text-blue-700 font-semibold uppercase tracking-wide">Clientes activos</p>
-                <p className="text-2xl font-bold text-blue-700 mt-1">{activeClients.length}</p>
-                <p className="text-xs text-blue-600 mt-1">{categories.length} categorias</p>
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 20px 16px', borderTop: '3px solid #0f172a' }}>
+                <p style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Clientes activos</p>
+                <p style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{activeClients.length}</p>
+                <p style={{ fontSize: '11px', color: '#64748b', marginTop: '6px' }}>{categories.length} categorías de servicio</p>
               </div>
             </div>
           )}
@@ -687,27 +693,28 @@ export default function FinancesPage() {
                 const catCancelled = catClients.filter(c => !c.deleted_at).reduce((s, c) => s + Number(c.cancelled_amount), 0)
 
                 return (
-                  <div key={cat.id} className="rounded-xl overflow-hidden" style={{ borderLeft: `4px solid ${cat.color}` }}>
+                  <div key={cat.id} style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0', marginBottom: '2px' }}>
                     {/* Category header */}
-                    <div className="flex items-center justify-between px-5 py-3.5 cursor-pointer" style={{ backgroundColor: hexToRgba(cat.color, 0.08) }} onClick={() => setExpandedCats(prev => ({ ...prev, [cat.id]: !prev[cat.id] }))}>
+                    <div className="flex items-center justify-between px-4 py-3 cursor-pointer" style={{ background: '#f8fafc', borderBottom: expanded ? '1px solid #e2e8f0' : 'none' }} onClick={() => setExpandedCats(prev => ({ ...prev, [cat.id]: !prev[cat.id] }))}>
                       <div className="flex items-center gap-3">
-                        {expanded ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevRight className="h-4 w-4 text-slate-500" />}
-                        <span className="text-xl">{cat.icon}</span>
+                        {expanded ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" /> : <ChevRight className="h-3.5 w-3.5 text-slate-400" />}
+                        <span style={{ width: '4px', height: '18px', background: cat.color, borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
+                        <span style={{ fontSize: '16px', lineHeight: 1 }}>{cat.icon}</span>
                         <div>
-                          <h3 className="text-sm font-bold text-slate-900" style={{ color: cat.color }}>{cat.name.toUpperCase()}</h3>
-                          <p className="text-[11px] text-slate-500">{catClients.filter(c => !c.deleted_at).length} clientes</p>
+                          <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{cat.name}</h3>
+                          <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '1px' }}>{catClients.filter(c => !c.deleted_at).length} clientes</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-green-600">${(catTotal + catCommissions).toLocaleString()}</p>
-                          <p className="text-[10px] text-slate-400">total mensual</p>
+                      <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                        <div style={{ textAlign: 'right', marginRight: '8px' }}>
+                          <p style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${(catTotal + catCommissions).toLocaleString()}</p>
+                          <p style={{ fontSize: '10px', color: '#94a3b8' }}>total mensual</p>
                         </div>
-                        <button onClick={() => { setShowClientModal({ categoryId: cat.id }); setEditingClient(null) }} className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50">
-                          <Plus className="h-3.5 w-3.5" /> Agregar cliente
+                        <button onClick={() => { setShowClientModal({ categoryId: cat.id }); setEditingClient(null) }} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fff', border: '1px solid #e2e8f0', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
+                          <Plus className="h-3 w-3" /> Agregar
                         </button>
-                        <button onClick={() => { setEditingCategory(cat); setShowCategoryModal(true) }} className="p-1.5 rounded-lg hover:bg-white/60">
-                          <Settings className="h-3.5 w-3.5 text-slate-500" />
+                        <button onClick={() => { setEditingCategory(cat); setShowCategoryModal(true) }} style={{ padding: '5px', borderRadius: '6px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                          <Settings className="h-3.5 w-3.5 text-slate-400" />
                         </button>
                       </div>
                     </div>
@@ -718,34 +725,34 @@ export default function FinancesPage() {
                         {catClients.length === 0 ? (
                           <p className="text-center text-sm text-slate-400 py-6">No hay clientes en esta categoria</p>
                         ) : (
-                          <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse', minWidth: '1350px' }}>
+                          <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse', minWidth: '1320px' }}>
                             <colgroup>
-                              <col style={{ width: '40px' }} />
-                              <col style={{ width: '160px' }} />
-                              <col style={{ width: '130px' }} />
-                              <col style={{ width: '90px' }} />
-                              <col style={{ width: '70px' }} />
+                              <col style={{ width: '36px' }} />
+                              <col style={{ width: '155px' }} />
+                              <col style={{ width: '125px' }} />
+                              <col style={{ width: '80px' }} />
+                              <col style={{ width: '65px' }} />
+                              <col style={{ width: '95px' }} />
+                              <col style={{ width: '125px' }} />
                               <col style={{ width: '100px' }} />
-                              <col style={{ width: '120px' }} />
-                              <col style={{ width: '100px' }} />
                               <col style={{ width: '90px' }} />
-                              <col style={{ width: '110px' }} />
+                              <col style={{ width: '100px' }} />
                               <col />
-                              <col style={{ width: '190px' }} />
+                              <col style={{ width: '165px' }} />
                             </colgroup>
                             <thead>
-                              <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                                <th style={thStyle('center')}>Nº</th>
-                                <th style={thStyle('left')}>Clientes</th>
-                                <th style={thStyle('right')}>Costo contrato</th>
-                                <th style={thStyle('center')}>Comision %</th>
+                              <tr style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+                                <th style={{ ...thStyle('center'), color: '#cbd5e1', fontSize: '10px' }}>Nº</th>
+                                <th style={thStyle('left')}>Cliente</th>
+                                <th style={thStyle('right')}>Fee mensual</th>
+                                <th style={thStyle('center')}>Comis. %</th>
                                 <th style={thStyle('center')}>Cuentas</th>
-                                <th style={thStyle('center')}>Fecha inicio</th>
+                                <th style={thStyle('center')}>Inicio</th>
                                 <th style={thStyle('right')}>Comisión mes</th>
                                 <th style={thStyle('right')}>Total</th>
                                 <th style={thStyle('right')}>Cancelado</th>
-                                <th style={thStyle('center')}>Asignado a</th>
-                                <th style={thStyle('left')}>Observacion</th>
+                                <th style={thStyle('center')}>Asignado</th>
+                                <th style={thStyle('left')}>Observación</th>
                                 <th style={thStyle('center')}>Acciones</th>
                               </tr>
                             </thead>
@@ -781,21 +788,16 @@ export default function FinancesPage() {
                                     <td style={{ padding: '10px 8px', textAlign: 'right' }}>
                                       {(() => {
                                         const rec = getMonthlyRecord(c.id)
-                                        if (!rec) return <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span>
+                                        if (!rec || Number(rec.commission_amount) === 0) return <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span>
                                         const amt = Number(rec.commission_amount)
                                         const isPaid = rec.status === 'paid'
                                         return (
-                                          <span style={{
-                                            background: isPaid ? '#dcfce7' : '#fef9c3',
-                                            color: isPaid ? '#16a34a' : '#854d0e',
-                                            padding: '3px 8px',
-                                            borderRadius: '6px',
-                                            fontSize: '12px',
-                                            fontWeight: 700,
-                                            fontFamily: 'monospace',
-                                          }}>
-                                            {sym}{amt.toLocaleString()}
-                                          </span>
+                                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isPaid ? '#16a34a' : '#f59e0b', display: 'inline-block', flexShrink: 0 }} />
+                                            <span style={{ color: isPaid ? '#16a34a' : '#92400e', fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>
+                                              {sym}{amt.toLocaleString()}
+                                            </span>
+                                          </div>
                                         )
                                       })()}
                                     </td>
@@ -813,9 +815,13 @@ export default function FinancesPage() {
                                         : <span style={{ color: '#cbd5e1' }}>&mdash;</span>}
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                                      {c.assigned_to ? (
-                                        <span style={{ ...getAssignedBadgeStyle(c.assigned_to), borderRadius: '4px', padding: '3px 10px', fontSize: '11px', fontWeight: 800 }}>{c.assigned_to.toUpperCase()}</span>
-                                      ) : <span style={{ color: '#cbd5e1' }}>&mdash;</span>}
+                                      {c.assigned_to ? (() => {
+                                        const upper = c.assigned_to.toUpperCase().trim()
+                                        const isRafa = upper.includes('RAFA')
+                                        return (
+                                          <span style={{ background: isRafa ? '#eff6ff' : '#fff7ed', color: isRafa ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.04em' }}>{upper.split(' ')[0]}</span>
+                                        )
+                                      })() : <span style={{ color: '#cbd5e1' }}>—</span>}
                                     </td>
                                     <td style={{ padding: '10px 8px' }}>
                                       {c.observations ? (
@@ -840,35 +846,35 @@ export default function FinancesPage() {
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                       {!isDeleted ? (
-                                        <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                                        <div style={{ display: 'inline-flex', gap: '3px', alignItems: 'center' }}>
                                           <button
                                             onClick={() => setClosingClient(c)}
-                                            title="Cierre de mes"
-                                            style={{ background: '#dcfce7', color: '#16a34a', padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                                            title="Registrar comisión del mes"
+                                            style={{ background: '#f0fdf4', color: '#16a34a', padding: '5px 9px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bbf7d0', cursor: 'pointer' }}
                                           >
-                                            💰 Comisión
+                                            Comisión
                                           </button>
                                           <button
                                             onClick={() => { setEditingClient(c); setShowClientModal({ categoryId: c.category_id }) }}
                                             title="Editar cliente"
-                                            style={{ background: '#dbeafe', color: '#2563eb', padding: '5px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                                            style={{ background: '#f8fafc', color: '#475569', padding: '5px 7px', borderRadius: '6px', border: '1px solid #e2e8f0', cursor: 'pointer' }}
                                           >
-                                            ✏️ Editar
+                                            <Pencil style={{ width: '13px', height: '13px' }} />
                                           </button>
                                           <button
                                             onClick={() => setDeletingClient(c)}
                                             title="Eliminar cliente"
-                                            style={{ background: '#fee2e2', color: '#dc2626', padding: '5px 7px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                                            style={{ background: '#fff5f5', color: '#dc2626', padding: '5px 7px', borderRadius: '6px', border: '1px solid #fecaca', cursor: 'pointer' }}
                                           >
-                                            🗑️
+                                            <Trash2 style={{ width: '13px', height: '13px' }} />
                                           </button>
                                         </div>
                                       ) : (
                                         <button
                                           onClick={() => handleRestoreClient(c)}
-                                          style={{ background: '#dbeafe', color: '#2563eb', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                                          style={{ background: '#f8fafc', color: '#2563eb', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bfdbfe', cursor: 'pointer' }}
                                         >
-                                          ↩️ Restaurar
+                                          Restaurar
                                         </button>
                                       )}
                                     </td>
@@ -877,19 +883,19 @@ export default function FinancesPage() {
                               })}
                             </tbody>
                             <tfoot>
-                              <tr style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%)', color: 'white', fontWeight: 700 }}>
-                                <td style={{ padding: '12px 8px', textAlign: 'center', color: '#93c5fd', fontSize: '11px', fontWeight: 800 }}>TOTAL</td>
-                                <td style={{ padding: '12px 8px', fontSize: '12px', color: 'white' }}>{catClients.filter(c => !c.deleted_at).length} clientes</td>
-                                <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: 'white', fontWeight: 700 }}>${catTotal.toLocaleString()}</td>
-                                <td style={{ padding: '12px 8px' }}></td>
-                                <td style={{ padding: '12px 8px' }}></td>
-                                <td style={{ padding: '12px 8px' }}></td>
-                                <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#86efac', fontWeight: 700 }}>${catCommissions.toLocaleString()}</td>
-                                <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#86efac', fontWeight: 700 }}>${(catTotal + catCommissions).toLocaleString()}</td>
-                                <td style={{ padding: '12px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#fca5a5', fontWeight: 700 }}>${catCancelled.toLocaleString()}</td>
-                                <td style={{ padding: '12px 8px' }}></td>
-                                <td style={{ padding: '12px 8px' }}></td>
-                                <td style={{ padding: '12px 8px' }}></td>
+                              <tr style={{ background: '#0f172a', color: 'white', fontWeight: 700 }}>
+                                <td style={{ padding: '11px 8px', textAlign: 'center', color: '#64748b', fontSize: '10px', fontWeight: 800, letterSpacing: '0.05em' }}>TOTAL</td>
+                                <td style={{ padding: '11px 8px', fontSize: '12px', color: '#94a3b8' }}>{catClients.filter(c => !c.deleted_at).length} clientes</td>
+                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '13px', color: '#e2e8f0', fontWeight: 700 }}>${catTotal.toLocaleString()}</td>
+                                <td style={{ padding: '11px 8px' }}></td>
+                                <td style={{ padding: '11px 8px' }}></td>
+                                <td style={{ padding: '11px 8px' }}></td>
+                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '13px', color: '#4ade80', fontWeight: 700 }}>${catCommissions.toLocaleString()}</td>
+                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#f0fdf4', fontWeight: 800 }}>${(catTotal + catCommissions).toLocaleString()}</td>
+                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '13px', color: '#fca5a5', fontWeight: 700 }}>{catCancelled > 0 ? `$${catCancelled.toLocaleString()}` : '—'}</td>
+                                <td style={{ padding: '11px 8px' }}></td>
+                                <td style={{ padding: '11px 8px' }}></td>
+                                <td style={{ padding: '11px 8px' }}></td>
                               </tr>
                             </tfoot>
                           </table>
@@ -912,23 +918,24 @@ export default function FinancesPage() {
 
           {/* General totals */}
           {!loading && activeClients.length > 0 && (
-            <div className="rounded-xl p-5" style={{ backgroundColor: '#1e3a5f' }}>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 24px' }}>
+              <p style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>Resumen del mes — {MONTHS[month - 1]} {year}</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Total fees</p>
-                  <p className="text-xl font-bold mt-1">${totalContractCost.toLocaleString()}</p>
+                  <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Total fees</p>
+                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${totalBilled > 0 ? totalBilled.toLocaleString() : totalContractCost.toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Total comisiones</p>
-                  <p className="text-xl font-bold mt-1">${totalCommissions.toLocaleString()}</p>
+                  <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Total comisiones</p>
+                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${totalCommissions.toLocaleString()}</p>
+                </div>
+                <div style={{ borderLeft: '1px solid #f1f5f9', paddingLeft: '24px' }}>
+                  <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Total general</p>
+                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>${((totalBilled > 0 ? totalBilled : totalContractCost) + totalCommissions).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Total general</p>
-                  <p className="text-xl font-bold mt-1 text-green-300">${(totalContractCost + totalCommissions).toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-blue-200">Neto (- cancelados)</p>
-                  <p className="text-xl font-bold mt-1 text-green-300">${(totalContractCost + totalCommissions - totalCancelled).toLocaleString()}</p>
+                  <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Neto (− cancelados)</p>
+                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>${((totalBilled > 0 ? totalBilled : totalContractCost) + totalCommissions - totalCancelled).toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -1008,13 +1015,13 @@ export default function FinancesPage() {
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-[#0f172a] text-white">
-                    <td className="px-5 py-3 text-sm font-bold">TOTAL</td>
-                    <td className="px-5 py-3 text-sm">{payroll.length} empleados</td>
-                    <td className="px-5 py-3 text-right text-sm font-bold">${payroll.reduce((s, p) => s + Number(p.base_salary), 0).toLocaleString()}</td>
-                    <td className="px-5 py-3 text-right text-sm font-bold">${payroll.reduce((s, p) => s + Number(p.bonus), 0).toLocaleString()}</td>
-                    <td className="px-5 py-3 text-right text-sm font-bold">${payroll.reduce((s, p) => s + Number(p.deductions), 0).toLocaleString()}</td>
-                    <td className="px-5 py-3 text-right text-sm font-bold">${totalPayroll.toLocaleString()}</td>
+                  <tr style={{ background: '#0f172a', color: 'white' }}>
+                    <td className="px-5 py-3 text-xs font-bold" style={{ color: '#64748b', letterSpacing: '0.05em' }}>TOTAL</td>
+                    <td className="px-5 py-3 text-xs" style={{ color: '#94a3b8' }}>{payroll.length} empleados</td>
+                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#e2e8f0' }}>${payroll.reduce((s, p) => s + Number(p.base_salary), 0).toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#4ade80' }}>${payroll.reduce((s, p) => s + Number(p.bonus), 0).toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#fca5a5' }}>${payroll.reduce((s, p) => s + Number(p.deductions), 0).toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#f0fdf4', fontSize: '14px' }}>${totalPayroll.toLocaleString()}</td>
                     <td className="px-5 py-3" colSpan={2}></td>
                   </tr>
                 </>)}
@@ -1183,11 +1190,11 @@ export default function FinancesPage() {
                       <td className="px-5 py-3 text-right text-sm font-semibold text-red-600">-${Number(t.amount).toLocaleString()}</td>
                     </tr>
                   ))}
-                  <tr className="bg-[#0f172a] text-white">
-                    <td className="px-5 py-3 text-sm font-bold">TOTAL</td>
-                    <td className="px-5 py-3 text-sm">{expenseTx.length} gastos</td>
+                  <tr style={{ background: '#0f172a', color: 'white' }}>
+                    <td className="px-5 py-3 text-xs font-bold" style={{ color: '#64748b', letterSpacing: '0.05em' }}>TOTAL</td>
+                    <td className="px-5 py-3 text-xs" style={{ color: '#94a3b8' }}>{expenseTx.length} gastos</td>
                     <td className="px-5 py-3" colSpan={2}></td>
-                    <td className="px-5 py-3 text-right text-sm font-bold">${totalExpenses.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#fca5a5', fontSize: '14px' }}>${totalExpenses.toLocaleString()}</td>
                   </tr>
                 </>)}
               </tbody>
