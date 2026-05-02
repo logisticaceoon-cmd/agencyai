@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/server'
 
 // GET /api/cron/cleanup-accounts
 // Vercel Cron: ejecuta diariamente a las 3 AM UTC
@@ -13,19 +13,24 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const supabase = createAdminClient()
+
   try {
     const now = new Date()
 
     // Encontrar todas las organizaciones cuyo período de retención expiró
-    const expiredOrgs = await prisma.organization.findMany({
-      where: {
-        status: 'deactivated',
-        deleteAfter: { lte: now },
-      },
-      select: { id: true, name: true, slug: true, deleteAfter: true },
-    })
+    const { data: expiredOrgs, error: fetchErr } = await supabase
+      .from('organizations')
+      .select('id, name, slug, delete_after')
+      .eq('status', 'deactivated')
+      .lte('delete_after', now.toISOString())
 
-    if (expiredOrgs.length === 0) {
+    if (fetchErr) {
+      console.error('[cleanup-accounts] Error consultando orgs:', fetchErr.message)
+      return NextResponse.json({ error: fetchErr.message }, { status: 500 })
+    }
+
+    if (!expiredOrgs || expiredOrgs.length === 0) {
       return NextResponse.json({
         success: true,
         deleted: 0,
@@ -37,30 +42,49 @@ export async function GET(request: Request) {
     const deletedIds: string[] = []
     const errors: string[] = []
 
+    // Tablas a limpiar en orden (de hijos a padres para respetar FK)
+    const childTables = [
+      'notifications',
+      'activity_log',
+      'recordings',
+      'meetings',
+      'kpis',
+      'objectives',
+      'finances',
+      'reports',
+      'tasks',
+      'projects',
+      'clients',
+      'invitations',
+      'organization_members',
+    ]
+
     for (const org of expiredOrgs) {
       try {
-        // Borrar en orden para respetar FK constraints
-        // (Prisma onDelete: Cascade debería manejarlo, pero lo hacemos explícito)
-        await prisma.$transaction([
-          prisma.notification.deleteMany({ where: { organizationId: org.id } }),
-          prisma.activityLog.deleteMany({ where: { organizationId: org.id } }),
-          prisma.recording.deleteMany({ where: { organizationId: org.id } }),
-          prisma.meeting.deleteMany({ where: { organizationId: org.id } }),
-          prisma.kPI.deleteMany({ where: { organizationId: org.id } }),
-          prisma.objective.deleteMany({ where: { organizationId: org.id } }),
-          prisma.finance.deleteMany({ where: { organizationId: org.id } }),
-          prisma.audit.deleteMany({ where: { organizationId: org.id } }),
-          prisma.report.deleteMany({ where: { organizationId: org.id } }),
-          prisma.task.deleteMany({ where: { organizationId: org.id } }),
-          prisma.project.deleteMany({ where: { organizationId: org.id } }),
-          prisma.client.deleteMany({ where: { organizationId: org.id } }),
-          prisma.invitation.deleteMany({ where: { organizationId: org.id } }),
-          prisma.organizationMember.deleteMany({ where: { organizationId: org.id } }),
-          prisma.organization.delete({ where: { id: org.id } }),
-        ])
+        // Borrar datos relacionados en orden
+        for (const table of childTables) {
+          const { error } = await supabase
+            .from(table)
+            .delete()
+            .eq('organization_id', org.id)
+
+          if (error && !error.message.includes('does not exist')) {
+            console.warn(`[cleanup-accounts] Warning en tabla ${table} para org ${org.id}:`, error.message)
+          }
+        }
+
+        // Finalmente borrar la organización
+        const { error: deleteErr } = await supabase
+          .from('organizations')
+          .delete()
+          .eq('id', org.id)
+
+        if (deleteErr) {
+          throw new Error(deleteErr.message)
+        }
 
         deletedIds.push(org.id)
-        console.log(`[cleanup-accounts] Organización eliminada: ${org.name} (${org.id}) — deleteAfter: ${org.deleteAfter}`)
+        console.log(`[cleanup-accounts] Organización eliminada: ${org.name} (${org.id}) — deleteAfter: ${org.delete_after}`)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         errors.push(`${org.id} (${org.name}): ${msg}`)
