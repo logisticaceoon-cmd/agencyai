@@ -24,6 +24,8 @@ import {
   Percent,
 } from 'lucide-react'
 import { InfoBanner } from '@/components/shared/InfoBanner'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { Zap } from 'lucide-react'
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -126,6 +128,7 @@ const industries = [
 
 export default function ClientsPage() {
   const { user } = useCurrentUser()
+  const { maxClients, isFounder } = usePlanLimits()
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
@@ -135,6 +138,7 @@ export default function ClientsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleteInput, setDeleteInput] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [upgradeModal, setUpgradeModal] = useState(false)
 
   const canManage = !user ? false : ['CEO', 'Manager', 'owner', 'admin'].includes(user.role)
 
@@ -286,6 +290,12 @@ export default function ClientsPage() {
         if (res.ok) {
           setDialogOpen(false)
           loadClients()
+        } else {
+          const err = await res.json()
+          if (err.limitReached) {
+            setDialogOpen(false)
+            setUpgradeModal(true)
+          }
         }
       }
     } finally {
@@ -320,8 +330,47 @@ export default function ClientsPage() {
 
   // -- Render -----------------------------------------------------------------
 
+  // Indicador de uso
+  const clientCount = clients.length
+  const atLimit = !isFounder && maxClients !== Infinity && clientCount >= maxClients
+  const usagePercent = maxClients !== Infinity ? Math.min((clientCount / maxClients) * 100, 100) : 0
+
   return (
     <div className="space-y-6">
+      {/* Modal upgrade */}
+      {upgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <Zap className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">Límite de clientes alcanzado</h3>
+                <p className="text-sm text-slate-500">Tu plan actual permite máximo {maxClients} clientes</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 mb-6">
+              Para agregar más clientes, actualizá tu plan. Los planes Pro, Agency y Scale ofrecen más capacidad para hacer crecer tu agencia.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setUpgradeModal(false)}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <a
+                href="/settings/billing"
+                className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white text-center hover:bg-blue-700"
+              >
+                Ver planes →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       <InfoBanner id="clients" title="Gestion de Clientes" description="Aqui podes administrar todos los clientes de tu agencia. Crea, edita y organiza tu cartera de clientes por industria." />
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -331,15 +380,31 @@ export default function ClientsPage() {
             Gestion de clientes de la agencia
           </p>
         </div>
-        {canManage && (
-          <button
-            onClick={openCreateDialog}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo cliente
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {/* Indicador de uso */}
+          {!isFounder && maxClients !== Infinity && (
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium ${atLimit ? 'text-red-600' : 'text-slate-500'}`}>
+                {clientCount}/{maxClients} clientes
+              </span>
+              <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${atLimit ? 'bg-red-500' : usagePercent > 75 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                  style={{ width: `${usagePercent}%` }}
+                />
+              </div>
+            </div>
+          )}
+          {canManage && (
+            <button
+              onClick={atLimit ? () => setUpgradeModal(true) : openCreateDialog}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors ${atLimit ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+            >
+              {atLimit ? <Zap className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {atLimit ? 'Límite alcanzado' : 'Nuevo cliente'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
