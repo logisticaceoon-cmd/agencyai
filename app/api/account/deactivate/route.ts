@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/server'
 
 // POST /api/account/deactivate
 // Desactiva la cuenta del usuario. Los datos se conservan 90 días.
@@ -8,17 +8,20 @@ export async function POST(request: Request) {
   const auth = await getAuthContext()
   if (isAuthError(auth)) return auth
 
-  try {
-    const org = await prisma.organization.findUnique({
-      where: { id: auth.workspaceId },
-      select: { id: true, status: true, ownerId: true },
-    })
+  const supabase = createAdminClient()
 
-    if (!org) {
+  try {
+    const { data: org, error: fetchErr } = await supabase
+      .from('organizations')
+      .select('id, status, owner_id, plan')
+      .eq('id', auth.workspaceId)
+      .single()
+
+    if (fetchErr || !org) {
       return NextResponse.json({ error: 'Organización no encontrada' }, { status: 404 })
     }
 
-    if (org.ownerId !== auth.userId) {
+    if (org.owner_id !== auth.userId) {
       return NextResponse.json({ error: 'Solo el dueño puede desactivar la cuenta' }, { status: 403 })
     }
 
@@ -30,15 +33,20 @@ export async function POST(request: Request) {
     const deleteAfter = new Date(now)
     deleteAfter.setDate(deleteAfter.getDate() + 90)
 
-    await prisma.organization.update({
-      where: { id: auth.workspaceId },
-      data: {
+    const { error: updateErr } = await supabase
+      .from('organizations')
+      .update({
         status: 'deactivated',
-        deactivatedAt: now,
-        deleteAfter: deleteAfter,
+        deactivated_at: now.toISOString(),
+        delete_after: deleteAfter.toISOString(),
         plan: 'free',
-      },
-    })
+      })
+      .eq('id', auth.workspaceId)
+
+    if (updateErr) {
+      console.error('Error deactivating org:', updateErr.message)
+      return NextResponse.json({ error: 'Error al desactivar: ' + updateErr.message }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,
