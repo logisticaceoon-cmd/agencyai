@@ -1,159 +1,248 @@
 import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import nodemailer from 'nodemailer'
 
-// 0 12 5 * * = 9 AM Argentina on day 5 of each month
+const RAFAEL_EMAIL = 'logisticaceoon@gmail.com'
+const FROM_ADDRESS =
+  process.env.EMAIL_FROM || 'Ceonyx · Logística CEOON <logisticaceoon@gmail.com>'
+
+const MONTHS = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
+function getTransporter() {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER || 'logisticaceoon@gmail.com',
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  })
+}
+
+function usd(n: number) {
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+}
+
+function pctDiff(current: number, prev: number): string {
+  if (prev === 0) return current > 0 ? '+100%' : '0%'
+  const diff = ((current - prev) / prev) * 100
+  return (diff >= 0 ? '+' : '') + diff.toFixed(1) + '%'
+}
+
+function pctColor(current: number, prev: number): string {
+  if (prev === 0) return current > 0 ? '#16a34a' : '#6b7280'
+  return current >= prev ? '#16a34a' : '#dc2626'
+}
+
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const supabaseUrl = process.env.SUPABASE_URL_REAL || ''
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY_REAL || ''
-    const workspaceId = '41b4b8ab-2483-418d-bb29-d39084ca36f0'
+    const supabase = createAdminClient()
+    const nowUTC = new Date()
+    const argOffset = -3 * 60 * 60 * 1000
+    const argNow = new Date(nowUTC.getTime() + argOffset)
 
-    const argNow = new Date(Date.now() - 3 * 60 * 60 * 1000)
-    const currentMonth = argNow.getUTCMonth() + 1
-    const currentYear = argNow.getUTCFullYear()
-    const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1
-    const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear
+    // Mes actual = mes que acaba de cerrar (el día 5 ya pasó el mes anterior)
+    const currentMonthIdx = argNow.getUTCMonth()     // mayo = 4
+    const prevMonthIdx = currentMonthIdx === 0 ? 11 : currentMonthIdx - 1  // abril = 3
+    const prevPrevMonthIdx = prevMonthIdx === 0 ? 11 : prevMonthIdx - 1    // marzo = 2
 
-    const MONTHS_ES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+    const year = currentMonthIdx === 0 ? argNow.getUTCFullYear() - 1 : argNow.getUTCFullYear()
+    const prevYear = prevMonthIdx === 0 ? year - 1 : year
 
-    // Pull finance monthly data for current and previous month
-    const [curRes, prevRes, expRes] = await Promise.all([
-      fetch(`${supabaseUrl}/rest/v1/finance_client_monthly?workspace_id=eq.${workspaceId}&month=eq.${currentMonth}&year=eq.${currentYear}&select=fee,commission,client_id,status`,
-        { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }),
-      fetch(`${supabaseUrl}/rest/v1/finance_client_monthly?workspace_id=eq.${workspaceId}&month=eq.${prevMonth}&year=eq.${prevYear}&select=fee,commission,status`,
-        { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }),
-      fetch(`${supabaseUrl}/rest/v1/expenses?workspace_id=eq.${workspaceId}&month=eq.${currentMonth}&year=eq.${currentYear}&select=amount,category,description`,
-        { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }),
-    ])
+    const prevMonthName = MONTHS[prevMonthIdx]
+    const prevPrevMonthName = MONTHS[prevPrevMonthIdx]
 
-    const curData = await curRes.json()
-    const prevData = await prevRes.json()
-    const expData = await expRes.json()
+    // Workspace de Rafael
+    const WORKSPACE_ID = '41b4b8ab-2483-418d-bb29-d39084ca36f0'
 
-    const sum = (arr: any[], field: string) =>
-      (Array.isArray(arr) ? arr : []).reduce((acc: number, r: any) => acc + (parseFloat(r[field]) || 0), 0)
+    // Leer finance_client_monthly del mes anterior y del anterior-anterior
+    const { data: prevMonthData } = await supabase
+      .from('finance_client_monthly')
+      .select('client_id, billed_amount, commission_amount, month, year')
+      .eq('workspace_id', WORKSPACE_ID)
+      .eq('month', prevMonthIdx + 1)   // meses en DB son 1-indexed
+      .eq('year', prevYear)
 
-    const curFees = sum(curData, 'fee')
-    const curComm = sum(curData, 'commission')
-    const curTotal = curFees + curComm
+    const { data: prevPrevMonthData } = await supabase
+      .from('finance_client_monthly')
+      .select('client_id, billed_amount, commission_amount, month, year')
+      .eq('workspace_id', WORKSPACE_ID)
+      .eq('month', prevPrevMonthIdx + 1)
+      .eq('year', prevYear)
 
-    const prevFees = sum(prevData, 'fee')
-    const prevComm = sum(prevData, 'commission')
-    const prevTotal = prevFees + prevComm
+    // Leer clientes activos
+    const { data: clients } = await supabase
+      .from('finance_clients')
+      .select('id, client_name, contract_cost, is_active')
+      .eq('workspace_id', WORKSPACE_ID)
+      .eq('is_active', true)
+      .order('client_name')
 
-    const totalExpenses = Array.isArray(expData) ? sum(expData, 'amount') : 0
-    const margin = curTotal - totalExpenses
-    const marginPct = curTotal > 0 ? ((margin / curTotal) * 100).toFixed(1) : '0'
+    const prevRows = prevMonthData || []
+    const prevPrevRows = prevPrevMonthData || []
+    const clientList = clients || []
 
-    const pctChange = prevTotal > 0 ? (((curTotal - prevTotal) / prevTotal) * 100).toFixed(1) : 'N/A'
-    const trend = parseFloat(pctChange) >= 0 ? '📈' : '📉'
-    const trendColor = parseFloat(pctChange) >= 0 ? '#16a34a' : '#dc2626'
+    // Totales mes anterior
+    const totalFees = prevRows.reduce((s, r) => s + (r.billed_amount || 0), 0)
+    const totalComisiones = prevRows.reduce((s, r) => s + (r.commission_amount || 0), 0)
+    const totalGeneral = totalFees + totalComisiones
 
-    // Nómina/gastos breakdown
-    let expenseRows = ''
-    if (Array.isArray(expData) && expData.length > 0) {
-      expenseRows = expData.map((e: any) =>
-        `<tr><td style="padding:8px;border-bottom:1px solid #f1f5f9">${e.category || 'General'}</td>
-         <td style="padding:8px;border-bottom:1px solid #f1f5f9">${e.description || ''}</td>
-         <td style="padding:8px;border-bottom:1px solid #f1f5f9;text-align:right">$${parseFloat(e.amount).toFixed(2)}</td></tr>`
-      ).join('')
-    } else {
-      expenseRows = `<tr><td colspan="3" style="padding:8px;color:#94a3b8;text-align:center">Sin gastos registrados en AgencyAi este mes</td></tr>`
+    // Totales mes anterior-anterior
+    const totalFeesPrev = prevPrevRows.reduce((s, r) => s + (r.billed_amount || 0), 0)
+    const totalComisionesPrev = prevPrevRows.reduce((s, r) => s + (r.commission_amount || 0), 0)
+    const totalGeneralPrev = totalFeesPrev + totalComisionesPrev
+
+    // Tabla por cliente
+    const clientRows = clientList.map(c => {
+      const curr = prevRows.find(r => r.client_id === c.id)
+      const prev = prevPrevRows.find(r => r.client_id === c.id)
+
+      const fee = curr?.billed_amount || 0
+      const com = curr?.commission_amount || 0
+      const total = fee + com
+
+      const feePrev = prev?.billed_amount || 0
+      const comPrev = prev?.commission_amount || 0
+      const totalPrev = feePrev + comPrev
+
+      return { name: c.client_name, fee, com, total, totalPrev }
+    }).filter(c => c.total > 0 || c.fee > 0)
+
+    // Clientes sin datos cargados
+    const sinDatos = clientList.filter(c =>
+      !prevRows.find(r => r.client_id === c.id)
+    )
+
+    // ── Render ───────────────────────────────────────────────────────
+    const clientTableRows = clientRows.map(c => {
+      const diff = pctDiff(c.total, c.totalPrev)
+      const color = pctColor(c.total, c.totalPrev)
+      return `
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#111827;">${c.name}</td>
+          <td style="padding:10px 14px;font-size:13px;color:#374151;text-align:right;">${usd(c.fee)}</td>
+          <td style="padding:10px 14px;font-size:13px;color:#374151;text-align:right;">${usd(c.com)}</td>
+          <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#111827;text-align:right;">${usd(c.total)}</td>
+          <td style="padding:10px 14px;font-size:12px;font-weight:700;color:${color};text-align:right;">${diff}</td>
+        </tr>`
+    }).join('')
+
+    const sinDatosBlock = sinDatos.length > 0
+      ? `<div style="background:#fff7ed;border-left:4px solid #f97316;padding:14px 18px;border-radius:6px;margin-bottom:20px;">
+          <p style="margin:0 0 6px;font-weight:700;color:#c2410c;font-size:13px;">⚠️ Sin datos cargados en ${prevMonthName}:</p>
+          <ul style="margin:0;padding-left:18px;font-size:13px;color:#374151;line-height:1.9;">
+            ${sinDatos.map(c => `<li>${c.client_name}</li>`).join('')}
+          </ul>
+          <p style="margin:8px 0 0;font-size:12px;color:#9ca3af;">Entrá a AgencyAi → Finanzas y cargá los datos del mes.</p>
+        </div>` : ''
+
+    const noData = prevRows.length === 0
+    const summaryBlock = noData
+      ? `<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:16px 20px;border-radius:8px;margin-bottom:20px;">
+          <p style="margin:0;font-size:14px;color:#b91c1c;font-weight:600;">No hay datos registrados para ${prevMonthName}.</p>
+          <p style="margin:8px 0 0;font-size:13px;color:#6b7280;">Cargá fees y comisiones en AgencyAi → Finanzas antes de cerrar el mes.</p>
+        </div>`
+      : `<!-- Totales -->
+        <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;background:#f0fdf4;border-radius:10px;padding:16px 18px;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Total Fees</p>
+            <p style="margin:4px 0 0;font-size:22px;font-weight:800;color:#15803d;">${usd(totalFees)}</p>
+            <p style="margin:4px 0 0;font-size:11px;color:${pctColor(totalFees, totalFeesPrev)};">${pctDiff(totalFees, totalFeesPrev)} vs ${prevPrevMonthName}</p>
+          </div>
+          <div style="flex:1;min-width:140px;background:#eff6ff;border-radius:10px;padding:16px 18px;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Comisiones</p>
+            <p style="margin:4px 0 0;font-size:22px;font-weight:800;color:#1d4ed8;">${usd(totalComisiones)}</p>
+            <p style="margin:4px 0 0;font-size:11px;color:${pctColor(totalComisiones, totalComisionesPrev)};">${pctDiff(totalComisiones, totalComisionesPrev)} vs ${prevPrevMonthName}</p>
+          </div>
+          <div style="flex:1;min-width:140px;background:#fdf4ff;border-radius:10px;padding:16px 18px;text-align:center;">
+            <p style="margin:0;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Total General</p>
+            <p style="margin:4px 0 0;font-size:22px;font-weight:800;color:#7c3aed;">${usd(totalGeneral)}</p>
+            <p style="margin:4px 0 0;font-size:11px;color:${pctColor(totalGeneral, totalGeneralPrev)};">${pctDiff(totalGeneral, totalGeneralPrev)} vs ${prevPrevMonthName}</p>
+          </div>
+        </div>
+
+        <!-- Tabla por cliente -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+          <thead>
+            <tr style="background:#f9fafb;">
+              <th style="padding:10px 14px;text-align:left;font-size:12px;color:#6b7280;font-weight:600;border-radius:6px 0 0 0;">Cliente</th>
+              <th style="padding:10px 14px;text-align:right;font-size:12px;color:#6b7280;font-weight:600;">Fee</th>
+              <th style="padding:10px 14px;text-align:right;font-size:12px;color:#6b7280;font-weight:600;">Comisión</th>
+              <th style="padding:10px 14px;text-align:right;font-size:12px;color:#6b7280;font-weight:600;">Total</th>
+              <th style="padding:10px 14px;text-align:right;font-size:12px;color:#6b7280;font-weight:600;border-radius:0 6px 0 0;">vs ${prevPrevMonthName}</th>
+            </tr>
+          </thead>
+          <tbody>${clientTableRows}</tbody>
+          <tfoot>
+            <tr style="background:#f9fafb;">
+              <td style="padding:12px 14px;font-size:13px;font-weight:700;color:#111827;">TOTAL</td>
+              <td style="padding:12px 14px;font-size:13px;font-weight:700;color:#111827;text-align:right;">${usd(totalFees)}</td>
+              <td style="padding:12px 14px;font-size:13px;font-weight:700;color:#111827;text-align:right;">${usd(totalComisiones)}</td>
+              <td style="padding:12px 14px;font-size:13px;font-weight:700;color:#111827;text-align:right;">${usd(totalGeneral)}</td>
+              <td style="padding:12px 14px;font-size:13px;font-weight:700;color:${pctColor(totalGeneral, totalGeneralPrev)};text-align:right;">${pctDiff(totalGeneral, totalGeneralPrev)}</td>
+            </tr>
+          </tfoot>
+        </table>`
+
+    const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:620px;margin:24px auto;padding:0 12px;">
+    <div style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,0.08);">
+
+      <div style="background:linear-gradient(135deg,#1e1b4b 0%,#3730a3 100%);padding:24px 28px;">
+        <h1 style="margin:0;font-size:18px;color:white;font-weight:700;">📊 Reporte Financiero — ${prevMonthName} ${prevYear}</h1>
+        <p style="margin:6px 0 0;color:#a5b4fc;font-size:13px;">Logística CEOON · Generado el 5 de ${MONTHS[currentMonthIdx]}</p>
+      </div>
+
+      <div style="padding:24px 28px;">
+
+        ${sinDatosBlock}
+        ${summaryBlock}
+
+        <div style="text-align:center;margin-top:20px;">
+          <a href="https://agencyai-iota.vercel.app/finances"
+             style="display:inline-block;background:#1e1b4b;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600;">
+            Ver finanzas completas →
+          </a>
+        </div>
+
+        <p style="font-size:12px;color:#9ca3af;margin:20px 0 0;text-align:center;">
+          Enviado automáticamente el día 5 de cada mes · Ceonyx — Logística CEOON
+        </p>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>`
+
+    if (process.env.GMAIL_APP_PASSWORD) {
+      const transporter = getTransporter()
+      await transporter.sendMail({
+        from: FROM_ADDRESS,
+        to: RAFAEL_EMAIL,
+        subject: `📊 Reporte ${prevMonthName} ${prevYear} — ${usd(totalGeneral)} total`,
+        html,
+      })
     }
 
-    const html = `
-    <div style="font-family:sans-serif;max-width:640px;margin:0 auto;padding:24px">
-      <h2 style="color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:12px">
-        💰 Reporte Financiero — ${MONTHS_ES[currentMonth]} ${currentYear}
-      </h2>
-      <p style="color:#64748b;font-size:14px">Generado el día 5 · Ceonyx · Logística CEOON</p>
-
-      <!-- KPIs -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:24px 0">
-        <div style="background:#f0fdf4;border-radius:10px;padding:16px;text-align:center">
-          <div style="color:#16a34a;font-size:22px;font-weight:700">$${curFees.toFixed(0)}</div>
-          <div style="color:#64748b;font-size:12px;margin-top:4px">Fees</div>
-        </div>
-        <div style="background:#eff6ff;border-radius:10px;padding:16px;text-align:center">
-          <div style="color:#2563eb;font-size:22px;font-weight:700">$${curComm.toFixed(0)}</div>
-          <div style="color:#64748b;font-size:12px;margin-top:4px">Comisiones</div>
-        </div>
-        <div style="background:#fafafa;border-radius:10px;padding:16px;text-align:center;border:2px solid #0f172a">
-          <div style="color:#0f172a;font-size:22px;font-weight:700">$${curTotal.toFixed(0)}</div>
-          <div style="color:#64748b;font-size:12px;margin-top:4px">Total bruto</div>
-        </div>
-      </div>
-
-      <!-- Comparativo -->
-      <div style="background:#f8fafc;border-radius:10px;padding:16px;margin:16px 0">
-        <h3 style="margin:0 0 12px;color:#0f172a">📊 vs ${MONTHS_ES[prevMonth]} ${prevYear}</h3>
-        <table style="width:100%;border-collapse:collapse">
-          <tr>
-            <td style="padding:6px 0;color:#64748b">Mes anterior</td>
-            <td style="padding:6px 0;text-align:right;font-weight:600">$${prevTotal.toFixed(0)}</td>
-          </tr>
-          <tr>
-            <td style="padding:6px 0;color:#64748b">Este mes</td>
-            <td style="padding:6px 0;text-align:right;font-weight:600">$${curTotal.toFixed(0)}</td>
-          </tr>
-          <tr>
-            <td style="padding:6px 0;color:#64748b">Variación</td>
-            <td style="padding:6px 0;text-align:right;font-weight:700;color:${trendColor}">${trend} ${pctChange}%</td>
-          </tr>
-        </table>
-      </div>
-
-      <!-- Gastos y margen -->
-      <div style="background:#fff7ed;border-left:4px solid #f59e0b;border-radius:8px;padding:16px;margin:16px 0">
-        <h3 style="margin:0 0 12px;color:#92400e">🧾 Gastos registrados</h3>
-        <table style="width:100%;border-collapse:collapse">
-          <tr style="background:#fef3c7">
-            <th style="padding:8px;text-align:left;font-size:12px">Categoría</th>
-            <th style="padding:8px;text-align:left;font-size:12px">Descripción</th>
-            <th style="padding:8px;text-align:right;font-size:12px">Monto</th>
-          </tr>
-          ${expenseRows}
-          <tr style="border-top:2px solid #f59e0b">
-            <td colspan="2" style="padding:8px;font-weight:700">Total gastos</td>
-            <td style="padding:8px;text-align:right;font-weight:700">$${totalExpenses.toFixed(0)}</td>
-          </tr>
-        </table>
-      </div>
-
-      <!-- Margen -->
-      <div style="background:${margin >= 0 ? '#f0fdf4' : '#fef2f2'};border-radius:10px;padding:20px;margin:16px 0;text-align:center">
-        <div style="color:#64748b;font-size:13px;margin-bottom:8px">Margen neto (bruto − gastos)</div>
-        <div style="font-size:32px;font-weight:800;color:${margin >= 0 ? '#16a34a' : '#dc2626'}">
-          $${margin.toFixed(0)}
-        </div>
-        <div style="color:#64748b;font-size:13px;margin-top:4px">${marginPct}% de margen</div>
-      </div>
-
-      <p style="color:#94a3b8;font-size:12px;margin-top:32px;border-top:1px solid #e2e8f0;padding-top:16px">
-        Ceonyx · Agente IA — Logística CEOON · Reporte automático día 5
-      </p>
-    </div>`
-
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com', port: 465, secure: true,
-      auth: { user: 'logisticaceoon@gmail.com', pass: process.env.GMAIL_APP_PASSWORD },
+    return NextResponse.json({
+      success: true,
+      emailSent: !!process.env.GMAIL_APP_PASSWORD,
+      month: prevMonthName,
+      summary: { totalFees, totalComisiones, totalGeneral, clients: clientRows.length },
     })
-
-    await transporter.sendMail({
-      from: '"Ceonyx · CEOON" <logisticaceoon@gmail.com>',
-      to: 'logisticaceoon@gmail.com',
-      subject: `💰 Reporte Financiero ${MONTHS_ES[currentMonth]} ${currentYear} — $${curTotal.toFixed(0)} bruto · ${trend}${pctChange}%`,
-      html,
-    })
-
-    return NextResponse.json({ success: true, curTotal, prevTotal, margin, pctChange })
-  } catch (err: any) {
-    console.error('monthly-finance error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch (error: any) {
+    console.error('Monthly finance cron error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
