@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/cleanup-accounts",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/comisiones",
+      "schedule": "0 11 1-3 * *"
     }
   ]
 }
