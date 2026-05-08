@@ -179,6 +179,7 @@ export default function FinancesPage() {
   const [deletingPayroll, setDeletingPayroll] = useState<PayrollEntry | null>(null)
   const [payrollMenuOpen, setPayrollMenuOpen] = useState<string | null>(null)
   const [showExpenseForm, setShowExpenseForm] = useState(false)
+  const [deletingExpense, setDeletingExpense] = useState<Transaction | null>(null)
 
   const currentPeriod = `${year}-${String(month).padStart(2, '0')}`
 
@@ -489,6 +490,11 @@ export default function FinancesPage() {
       }),
     })
     setShowExpenseForm(false); fetchData()
+  }
+
+  async function handleDeleteExpense(tx: Transaction) {
+    await fetch(`/api/finances?id=${tx.id}`, { method: 'DELETE' })
+    setDeletingExpense(null); fetchData()
   }
 
   function exportExpensesCSV() {
@@ -1174,26 +1180,36 @@ export default function FinancesPage() {
                 <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase">Descripcion</th>
                 <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase">Cliente</th>
                 <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase">Monto</th>
+                <th className="px-3 py-2.5"></th>
               </tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
-                  <tr><td colSpan={5}><LoadingSkeleton /></td></tr>
+                  <tr><td colSpan={6}><LoadingSkeleton /></td></tr>
                 ) : expenseTx.length === 0 ? (
-                  <tr><td colSpan={5} className="px-5 py-8 text-center text-sm text-slate-400">No hay gastos este mes</td></tr>
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-sm text-slate-400">No hay gastos este mes</td></tr>
                 ) : (<>
                   {expenseTx.map(t => (
-                    <tr key={t.id} className="hover:bg-slate-50">
+                    <tr key={t.id} className="hover:bg-slate-50 group">
                       <td className="px-5 py-3 text-sm text-slate-600">{new Date(t.date).toLocaleDateString('es-ES')}</td>
                       <td className="px-5 py-3"><CategoryBadge category={t.category} /></td>
                       <td className="px-5 py-3 text-sm text-slate-800 max-w-[250px] truncate">{t.description}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{t.clients?.name || '-'}</td>
                       <td className="px-5 py-3 text-right text-sm font-semibold text-red-600">-${Number(t.amount).toLocaleString()}</td>
+                      <td className="px-3 py-3">
+                        <button
+                          onClick={() => setDeletingExpense(t)}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all"
+                          title="Eliminar gasto"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   <tr style={{ background: '#0f172a', color: 'white' }}>
                     <td className="px-5 py-3 text-xs font-bold" style={{ color: '#64748b', letterSpacing: '0.05em' }}>TOTAL</td>
                     <td className="px-5 py-3 text-xs" style={{ color: '#94a3b8' }}>{expenseTx.length} gastos</td>
-                    <td className="px-5 py-3" colSpan={2}></td>
+                    <td className="px-5 py-3" colSpan={3}></td>
                     <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#fca5a5', fontSize: '14px' }}>${totalExpenses.toLocaleString()}</td>
                   </tr>
                 </>)}
@@ -1263,6 +1279,29 @@ export default function FinancesPage() {
             <button onClick={handleDeleteClient} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar cliente</button>
           </div>
         </Modal>
+      )}
+
+      {deletingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeletingExpense(null)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                <Trash2 className="h-5 w-5 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Eliminar gasto?</h3>
+                <p className="text-xs text-slate-500">{deletingExpense.description}</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">
+              Se eliminara el gasto de <strong>${Number(deletingExpense.amount).toLocaleString()}</strong> del {new Date(deletingExpense.date).toLocaleDateString('es-ES')}. Esta accion no se puede deshacer.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setDeletingExpense(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+              <button onClick={() => handleDeleteExpense(deletingExpense)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {menuOpen && <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(null)} />}
