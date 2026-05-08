@@ -94,3 +94,39 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, role } = auth
+
+    const appRole = normalizeRole(role)
+    if (appRole === 'trafficker' || appRole === 'viewer') {
+      return NextResponse.json({ error: 'Sin permisos para eliminar transacciones' }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
+    }
+
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+
+    if (error) {
+      console.error('Error deleting transaction:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('Error in DELETE /api/finances:', err)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  }
+}
