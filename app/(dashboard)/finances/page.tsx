@@ -721,7 +721,7 @@ export default function FinancesPage() {
                   <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${Number(v).toLocaleString()}`} />
                   <Tooltip
                     contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                    formatter={(v: number, name: string) => [`$${Number(v).toLocaleString()}`, name === 'ingresos' ? 'Ingresos' : 'Egresos totales']}
+                    formatter={(v, name) => [`$${Number(v ?? 0).toLocaleString()}`, name === 'ingresos' ? 'Ingresos' : 'Egresos totales']}
                     cursor={{ fill: '#f8fafc' }}
                   />
                   <Legend formatter={(v) => v === 'ingresos' ? 'Ingresos' : 'Egresos totales'} wrapperStyle={{ fontSize: '12px' }} />
@@ -769,7 +769,7 @@ export default function FinancesPage() {
                       </Pie>
                       <Tooltip
                         contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                        formatter={(v: number, name: string) => [`$${Number(v).toLocaleString()} (${((v / totalEgresos) * 100).toFixed(1)}%)`, name]}
+                        formatter={(v, name) => [`$${Number(v ?? 0).toLocaleString()} (${((Number(v ?? 0) / totalEgresos) * 100).toFixed(1)}%)`, name]}
                       />
                     </PieChart>
                   </div>
