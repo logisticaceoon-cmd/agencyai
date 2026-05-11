@@ -640,12 +640,17 @@ export default function FinancesPage() {
         <Tabs.Content value="resumen" className="space-y-6">
           {!hasFinanceResumen && <UpgradeBanner feature="Resumen financiero" />}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              { label: 'Ingresos del mes', value: `$${totalIncome.toLocaleString()}`, color: '#16a34a' },
-              { label: 'Gastos del mes', value: `$${totalExpenses.toLocaleString()}`, color: '#dc2626' },
-              { label: 'Ganancia neta', value: `$${netProfit.toLocaleString()}`, color: netProfit >= 0 ? '#2563eb' : '#dc2626' },
-              { label: 'Contratos activos', value: `$${totalContractCost.toLocaleString()}/mes`, color: '#0f172a' },
-            ].map((k, i) => (
+            {(() => {
+              const totalRealIncome = totalBilled + totalCommissions
+              const totalCosts = totalExpenses + totalPayroll
+              const realNetProfit = totalRealIncome - totalCosts
+              return [
+                { label: 'Ingresos del mes', value: `$${totalRealIncome.toLocaleString()}`, color: '#16a34a' },
+                { label: 'Nóminas', value: `$${totalPayroll.toLocaleString()}`, color: '#7c3aed' },
+                { label: 'Gastos del mes', value: `$${totalExpenses.toLocaleString()}`, color: '#dc2626' },
+                { label: 'Ganancia neta', value: `$${realNetProfit.toLocaleString()}`, color: realNetProfit >= 0 ? '#2563eb' : '#dc2626' },
+              ]
+            })().map((k, i) => (
               <div key={i} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px 18px' }}>
                 <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>{k.label}</p>
                 <p style={{ fontSize: '20px', fontWeight: 800, color: k.color, fontVariantNumeric: 'tabular-nums' }}>{k.value}</p>
@@ -1448,7 +1453,7 @@ export default function FinancesPage() {
         description: 'Te ayudo a optimizar clientes, nominas y reducir gastos',
         module: 'finances',
         suggestions: ['Como optimizo mis contratos?', 'Que gastos puedo reducir?', 'Como estructuro las nominas?'],
-        context: { ingresos: totalIncome, gastos: totalExpenses, ganancia: netProfit, clientes: activeClients.length, nomina: totalPayroll },
+        context: { ingresos: totalBilled + totalCommissions, gastos: totalExpenses, nominas: totalPayroll, ganancia: (totalBilled + totalCommissions) - totalExpenses - totalPayroll, clientes: activeClients.length },
       }} />
     </div>
   )
