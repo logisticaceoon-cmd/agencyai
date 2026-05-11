@@ -708,25 +708,21 @@ export default function FinancesPage() {
 
           {chartData.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-white p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">Ingresos vs Egresos totales</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Últimos 6 meses · Egresos = gastos fijos + nóminas</p>
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={chartData} barGap={4}>
+              <h3 className="text-sm font-semibold text-slate-900 mb-0.5">Ingresos vs Egresos totales</h3>
+              <p className="text-xs text-slate-400 mb-4">Últimos 6 meses · Egresos = gastos fijos + nóminas</p>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={chartData} barCategoryGap="30%" barGap={3} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${Number(v).toLocaleString()}`} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={56} tickFormatter={(v) => `$${Number(v) >= 1000 ? (Number(v)/1000).toFixed(0)+'k' : Number(v)}`} />
                   <Tooltip
-                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)', fontSize: '12px', padding: '8px 12px' }}
                     formatter={(v, name) => [`$${Number(v ?? 0).toLocaleString()}`, name === 'ingresos' ? 'Ingresos' : 'Egresos totales']}
-                    cursor={{ fill: '#f8fafc' }}
+                    cursor={{ fill: '#f8fafc', radius: 4 }}
                   />
-                  <Legend formatter={(v) => v === 'ingresos' ? 'Ingresos' : 'Egresos totales'} wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="ingresos" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={48} />
-                  <Bar dataKey="egresos" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  <Legend formatter={(v) => v === 'ingresos' ? 'Ingresos' : 'Egresos totales'} wrapperStyle={{ fontSize: '11px', paddingTop: '12px' }} />
+                  <Bar dataKey="ingresos" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="egresos" fill="#f87171" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
