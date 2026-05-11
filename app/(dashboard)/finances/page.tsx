@@ -493,8 +493,21 @@ export default function FinancesPage() {
   }
 
   async function handleDeleteExpense(tx: Transaction) {
-    await fetch(`/api/finances?id=${tx.id}`, { method: 'DELETE' })
-    setDeletingExpense(null); fetchData()
+    const res = await fetch(`/api/finances?id=${tx.id}`, { method: 'DELETE', credentials: 'include' })
+    if (res.status === 401) {
+      // Sesión expirada — recargar página para renovar token
+      setDeletingExpense(null)
+      alert('Tu sesión expiró. La página se recargará automáticamente.')
+      window.location.reload()
+      return
+    }
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      alert(`Error al eliminar: ${body.error || res.status}`)
+      return
+    }
+    setDeletingExpense(null)
+    fetchData()
   }
 
   function exportExpensesCSV() {
