@@ -757,36 +757,46 @@ export default function FinancesPage() {
             }
             return (
               <div className="rounded-xl border border-slate-200 bg-white p-6">
-                <div className="mb-4">
+                <div className="mb-5">
                   <h3 className="text-sm font-semibold text-slate-900">Distribución de egresos — {MONTHS[month - 1]} {year}</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Total: ${totalEgresos.toLocaleString()}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Total: <span className="font-semibold text-slate-600">${totalEgresos.toLocaleString()}</span></p>
                 </div>
-                <div className="flex flex-col lg:flex-row items-center gap-6">
-                  <div className="flex-shrink-0">
-                    <PieChart width={240} height={240}>
-                      <Pie data={pieRows} cx={120} cy={120} innerRadius={65} outerRadius={110} paddingAngle={2} dataKey="value" labelLine={false} label={renderLabel}>
+                {/* Layout: dona centrada + lista compacta al lado */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
+                  {/* Dona */}
+                  <div style={{ flexShrink: 0 }}>
+                    <PieChart width={200} height={200}>
+                      <Pie data={pieRows} cx={100} cy={100} innerRadius={55} outerRadius={90} paddingAngle={2} dataKey="value" labelLine={false} label={renderLabel}>
                         {pieRows.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                       </Pie>
                       <Tooltip
-                        contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                        formatter={(v, name) => [`$${Number(v ?? 0).toLocaleString()} (${((Number(v ?? 0) / totalEgresos) * 100).toFixed(1)}%)`, name]}
+                        contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }}
+                        formatter={(v, name) => [`$${Number(v ?? 0).toLocaleString()} · ${((Number(v ?? 0) / totalEgresos) * 100).toFixed(1)}%`, name]}
                       />
                     </PieChart>
                   </div>
-                  <div className="flex-1 w-full space-y-2">
-                    {pieRows.sort((a, b) => b.value - a.value).map((row, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: row.color, flexShrink: 0, display: 'inline-block' }} />
-                        <span className="flex-1 text-sm text-slate-700">{row.name}</span>
-                        <div className="flex items-center gap-3 min-w-[140px]">
-                          <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                            <div style={{ width: `${(row.value / totalEgresos) * 100}%`, height: '100%', background: row.color, borderRadius: '999px' }} />
+                  {/* Lista compacta — ancho fijo, no se estira */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '220px', maxWidth: '320px' }}>
+                    {pieRows.sort((a, b) => b.value - a.value).map((row, i) => {
+                      const pct = (row.value / totalEgresos) * 100
+                      return (
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: row.color, flexShrink: 0, display: 'inline-block' }} />
+                              <span style={{ fontSize: '13px', color: '#334155', fontWeight: 500 }}>{row.name}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, width: '32px', textAlign: 'right' }}>{pct.toFixed(0)}%</span>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums', width: '64px', textAlign: 'right' }}>${row.value.toLocaleString()}</span>
+                            </div>
                           </div>
-                          <span className="text-xs font-semibold text-slate-500 w-8 text-right">{((row.value / totalEgresos) * 100).toFixed(0)}%</span>
-                          <span className="text-sm font-bold text-slate-900 w-20 text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>${row.value.toLocaleString()}</span>
+                          <div style={{ height: '4px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
+                            <div style={{ width: `${pct}%`, height: '100%', background: row.color, borderRadius: '999px', transition: 'width 0.4s ease' }} />
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               </div>
