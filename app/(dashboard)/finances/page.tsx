@@ -234,12 +234,25 @@ export default function FinancesPage() {
         const d = new Date(year, month - 1 - i, 1)
         const m = d.getMonth() + 1
         const y = d.getFullYear()
-        return fetch(`/api/finances?month=${m}&year=${y}`).then(async (r) => {
-          if (!r.ok) return null
-          const j = await r.json()
-          const inc = (j.data || []).filter((t: Transaction) => t.type === 'income').reduce((s: number, t: Transaction) => s + Number(t.amount), 0)
-          const exp = (j.data || []).filter((t: Transaction) => t.type === 'expense').reduce((s: number, t: Transaction) => s + Number(t.amount), 0)
-          return { name: MONTHS[d.getMonth()].substring(0, 3), ingresos: inc, gastos: exp }
+        return Promise.all([
+          fetch(`/api/finances?month=${m}&year=${y}`).then(r => r.ok ? r.json() : null),
+          fetch(`/api/finances/finance-clients?month=${m}&year=${y}`).then(r => r.ok ? r.json() : null),
+        ]).then(([txJson, fcJson]) => {
+          // Gastos: desde transactions
+          const exp = (txJson?.data || [])
+            .filter((t: Transaction) => t.type === 'expense')
+            .reduce((s: number, t: Transaction) => s + Number(t.amount), 0)
+          // Ingresos: fees (con fallback a contract_cost) + comisiones — misma lógica que los KPIs
+          const activeC = (fcJson?.data || []).filter((c: { deleted_at: string | null }) => !c.deleted_at)
+          const recs: { client_id: string; billed_amount: number; commission_amount: number }[] = fcJson?.monthlyRecords || []
+          const fees = activeC.reduce((s: number, c: { id: string; contract_cost: number }) => {
+            const rec = recs.find(r => r.client_id === c.id)
+            return s + (rec ? Number(rec.billed_amount) : Number(c.contract_cost))
+          }, 0)
+          const comms = recs
+            .filter(r => activeC.some((c: { id: string }) => c.id === r.client_id))
+            .reduce((s: number, r) => s + Number(r.commission_amount), 0)
+          return { name: MONTHS[d.getMonth()].substring(0, 3), ingresos: fees + comms, gastos: exp }
         })
       })
       const results = await Promise.all(monthPromises)
