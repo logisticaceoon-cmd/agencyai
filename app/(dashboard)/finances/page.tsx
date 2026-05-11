@@ -180,6 +180,7 @@ export default function FinancesPage() {
   const [payrollMenuOpen, setPayrollMenuOpen] = useState<string | null>(null)
   const [showExpenseForm, setShowExpenseForm] = useState(false)
   const [deletingExpense, setDeletingExpense] = useState<Transaction | null>(null)
+  const [editingExpense, setEditingExpense] = useState<Transaction | null>(null)
 
   const currentPeriod = `${year}-${String(month).padStart(2, '0')}`
 
@@ -507,6 +508,31 @@ export default function FinancesPage() {
       return
     }
     setDeletingExpense(null)
+    fetchData()
+  }
+
+  async function handleUpdateExpense(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (!editingExpense) return
+    const fd = new FormData(e.currentTarget)
+    const body = {
+      amount: parseFloat(fd.get('amount') as string),
+      description: fd.get('description') as string,
+      date: fd.get('date') as string,
+      category: fd.get('category') as string || null,
+      clientId: fd.get('clientId') as string || null,
+    }
+    const res = await fetch(`/api/finances?id=${editingExpense.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      alert(`Error al editar: ${err.error || res.status}`)
+      return
+    }
+    setEditingExpense(null)
     fetchData()
   }
 
@@ -1209,13 +1235,22 @@ export default function FinancesPage() {
                       <td className="px-5 py-3 text-sm text-slate-500">{t.clients?.name || '-'}</td>
                       <td className="px-5 py-3 text-right text-sm font-semibold text-red-600">-${Number(t.amount).toLocaleString()}</td>
                       <td className="px-3 py-3">
-                        <button
-                          onClick={() => setDeletingExpense(t)}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500 transition-all"
-                          title="Eliminar gasto"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          <button
+                            onClick={() => setEditingExpense(t)}
+                            className="p-1.5 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-500"
+                            title="Editar gasto"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingExpense(t)}
+                            className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                            title="Eliminar gasto"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1292,6 +1327,69 @@ export default function FinancesPage() {
             <button onClick={handleDeleteClient} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar cliente</button>
           </div>
         </Modal>
+      )}
+
+      {editingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditingExpense(null)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
+                <Pencil className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Editar gasto</h3>
+                <p className="text-xs text-slate-500">{editingExpense.description}</p>
+              </div>
+            </div>
+            <form onSubmit={handleUpdateExpense} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block font-medium">Monto *</label>
+                  <input name="amount" type="number" step="0.01" required defaultValue={editingExpense.amount}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block font-medium">Fecha *</label>
+                  <input name="date" type="date" required defaultValue={editingExpense.date}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block font-medium">Descripcion *</label>
+                <input name="description" required defaultValue={editingExpense.description}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block font-medium">Categoria</label>
+                  <select name="category" defaultValue={editingExpense.category || ''}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                    <option value="">Seleccionar</option>
+                    <option value="software">Software</option>
+                    <option value="tool">Herramienta</option>
+                    <option value="ads_spend">Inversion ads</option>
+                    <option value="salary">Sueldo</option>
+                    <option value="office">Oficina</option>
+                    <option value="marketing">Marketing</option>
+                    <option value="other">Otro</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block font-medium">Cliente</label>
+                  <select name="clientId" defaultValue={editingExpense.client_id || ''}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                    <option value="">Sin cliente</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setEditingExpense(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button type="submit" className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Guardar cambios</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {deletingExpense && (
