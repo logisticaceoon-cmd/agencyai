@@ -7,7 +7,7 @@ import {
   Coins, Upload, ChevronDown, ChevronRight as ChevRight, Settings, RotateCcw, Briefcase,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import * as Tabs from '@radix-ui/react-tabs'
 import { AgentWidget } from '@/components/ai/AgentWidget'
 import { InfoBanner } from '@/components/shared/InfoBanner'
@@ -234,15 +234,21 @@ export default function FinancesPage() {
         const d = new Date(year, month - 1 - i, 1)
         const m = d.getMonth() + 1
         const y = d.getFullYear()
+        const period = `${y}-${String(m).padStart(2, '0')}`
         return Promise.all([
           fetch(`/api/finances?month=${m}&year=${y}`).then(r => r.ok ? r.json() : null),
           fetch(`/api/finances/finance-clients?month=${m}&year=${y}`).then(r => r.ok ? r.json() : null),
-        ]).then(([txJson, fcJson]) => {
-          // Gastos: desde transactions
-          const exp = (txJson?.data || [])
+          fetch(`/api/finances/payroll?period=${period}`).then(r => r.ok ? r.json() : null),
+        ]).then(([txJson, fcJson, payrollJson]) => {
+          // Gastos fijos: desde transactions
+          const gastosFijos = (txJson?.data || [])
             .filter((t: Transaction) => t.type === 'expense')
             .reduce((s: number, t: Transaction) => s + Number(t.amount), 0)
-          // Ingresos: fees (con fallback a contract_cost) + comisiones — misma lógica que los KPIs
+          // Nóminas del mes
+          const nominasMes = (payrollJson?.data || []).reduce((s: number, p: { net_salary: number }) => s + Number(p.net_salary), 0)
+          // Egresos totales = gastos + nóminas
+          const egresos = gastosFijos + nominasMes
+          // Ingresos: fees (con fallback) + comisiones
           const activeC = (fcJson?.data || []).filter((c: { deleted_at: string | null }) => !c.deleted_at)
           const recs: { client_id: string; billed_amount: number; commission_amount: number }[] = fcJson?.monthlyRecords || []
           const fees = activeC.reduce((s: number, c: { id: string; contract_cost: number }) => {
@@ -252,7 +258,7 @@ export default function FinancesPage() {
           const comms = recs
             .filter(r => activeC.some((c: { id: string }) => c.id === r.client_id))
             .reduce((s: number, r) => s + Number(r.commission_amount), 0)
-          return { name: MONTHS[d.getMonth()].substring(0, 3), ingresos: fees + comms, gastos: exp }
+          return { name: MONTHS[d.getMonth()].substring(0, 3), ingresos: fees + comms, egresos }
         })
       })
       const results = await Promise.all(monthPromises)
@@ -702,20 +708,90 @@ export default function FinancesPage() {
 
           {chartData.length > 0 && (
             <div className="rounded-xl border border-slate-200 bg-white p-6">
-              <h3 className="text-sm font-semibold text-slate-900 mb-4">Ingresos vs Gastos - Ultimos 6 meses</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v) => `$${Number(v).toLocaleString()}`} />
-                  <Legend />
-                  <Bar dataKey="ingresos" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="gastos" fill="#ef4444" radius={[4, 4, 0, 0]} />
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Ingresos vs Egresos totales</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Últimos 6 meses · Egresos = gastos fijos + nóminas</p>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={chartData} barGap={4}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${Number(v).toLocaleString()}`} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                    formatter={(v: number, name: string) => [`$${Number(v).toLocaleString()}`, name === 'ingresos' ? 'Ingresos' : 'Egresos totales']}
+                    cursor={{ fill: '#f8fafc' }}
+                  />
+                  <Legend formatter={(v) => v === 'ingresos' ? 'Ingresos' : 'Egresos totales'} wrapperStyle={{ fontSize: '12px' }} />
+                  <Bar dataKey="ingresos" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  <Bar dataKey="egresos" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={48} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
+
+          {/* ── Gráfico de dona: desglose de egresos del mes ── */}
+          {(() => {
+            const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
+              tools: 'Herramientas', software: 'Software', ads: 'Publicidad', office: 'Oficina',
+              hosting: 'Hosting', salary: 'Sueldos', services: 'Servicios', travel: 'Viáticos',
+              other: 'Otros', marketing: 'Marketing', legal: 'Legal', design: 'Diseño',
+            }
+            const PIE_COLORS = ['#7c3aed','#3b82f6','#f59e0b','#10b981','#f97316','#ec4899','#06b6d4','#84cc16','#6366f1','#14b8a6']
+            const pieRows: { name: string; value: number; color: string }[] = []
+            if (totalPayroll > 0) pieRows.push({ name: 'Nóminas', value: totalPayroll, color: '#7c3aed' })
+            Object.entries(expenseByCategory).filter(([, v]) => v > 0).forEach(([cat, val], i) => {
+              pieRows.push({ name: EXPENSE_CATEGORY_LABELS[cat] || cat, value: val, color: PIE_COLORS[(i + 1) % PIE_COLORS.length] })
+            })
+            const totalEgresos = pieRows.reduce((s, r) => s + r.value, 0)
+            if (pieRows.length === 0 || totalEgresos === 0) return null
+            const RADIAN = Math.PI / 180
+            const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+              if (percent < 0.05) return null
+              const r = innerRadius + (outerRadius - innerRadius) * 0.5
+              const x = cx + r * Math.cos(-midAngle * RADIAN)
+              const y = cy + r * Math.sin(-midAngle * RADIAN)
+              return <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" style={{ fontSize: '11px', fontWeight: 700 }}>{`${(percent * 100).toFixed(0)}%`}</text>
+            }
+            return (
+              <div className="rounded-xl border border-slate-200 bg-white p-6">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-slate-900">Distribución de egresos — {MONTHS[month - 1]} {year}</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Total: ${totalEgresos.toLocaleString()}</p>
+                </div>
+                <div className="flex flex-col lg:flex-row items-center gap-6">
+                  <div className="flex-shrink-0">
+                    <PieChart width={240} height={240}>
+                      <Pie data={pieRows} cx={120} cy={120} innerRadius={65} outerRadius={110} paddingAngle={2} dataKey="value" labelLine={false} label={renderLabel}>
+                        {pieRows.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                        formatter={(v: number, name: string) => [`$${Number(v).toLocaleString()} (${((v / totalEgresos) * 100).toFixed(1)}%)`, name]}
+                      />
+                    </PieChart>
+                  </div>
+                  <div className="flex-1 w-full space-y-2">
+                    {pieRows.sort((a, b) => b.value - a.value).map((row, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: row.color, flexShrink: 0, display: 'inline-block' }} />
+                        <span className="flex-1 text-sm text-slate-700">{row.name}</span>
+                        <div className="flex items-center gap-3 min-w-[140px]">
+                          <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                            <div style={{ width: `${(row.value / totalEgresos) * 100}%`, height: '100%', background: row.color, borderRadius: '999px' }} />
+                          </div>
+                          <span className="text-xs font-semibold text-slate-500 w-8 text-right">{((row.value / totalEgresos) * 100).toFixed(0)}%</span>
+                          <span className="text-sm font-bold text-slate-900 w-20 text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>${row.value.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
         </Tabs.Content>
 
         {/* ═══ TAB CLIENTES ═══ */}
