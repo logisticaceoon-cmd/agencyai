@@ -184,6 +184,8 @@ export default function FinancesPage() {
 
   const currentPeriod = `${year}-${String(month).padStart(2, '0')}`
 
+  // fetchData: solo carga datos operativos (transacciones, clientes, nominas)
+  // NO incluye el gráfico — el gráfico tiene su propio effect para no bloquear operaciones
   const fetchData = useCallback(async () => {
     setLoading(true)
     const prevMonth = month === 1 ? 12 : month - 1
@@ -202,7 +204,6 @@ export default function FinancesPage() {
     if (catsRes.ok) {
       const j = await catsRes.json()
       setCategories(j.data || [])
-      // Auto-expand all categories by default
       const expanded: Record<string, boolean> = {}
       ;(j.data || []).forEach((c: ServiceCategory) => { expanded[c.id] = true })
       setExpandedCats(prev => ({ ...expanded, ...prev }))
@@ -219,26 +220,37 @@ export default function FinancesPage() {
     if (payrollRes.ok) { const j = await payrollRes.json(); setPayroll(j.data || []) }
     if (clientListRes.ok) { const j = await clientListRes.json(); setClients(j.data || []) }
 
-    // Parallel fetches for last 6 months chart data
-    const monthPromises = Array.from({ length: 6 }, (_, idx) => {
-      const i = 5 - idx
-      const d = new Date(year, month - 1 - i, 1)
-      const m = d.getMonth() + 1
-      const y = d.getFullYear()
-      return fetch(`/api/finances?month=${m}&year=${y}`).then(async (r) => {
-        if (!r.ok) return null
-        const j = await r.json()
-        const inc = (j.data || []).filter((t: Transaction) => t.type === 'income').reduce((s: number, t: Transaction) => s + Number(t.amount), 0)
-        const exp = (j.data || []).filter((t: Transaction) => t.type === 'expense').reduce((s: number, t: Transaction) => s + Number(t.amount), 0)
-        return { name: MONTHS[d.getMonth()].substring(0, 3), ingresos: inc, gastos: exp }
-      })
-    })
-    const results = await Promise.all(monthPromises)
-    const cd = results.filter((r): r is { name: string; ingresos: number; gastos: number } => r !== null)
-    setChartData(cd)
     setLoading(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, year, currentPeriod, showDeleted])
+
+  // Gráfico: se carga por separado, solo cuando cambia el mes/año
+  // No bloquea las operaciones CRUD ni el loading principal
+  useEffect(() => {
+    let cancelled = false
+    const loadChart = async () => {
+      const monthPromises = Array.from({ length: 6 }, (_, idx) => {
+        const i = 5 - idx
+        const d = new Date(year, month - 1 - i, 1)
+        const m = d.getMonth() + 1
+        const y = d.getFullYear()
+        return fetch(`/api/finances?month=${m}&year=${y}`).then(async (r) => {
+          if (!r.ok) return null
+          const j = await r.json()
+          const inc = (j.data || []).filter((t: Transaction) => t.type === 'income').reduce((s: number, t: Transaction) => s + Number(t.amount), 0)
+          const exp = (j.data || []).filter((t: Transaction) => t.type === 'expense').reduce((s: number, t: Transaction) => s + Number(t.amount), 0)
+          return { name: MONTHS[d.getMonth()].substring(0, 3), ingresos: inc, gastos: exp }
+        })
+      })
+      const results = await Promise.all(monthPromises)
+      if (!cancelled) {
+        const cd = results.filter((r): r is { name: string; ingresos: number; gastos: number } => r !== null)
+        setChartData(cd)
+      }
+    }
+    loadChart()
+    return () => { cancelled = true }
+  }, [month, year]) // Solo recarga cuando cambia mes/año, NO en cada CRUD
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -400,8 +412,15 @@ export default function FinancesPage() {
 
   async function handleDeleteClient() {
     if (!deletingClient) return
-    await fetch(`/api/finances/finance-clients/${deletingClient.id}`, { method: 'DELETE' })
-    setDeletingClient(null); fetchData()
+    const id = deletingClient.id
+    // Optimistic: quitar de la lista inmediatamente
+    setFinanceClients(prev => prev.filter(c => c.id !== id))
+    setDeletingClient(null)
+    // Llamada en background — sin bloquear la UI
+    fetch(`/api/finances/finance-clients/${id}`, { method: 'DELETE' }).catch(() => {
+      // Si falla, recargar para recuperar estado real
+      fetchData()
+    })
   }
 
   async function handleRestoreClient(c: FinanceClient) {
@@ -470,12 +489,18 @@ export default function FinancesPage() {
   }
 
   async function handleDeletePayroll(entry: PayrollEntry, fromCurrentForward: boolean) {
+    // Optimistic: quitar de la lista inmediatamente
     if (fromCurrentForward) {
-      await fetch(`/api/finances/payroll?employee_name=${encodeURIComponent(entry.employee_name)}&from_period=${currentPeriod}`, { method: 'DELETE' })
+      setPayroll(prev => prev.filter(p => p.employee_name !== entry.employee_name))
+      setDeletingPayroll(null)
+      fetch(`/api/finances/payroll?employee_name=${encodeURIComponent(entry.employee_name)}&from_period=${currentPeriod}`, { method: 'DELETE' })
+        .catch(() => fetchData())
     } else {
-      await fetch(`/api/finances/payroll?id=${entry.id}`, { method: 'DELETE' })
+      setPayroll(prev => prev.filter(p => p.id !== entry.id))
+      setDeletingPayroll(null)
+      fetch(`/api/finances/payroll?id=${entry.id}`, { method: 'DELETE' })
+        .catch(() => fetchData())
     }
-    setDeletingPayroll(null); fetchData()
   }
 
   async function handleCreateExpense(e: React.FormEvent<HTMLFormElement>) {
@@ -494,21 +519,22 @@ export default function FinancesPage() {
   }
 
   async function handleDeleteExpense(tx: Transaction) {
+    // Optimistic: quitar del estado inmediatamente → UI instantánea
+    setTransactions(prev => prev.filter(t => t.id !== tx.id))
+    setDeletingExpense(null)
+    // Llamada real en background
     const res = await fetch(`/api/finances?id=${tx.id}`, { method: 'DELETE', credentials: 'include' })
     if (res.status === 401) {
-      // Sesión expirada — recargar página para renovar token
-      setDeletingExpense(null)
       alert('Tu sesión expiró. La página se recargará automáticamente.')
       window.location.reload()
       return
     }
     if (!res.ok) {
+      // Si falló, devolver el item y notificar
       const body = await res.json().catch(() => ({}))
       alert(`Error al eliminar: ${body.error || res.status}`)
-      return
+      fetchData() // resync
     }
-    setDeletingExpense(null)
-    fetchData()
   }
 
   async function handleUpdateExpense(e: React.FormEvent<HTMLFormElement>) {
