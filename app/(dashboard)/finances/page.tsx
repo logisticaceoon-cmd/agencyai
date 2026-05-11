@@ -162,7 +162,7 @@ export default function FinancesPage() {
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
-  const [chartData, setChartData] = useState<{name:string;ingresos:number;gastos:number}[]>([])
+  const [chartData, setChartData] = useState<{name:string;ingresos:number;egresos:number}[]>([])
   const [showDeleted, setShowDeleted] = useState(false)
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({})
 
@@ -263,7 +263,7 @@ export default function FinancesPage() {
       })
       const results = await Promise.all(monthPromises)
       if (!cancelled) {
-        const cd = results.filter((r): r is { name: string; ingresos: number; gastos: number } => r !== null)
+        const cd = results.filter((r): r is { name: string; ingresos: number; egresos: number } => r !== null)
         setChartData(cd)
       }
     }
