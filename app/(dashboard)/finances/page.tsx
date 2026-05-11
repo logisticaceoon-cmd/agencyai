@@ -273,10 +273,23 @@ export default function FinancesPage() {
 
   const activeClients = useMemo(() => financeClients.filter(c => !c.deleted_at), [financeClients])
   const totalContractCost = activeClients.reduce((s, c) => s + Number(c.contract_cost), 0)
-  const totalCommissions = monthlyRecords.reduce((s, r) => s + Number(r.commission_amount), 0)
-  const totalBilled = monthlyRecords.reduce((s, r) => s + Number(r.billed_amount), 0)
   const totalCancelled = activeClients.reduce((s, c) => s + Number(c.cancelled_amount), 0)
-  const prevBilled = prevMonthlyRecords.reduce((s, r) => s + Number(r.billed_amount), 0)
+
+  // Lógica unificada: fee = billed_amount si existe el registro, sino contract_cost (mismo criterio que el header de categoría)
+  const totalBilled = activeClients.reduce((s, c) => {
+    const rec = monthlyRecords.find(r => r.client_id === c.id)
+    return s + (rec ? Number(rec.billed_amount) : Number(c.contract_cost))
+  }, 0)
+  // Comisiones: solo de clientes activos
+  const totalCommissions = monthlyRecords
+    .filter(r => activeClients.some(c => c.id === r.client_id))
+    .reduce((s, r) => s + Number(r.commission_amount), 0)
+
+  // Mes anterior: misma lógica para comparación
+  const prevBilled = activeClients.reduce((s, c) => {
+    const rec = prevMonthlyRecords.find(r => r.client_id === c.id)
+    return s + (rec ? Number(rec.billed_amount) : Number(c.contract_cost))
+  }, 0)
   const billedChange = prevBilled > 0 ? ((totalBilled - prevBilled) / prevBilled) * 100 : 0
 
   const clientsByCategory = useMemo(() => {
@@ -761,11 +774,14 @@ export default function FinancesPage() {
                 const catClients = clientsByCategory[cat.id] || []
                 const expanded = expandedCats[cat.id]
                 const catRecords = monthlyRecords.filter(r => catClients.some(c => c.id === r.client_id))
-                const catTotal = catClients.filter(c => !c.deleted_at).reduce((s, c) => {
+                const activeCatClients = catClients.filter(c => !c.deleted_at)
+                const catTotal = activeCatClients.reduce((s, c) => {
                   const rec = catRecords.find(r => r.client_id === c.id)
                   return s + (rec ? Number(rec.billed_amount) : Number(c.contract_cost))
                 }, 0)
-                const catCommissions = catRecords.reduce((s, r) => s + Number(r.commission_amount), 0)
+                const catCommissions = catRecords
+                  .filter(r => activeCatClients.some(c => c.id === r.client_id))
+                  .reduce((s, r) => s + Number(r.commission_amount), 0)
                 const catCancelled = catClients.filter(c => !c.deleted_at).reduce((s, c) => s + Number(c.cancelled_amount), 0)
 
                 return (
@@ -999,7 +1015,7 @@ export default function FinancesPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div>
                   <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Total fees</p>
-                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${totalBilled > 0 ? totalBilled.toLocaleString() : totalContractCost.toLocaleString()}</p>
+                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${totalBilled.toLocaleString()}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Total comisiones</p>
@@ -1007,11 +1023,11 @@ export default function FinancesPage() {
                 </div>
                 <div style={{ borderLeft: '1px solid #f1f5f9', paddingLeft: '24px' }}>
                   <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Total general</p>
-                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>${((totalBilled > 0 ? totalBilled : totalContractCost) + totalCommissions).toLocaleString()}</p>
+                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>${(totalBilled + totalCommissions).toLocaleString()}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Neto (− cancelados)</p>
-                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>${((totalBilled > 0 ? totalBilled : totalContractCost) + totalCommissions - totalCancelled).toLocaleString()}</p>
+                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>${(totalBilled + totalCommissions - totalCancelled).toLocaleString()}</p>
                 </div>
               </div>
             </div>
