@@ -95,6 +95,49 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PATCH(request: Request) {
+  try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, role } = auth
+
+    const appRole = normalizeRole(role)
+    if (appRole === 'trafficker' || appRole === 'viewer') {
+      return NextResponse.json({ error: 'Sin permisos para editar transacciones' }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 })
+
+    const body = await request.json()
+    const updates: Record<string, unknown> = {}
+    if (body.amount !== undefined) updates.amount = body.amount
+    if (body.description !== undefined) updates.description = body.description
+    if (body.date !== undefined) updates.date = body.date
+    if (body.category !== undefined) updates.category = body.category || null
+    if (body.clientId !== undefined) updates.client_id = body.clientId || null
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .update(updates)
+      .eq('id', id)
+      .eq('workspace_id', workspaceId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating transaction:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ data })
+  } catch (err) {
+    console.error('Error in PATCH /api/finances:', err)
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const auth = await getAuthContext()
