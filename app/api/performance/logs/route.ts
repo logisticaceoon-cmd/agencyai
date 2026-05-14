@@ -60,7 +60,7 @@ export async function GET(request: Request) {
       .eq('workspace_id', workspaceId)
       .eq('status', 'completed')
       .is('deleted_at', null)
-      .order('createdAt', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(500)
 
     const { data, error } = await query
