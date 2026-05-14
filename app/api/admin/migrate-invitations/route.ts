@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { Pool } from 'pg'
+import { PrismaClient } from '@prisma/client'
 
 export async function POST(request: Request) {
   const { secret } = await request.json().catch(() => ({}))
@@ -7,10 +7,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+  const prisma = new PrismaClient()
   
   try {
-    await pool.query(`
+    await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS public.workspace_invitations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         workspace_id UUID NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
@@ -23,13 +23,13 @@ export async function POST(request: Request) {
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `)
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_wi_workspace_id ON public.workspace_invitations(workspace_id)`)
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_wi_token ON public.workspace_invitations(token)`)
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_wi_email ON public.workspace_invitations(email)`)
-    await pool.end()
-    return NextResponse.json({ ok: true, message: 'workspace_invitations table created' })
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_wi_workspace_id ON public.workspace_invitations(workspace_id)`)
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_wi_token ON public.workspace_invitations(token)`)
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_wi_email ON public.workspace_invitations(email)`)
+    await prisma.$disconnect()
+    return NextResponse.json({ ok: true, message: 'workspace_invitations table created successfully' })
   } catch (err: unknown) {
-    await pool.end().catch(() => {})
+    await prisma.$disconnect().catch(() => {})
     const msg = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ error: msg }, { status: 500 })
   }
