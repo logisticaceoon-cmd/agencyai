@@ -90,7 +90,7 @@ export async function GET() {
         .select('id, name, company, email, status')
         .eq('workspace_id', workspaceId)
         .is('deleted_at', null)
-        .order('createdAt', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(3),
     ])
 
