@@ -24,7 +24,7 @@ export async function GET(
       .from('comments')
       .select('*')
       .eq('taskId', id)
-      .order('createdAt', { ascending: true })
+      .order('created_at', { ascending: true })
 
     if (error) {
       console.error('Error fetching comments:', error.message)
