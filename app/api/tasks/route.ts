@@ -23,7 +23,7 @@ export async function GET(request: Request) {
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
       .limit(500)
-      .order('createdAt', { ascending: true })
+      .order('created_at', { ascending: true })
 
     // Filtrar por asignado si el rol no tiene acceso total
     if (scope === 'assigned') {
