@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
       .limit(200)
-      .order('createdAt', { ascending: false })
+      .order('created_at', { ascending: false })
 
     // Trafficker/viewer: solo proyectos donde son owner o tienen tareas asignadas
     if (scope === 'assigned') {
