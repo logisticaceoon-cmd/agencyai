@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       .select('*')
       .eq('organizationId', workspaceId)
       .eq('actionType', 'performance_task_completed')
-      .order('createdAt', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(200)
 
     if (userId) logsQuery = logsQuery.eq('userId', userId)
