@@ -1,18 +1,24 @@
-import { NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
+import { NextResponse } from "next/server"
+import nodemailer from "nodemailer"
+
+function verifySecret(request: Request): boolean {
+  const authHeader = request.headers.get("authorization") || ""
+  const secret = process.env.SUPABASE_AUTH_HOOK_SECRET || ""
+  return authHeader === `Bearer ${secret}`
+}
 
 function getTransporter() {
   return nodemailer.createTransport({
-    service: 'gmail',
+    service: "gmail",
     auth: {
-      user: process.env.GMAIL_USER || 'logisticaceoon@gmail.com',
+      user: process.env.GMAIL_USER || "logisticaceoon@gmail.com",
       pass: process.env.GMAIL_APP_PASSWORD,
     },
   })
 }
 
 function buildConfirmationUrl(siteUrl: string, tokenHash: string, type: string, redirectTo?: string) {
-  const base = siteUrl.replace(/\/$/, '')
+  const base = siteUrl.replace(/\/$/, "")
   let url = `${base}/auth/confirm?token_hash=${tokenHash}&type=${type}`
   if (redirectTo) url += `&next=${encodeURIComponent(redirectTo)}`
   return url
@@ -20,22 +26,22 @@ function buildConfirmationUrl(siteUrl: string, tokenHash: string, type: string, 
 
 function getEmailContent(type: string, confirmationUrl: string, userEmail: string) {
   const subjects: Record<string, string> = {
-    signup: 'Confirmá tu cuenta — AgencyAI',
-    recovery: 'Recuperar contraseña — AgencyAI',
-    invite: 'Te invitaron a AgencyAI',
-    magiclink: 'Tu link de acceso — AgencyAI',
+    signup: "Confirmá tu cuenta — AgencyAI",
+    recovery: "Recuperar contraseña — AgencyAI",
+    invite: "Te invitaron a AgencyAI",
+    magiclink: "Tu link de acceso — AgencyAI",
   }
   const labels: Record<string, string> = {
-    signup: 'Confirmar mi cuenta',
-    recovery: 'Restablecer contraseña',
-    invite: 'Aceptar invitación',
-    magiclink: 'Iniciar sesión',
+    signup: "Confirmar mi cuenta",
+    recovery: "Restablecer contraseña",
+    invite: "Aceptar invitación",
+    magiclink: "Iniciar sesión",
   }
-  const subject = subjects[type] || subjects['signup']
-  const btnLabel = labels[type] || labels['signup']
-  const intro = type === 'recovery'
+  const subject = subjects[type] || subjects["signup"]
+  const btnLabel = labels[type] || labels["signup"]
+  const intro = type === "recovery"
     ? `Recibimos una solicitud para restablecer la contraseña de <strong>${userEmail}</strong>.`
-    : 'Hacé click en el botón para continuar.'
+    : "Hacé click en el botón para continuar."
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;">
       <h1 style="color:#2563eb;text-align:center;">⚡ AgencyAI</h1>
@@ -53,26 +59,29 @@ function getEmailContent(type: string, confirmationUrl: string, userEmail: strin
 
 export async function POST(request: Request) {
   try {
+    if (!verifySecret(request)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     const body = await request.json()
     const { user, email_data } = body
     if (!user?.email || !email_data) {
-      return NextResponse.json({ error: 'Payload inválido' }, { status: 400 })
+      return NextResponse.json({ error: "Payload inválido" }, { status: 400 })
     }
     const { token_hash, email_action_type, site_url, redirect_to } = email_data
-    const actionType = email_action_type || 'signup'
-    const siteUrl = site_url || 'https://agencyai-iota.vercel.app'
+    const actionType = email_action_type || "signup"
+    const siteUrl = site_url || "https://agencyai-iota.vercel.app"
     const confirmationUrl = buildConfirmationUrl(siteUrl, token_hash, actionType, redirect_to)
     const { subject, html } = getEmailContent(actionType, confirmationUrl, user.email)
     const transporter = getTransporter()
     await transporter.sendMail({
-      from: process.env.EMAIL_FROM || 'AgencyAI <logisticaceoon@gmail.com>',
+      from: process.env.EMAIL_FROM || "AgencyAI <logisticaceoon@gmail.com>",
       to: user.email,
       subject,
       html,
     })
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Auth hook email error:', error)
-    return NextResponse.json({ error: 'Error enviando email' }, { status: 500 })
+    console.error("Auth hook email error:", error)
+    return NextResponse.json({ error: "Error enviando email" }, { status: 500 })
   }
 }
