@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Zap, Eye, EyeOff } from 'lucide-react'
+import type { AuthChangeEvent } from '@supabase/supabase-js'
 
 function ResetContent() {
   const router = useRouter()
@@ -17,14 +18,12 @@ function ResetContent() {
   const [sessionReady, setSessionReady] = useState(false)
 
   useEffect(() => {
-    // Supabase maneja el token de recovery en el hash de la URL automáticamente
     const supabase = createClient()
-    supabase.auth.onAuthStateChange((event) => {
+    supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
       if (event === 'PASSWORD_RECOVERY') {
         setSessionReady(true)
       }
     })
-    // También verificar si hay token_hash en los params (flujo desde el hook)
     const tokenHash = searchParams.get('token_hash')
     const type = searchParams.get('type')
     if (tokenHash && type === 'recovery') {
@@ -37,30 +36,17 @@ function ResetContent() {
 
   async function handleReset(e: React.FormEvent) {
     e.preventDefault()
-    if (password !== confirm) {
-      setError('Las contraseñas no coinciden.')
-      return
-    }
-    if (password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres.')
-      return
-    }
+    if (password !== confirm) { setError('Las contraseñas no coinciden.'); return }
+    if (password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres.'); return }
     setLoading(true)
     setError('')
     try {
       const supabase = createClient()
       const { error } = await supabase.auth.updateUser({ password })
-      if (error) {
-        setError('No se pudo actualizar la contraseña. Intentá de nuevo.')
-      } else {
-        setDone(true)
-        setTimeout(() => router.push('/dashboard'), 2000)
-      }
-    } catch {
-      setError('Error inesperado.')
-    } finally {
-      setLoading(false)
-    }
+      if (error) setError('No se pudo actualizar la contraseña. Intentá de nuevo.')
+      else { setDone(true); setTimeout(() => router.push('/dashboard'), 2000) }
+    } catch { setError('Error inesperado.') }
+    finally { setLoading(false) }
   }
 
   return (
@@ -74,7 +60,6 @@ function ResetContent() {
             <span className="text-2xl font-bold text-[var(--text-primary)]">AgencyAI</span>
           </div>
         </div>
-
         <div className="rounded-[var(--radius-xl)] border border-[var(--border-base)] bg-white p-8 shadow-[var(--shadow-lg)]">
           {done ? (
             <div className="text-center py-4">
@@ -86,7 +71,6 @@ function ResetContent() {
             <>
               <h2 className="text-xl font-semibold text-[var(--text-primary)] mb-2">Nueva contraseña</h2>
               <p className="text-[13px] text-[var(--text-muted)] mb-6">Elegí una contraseña segura de al menos 8 caracteres.</p>
-
               <form onSubmit={handleReset} className="space-y-4">
                 <div>
                   <label className="block text-[13px] font-medium text-[var(--text-secondary)] mb-1.5">Nueva contraseña</label>
@@ -95,8 +79,7 @@ function ResetContent() {
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      required
-                      minLength={8}
+                      required minLength={8}
                       placeholder="Mínimo 8 caracteres"
                       className="w-full rounded-[var(--radius-md)] border border-[var(--border-base)] bg-white px-4 py-2.5 pr-10 text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-[var(--blue)] focus:outline-none focus:shadow-[var(--shadow-focus)] transition-all"
                     />
@@ -105,26 +88,17 @@ function ResetContent() {
                     </button>
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-[13px] font-medium text-[var(--text-secondary)] mb-1.5">Confirmar contraseña</label>
                   <input
-                    type="password"
-                    value={confirm}
+                    type="password" value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
-                    required
-                    placeholder="Repetí la contraseña"
+                    required placeholder="Repetí la contraseña"
                     className="w-full rounded-[var(--radius-md)] border border-[var(--border-base)] bg-white px-4 py-2.5 text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-[var(--blue)] focus:outline-none focus:shadow-[var(--shadow-focus)] transition-all"
                   />
                 </div>
-
-                {error && (
-                  <p className="text-[13px] text-red-600 bg-red-50 px-3 py-2 rounded-[var(--radius-md)]">{error}</p>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading}
+                {error && <p className="text-[13px] text-red-600 bg-red-50 px-3 py-2 rounded-[var(--radius-md)]">{error}</p>}
+                <button type="submit" disabled={loading}
                   className="w-full rounded-[var(--radius-md)] bg-[var(--blue)] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_1px_2px_rgba(37,99,235,0.3)]"
                 >
                   {loading ? 'Guardando...' : 'Actualizar contraseña'}
