@@ -11,7 +11,7 @@ export default function ConfirmPage() {
 
   useEffect(() => {
     const tokenHash = searchParams.get("token_hash")
-    const type = searchParams.get("type") as "signup" | "recovery" | "invite" | "magiclink" || "signup"
+    const type = (searchParams.get("type") || "signup") as "signup" | "recovery" | "invite" | "magiclink"
     const next = searchParams.get("next") || "/dashboard"
 
     if (!tokenHash) {
@@ -21,8 +21,8 @@ export default function ConfirmPage() {
     }
 
     const supabase = createClient()
-    supabase.auth.verifyOtp({ token_hash: tokenHash, type }).then(({ error }) => {
-      if (error) {
+    supabase.auth.verifyOtp({ token_hash: tokenHash, type }).then((result: { error: { message: string } | null }) => {
+      if (result.error) {
         setStatus("error")
         setMessage("El link expiró o ya fue usado. Solicitá uno nuevo.")
       } else {
