@@ -12,7 +12,7 @@ function ConfirmContent() {
   useEffect(() => {
     const tokenHash = searchParams.get("token_hash")
     const type = (searchParams.get("type") || "signup") as "signup" | "recovery" | "invite" | "magiclink"
-    const next = searchParams.get("next") || "/dashboard"
+    const next = searchParams.get("next") || (type === "recovery" ? "/reset-password" : "/dashboard")
 
     if (!tokenHash) {
       setStatus("error")
@@ -25,22 +25,23 @@ function ConfirmContent() {
       if (result.error) {
         setStatus("error")
         setMessage("El link expiró o ya fue usado. Solicitá uno nuevo.")
+        console.error("verifyOtp error:", result.error)
       } else {
         setStatus("success")
-        setMessage("¡Cuenta confirmada! Redirigiendo...")
-        setTimeout(() => router.push(next), 1500)
+        setMessage(type === "recovery" ? "Identidad verificada. Redirigiendo..." : "¡Cuenta confirmada! Redirigiendo...")
+        setTimeout(() => router.push(next), 1200)
       }
     })
   }, [router, searchParams])
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc" }}>
-      <div style={{ textAlign: "center", padding: "40px", background: "white", borderRadius: "12px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", maxWidth: "400px", width: "100%" }}>
-        <h1 style={{ color: "#2563eb", fontSize: "28px", marginBottom: "16px" }}>⚡ AgencyAI</h1>
+      <div style={{ textAlign: "center", padding: "40px", background: "white", borderRadius: "16px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)", maxWidth: "400px", width: "100%" }}>
+        <h1 style={{ color: "#2563eb", fontSize: "24px", fontWeight: "700", marginBottom: "20px" }}>⚡ AgencyAI</h1>
         {status === "loading" && (
           <>
             <div style={{ width: "40px", height: "40px", border: "3px solid #e2e8f0", borderTop: "3px solid #2563eb", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
-            <p style={{ color: "#64748b" }}>Verificando tu cuenta...</p>
+            <p style={{ color: "#64748b" }}>Verificando...</p>
           </>
         )}
         {status === "success" && (
@@ -55,7 +56,7 @@ function ConfirmContent() {
             <div style={{ fontSize: "48px", marginBottom: "16px" }}>❌</div>
             <h2 style={{ color: "#dc2626", marginBottom: "8px" }}>Error</h2>
             <p style={{ color: "#64748b", marginBottom: "24px" }}>{message}</p>
-            <a href="/login" style={{ background: "#2563eb", color: "white", padding: "10px 24px", borderRadius: "8px", textDecoration: "none", fontSize: "14px" }}>Volver al login</a>
+            <a href="/sign-in" style={{ background: "#2563eb", color: "white", padding: "10px 24px", borderRadius: "8px", textDecoration: "none", fontSize: "14px", display: "inline-block" }}>Volver al login</a>
           </>
         )}
       </div>
