@@ -93,7 +93,7 @@ export async function GET() {
     .from('workspace_members')
     .select('*')
     .eq('workspace_id', workspaceId)
-    .order('created_at', { ascending: true })
+    .order('createdAt', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -105,7 +105,7 @@ export async function GET() {
     .eq('workspace_id', workspaceId)
     .is('accepted_at', null)
     .gte('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false })
+    .order('createdAt', { ascending: false })
 
   return NextResponse.json({ data, pendingInvites: pendingInvites || [] })
 }
