@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
 
   const { data, error } = await supabase
     .from('projects')
-    .select('id, name, status, priority, start_date, due_date, budget, budget_spent')
+    .select('id, name, status, priority, startDate, endDate, budget, budget_spent')
     .eq('client_id', access.client_id)
     .eq('workspace_id', access.workspace_id)
     .is('deleted_at', null)
