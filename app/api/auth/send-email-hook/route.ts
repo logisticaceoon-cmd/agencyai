@@ -20,10 +20,11 @@ function getTransporter() {
 /**
  * Builds the confirmation URL for each email type.
  *
- * Recovery emails go DIRECTLY to /reset-password so the page can verify
- * the OTP itself and show the form immediately — no intermediate /auth/confirm.
+ * All types go through /auth/confirm which calls verifyOtp client-side,
+ * establishes the session in the browser, then redirects to the next page.
  *
- * All other types (signup, invite, magiclink) go through /auth/confirm.
+ * Recovery emails redirect to /reset-password (default in /auth/confirm when type=recovery).
+ * All other types redirect to /dashboard.
  */
 function buildConfirmationUrl(
   siteUrl: string,
@@ -33,13 +34,6 @@ function buildConfirmationUrl(
 ) {
   const base = siteUrl.replace(/\/$/, "")
 
-  if (type === "recovery") {
-    // Server route verifies OTP, sets session cookie, redirects to /reset-password
-    // This avoids client-side race conditions with the Supabase browser client
-    return `${base}/api/auth/verify-recovery?token_hash=${tokenHash}&type=recovery`
-  }
-
-  // All other types go through the general confirm page
   let url = `${base}/auth/confirm?token_hash=${tokenHash}&type=${type}`
   if (redirectTo) url += `&next=${encodeURIComponent(redirectTo)}`
   return url
