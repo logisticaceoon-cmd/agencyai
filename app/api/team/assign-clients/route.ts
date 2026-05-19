@@ -28,7 +28,13 @@ export async function GET(request: Request) {
     .eq('workspace_id', workspaceId)
     .eq('member_user_id', memberUserId)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // PGRST205 = table not found (DDL pending) — return empty gracefully
+  if (error) {
+    if (error.code === 'PGRST205' || error.message?.includes('not found')) {
+      return NextResponse.json({ data: [], _tableReady: false })
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
   return NextResponse.json({ data: data || [] })
 }
 
@@ -63,11 +69,18 @@ export async function POST(request: Request) {
   }
 
   // Eliminar asignaciones anteriores del miembro en este workspace
-  await supabase
+  const { error: delError } = await supabase
     .from('member_client_assignments')
     .delete()
     .eq('workspace_id', workspaceId)
     .eq('member_user_id', member_user_id)
+
+  if (delError && (delError.code === 'PGRST205' || delError.message?.includes('not found'))) {
+    return NextResponse.json({
+      error: 'Tabla member_client_assignments no existe. Ejecutar el SQL de setup en Supabase Dashboard.',
+      _tableReady: false,
+    }, { status: 503 })
+  }
 
   // Insertar nuevas asignaciones
   if (client_ids.length > 0) {
