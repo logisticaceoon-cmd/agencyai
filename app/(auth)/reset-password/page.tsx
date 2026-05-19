@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import type { Session, AuthChangeEvent } from '@supabase/supabase-js'
 import { Zap, Eye, EyeOff, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 
 // ─── Inner component (needs useSearchParams) ─────────────────────
@@ -37,13 +38,13 @@ function ResetContent() {
     // Session should already be established by /api/auth/verify-recovery (server route)
     // Just confirm the session exists
     const supabase = createClient()
-    supabase.auth.getSession().then((result: { data: { session: { user: unknown } | null } }) => {
-      const session = result.data.session
+    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
+      const session = data.session
       if (session) {
         setPhase('form')
       } else {
         // Listen for PASSWORD_RECOVERY event (fallback for direct Supabase hash-based flow)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
           if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
             setPhase('form')
             subscription.unsubscribe()
