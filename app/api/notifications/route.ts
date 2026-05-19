@@ -43,7 +43,7 @@ export async function GET() {
       .from('notifications')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
       .limit(20)
 
     if (notifError) {
