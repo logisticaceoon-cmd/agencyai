@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       .from('objectives')
       .select('*, key_results(*)')
       .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (quarter) query = query.eq('quarter', quarter)
     if (year) query = query.eq('year', parseInt(year))
