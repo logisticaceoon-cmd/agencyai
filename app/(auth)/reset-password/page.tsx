@@ -35,35 +35,37 @@ function ResetContent() {
       return
     }
 
-    // Session should already be established by /api/auth/verify-recovery (server route)
-    // Just confirm the session exists
     const supabase = createClient()
-    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
-      const session = data.session
-      if (session) {
+
+    // The verify-recovery server route redirects here with #access_token=...&type=recovery
+    // Supabase's createBrowserClient automatically detects the hash and fires PASSWORD_RECOVERY
+    // Also handles existing session (e.g. if user is already authenticated)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
         setPhase('form')
-      } else {
-        // Listen for PASSWORD_RECOVERY event (fallback for direct Supabase hash-based flow)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
-          if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
-            setPhase('form')
-            subscription.unsubscribe()
-          }
-        })
-
-        // Timeout fallback
-        const timeout = setTimeout(() => {
-          subscription.unsubscribe()
-          setErrorMsg('Sesión no encontrada. Usá el link del email o solicitá uno nuevo.')
-          setPhase('error')
-        }, 5000)
-
-        return () => {
-          clearTimeout(timeout)
-          subscription.unsubscribe()
-        }
+        subscription.unsubscribe()
       }
     })
+
+    // Also check if there's already a valid session (e.g. second visit)
+    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
+      if (data.session) {
+        setPhase('form')
+        subscription.unsubscribe()
+      }
+    })
+
+    // Timeout fallback
+    const timeout = setTimeout(() => {
+      subscription.unsubscribe()
+      setErrorMsg('Sesión no encontrada. Usá el link del email o solicitá uno nuevo.')
+      setPhase('error')
+    }, 6000)
+
+    return () => {
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, [searchParams])
 
   // ── Update password ──────────────────────────────────────────────
