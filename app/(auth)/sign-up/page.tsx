@@ -65,14 +65,24 @@ function SignUpInner() {
           data: {
             full_name: data.fullName,
           },
+          // Si viene de invitación, confirmar email redirige de vuelta a la página del invite
+          emailRedirectTo: inviteToken
+            ? `${window.location.origin}/invite/${inviteToken}`
+            : `${window.location.origin}/onboarding`,
         },
       })
       if (error) {
         toast({ title: 'Error al crear cuenta', description: error.message, variant: 'destructive' })
         return
       }
-      toast({ title: 'Cuenta creada', description: inviteToken ? 'Aceptando invitacion...' : 'Redirigiendo al onboarding...' })
-      // Si vino con invitación, ir a aceptarla; si no, al onboarding
+      toast({
+        title: 'Cuenta creada',
+        description: inviteToken
+          ? 'Revisá tu email para confirmar tu cuenta. El link de confirmación te traerá de vuelta a la invitación.'
+          : 'Revisá tu email para confirmar tu cuenta.',
+      })
+      // Si vino con invitación, redirigir a la página del invite (por si Supabase no requiere confirmación)
+      // Si requiere confirmación, el emailRedirectTo llevará de vuelta al invite luego de confirmar
       router.push(inviteToken ? `/invite/${inviteToken}` : '/onboarding')
       router.refresh()
     } catch {
