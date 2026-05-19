@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -17,11 +17,30 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>
 type View = 'login' | 'forgot' | 'forgot-sent'
 
-export default function SignInPage() {
+function SignInInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteToken = searchParams.get('invite')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [inviteInfo, setInviteInfo] = useState<{ workspaceName: string; role: string } | null>(null)
+
+  // Si hay token de invitación, cargar info del workspace
+  useEffect(() => {
+    if (!inviteToken) return
+    fetch(`/api/invitations/${inviteToken}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.data) {
+          setInviteInfo({
+            workspaceName: d.data.workspaces?.name || 'un workspace',
+            role: d.data.role || 'member',
+          })
+        }
+      })
+      .catch(() => {})
+  }, [inviteToken])
 
   // Forgot password state
   const [view, setView] = useState<View>('login')
@@ -50,7 +69,8 @@ export default function SignInPage() {
         toast({ title: 'Error al iniciar sesión', description: error.message, variant: 'destructive' })
         return
       }
-      router.push('/dashboard')
+      // Si vino con invitación, volver a aceptarla; si no, al dashboard
+      router.push(inviteToken ? `/invite/${inviteToken}` : '/dashboard')
       router.refresh()
     } catch {
       toast({ title: 'Error inesperado', variant: 'destructive' })
@@ -88,14 +108,6 @@ export default function SignInPage() {
     setForgotLoading(true)
     setForgotError('')
     try {
-      // Verificar si el email está registrado antes de enviar
-      const checkRes = await fetch(`/api/auth/check-email?email=${encodeURIComponent(targetEmail)}`)
-      const checkData = await checkRes.json()
-      if (!checkData.exists) {
-        setForgotError('Este email no está registrado. Verificá que sea el correcto.')
-        return
-      }
-
       const supabase = createClient()
       const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
         redirectTo: `${window.location.origin}/reset-password`,
@@ -249,6 +261,14 @@ export default function SignInPage() {
 
         {/* Card */}
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          {inviteInfo ? (
+            <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 mb-5">
+              <p className="text-sm font-semibold text-blue-900">Tenés una invitación pendiente</p>
+              <p className="text-sm text-blue-700 mt-0.5">
+                Iniciá sesión para unirte a <strong>{inviteInfo.workspaceName}</strong> como <strong>{inviteInfo.role}</strong>
+              </p>
+            </div>
+          ) : null}
           <h2 className="text-xl font-semibold text-slate-900 mb-1">Iniciar sesión</h2>
           <p className="text-sm text-slate-500 mb-6">Ingresá a tu cuenta para continuar</p>
 
@@ -334,12 +354,27 @@ export default function SignInPage() {
 
           <p className="mt-5 text-center text-sm text-slate-500">
             ¿No tienes cuenta?{' '}
-            <Link href="/sign-up" className="font-medium text-blue-600 hover:text-blue-700 transition-colors">
+            <Link
+              href={inviteToken ? `/sign-up?invite=${inviteToken}` : '/sign-up'}
+              className="font-medium text-blue-600 hover:text-blue-700 transition-colors"
+            >
               Crear cuenta gratis
             </Link>
           </p>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[var(--bg-subtle)] flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+      </div>
+    }>
+      <SignInInner />
+    </Suspense>
   )
 }
