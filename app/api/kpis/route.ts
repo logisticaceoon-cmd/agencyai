@@ -18,7 +18,7 @@ export async function GET(request: Request) {
       .from('kpis')
       .select('*, kpi_records(*)')
       .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (clientId) query = query.eq('client_id', clientId)
 
