@@ -1,61 +1,43 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 
 /**
  * GET /api/auth/verify-recovery?token_hash=...&type=recovery
  *
- * Server-side token verification for password recovery.
- * Verifies the OTP, sets the session cookie, then redirects to /reset-password.
- * This avoids client-side race conditions with createBrowserClient intercepting
- * the token_hash URL parameter before the page useEffect can process it.
+ * Server-side OTP verification for password recovery.
+ * Uses the server Supabase client (cookie-based session).
+ * On success: redirects to /reset-password (session already in cookies).
+ * On failure: redirects to /sign-in?error=link_expired
  */
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
-  const tokenHash = searchParams.get('token_hash')
-  const type = searchParams.get('type')
+  try {
+    const { searchParams, origin } = new URL(request.url)
+    const tokenHash = searchParams.get('token_hash')
+    const type = searchParams.get('type')
 
-  // Validate params
-  if (!tokenHash || type !== 'recovery') {
+    // Validate required params
+    if (!tokenHash || type !== 'recovery') {
+      return NextResponse.redirect(`${origin}/sign-in?error=invalid_link`)
+    }
+
+    // Verify OTP using server-side client (sets session cookie automatically)
+    const supabase = await createClient()
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: 'recovery',
+    })
+
+    if (error) {
+      console.error('[verify-recovery] verifyOtp error:', error.message)
+      return NextResponse.redirect(`${origin}/sign-in?error=link_expired`)
+    }
+
+    // Session established in cookies — send to reset password page
+    return NextResponse.redirect(`${origin}/reset-password`)
+
+  } catch (err) {
+    console.error('[verify-recovery] Unexpected error:', err)
+    const { origin } = new URL(request.url)
     return NextResponse.redirect(`${origin}/sign-in?error=invalid_link`)
   }
-
-  // Verify OTP server-side and set session cookie
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
-          } catch {
-            // Cookies can only be set in Server Actions / Route Handlers — this is fine
-          }
-        },
-      },
-    }
-  )
-
-  const { error } = await supabase.auth.verifyOtp({
-    token_hash: tokenHash,
-    type: 'recovery',
-  })
-
-  if (error) {
-    console.error('verifyOtp error:', error.message)
-    // Token expired or already used — redirect to sign-in with error param
-    return NextResponse.redirect(
-      `${origin}/sign-in?error=link_expired`
-    )
-  }
-
-  // Session established in cookies — redirect to the password reset page
-  return NextResponse.redirect(`${origin}/reset-password`)
 }
