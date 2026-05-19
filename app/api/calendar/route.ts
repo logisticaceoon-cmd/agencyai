@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 
       supabase
         .from('project_milestones')
-        .select('id, title, deadline, completed, description, projectId')
+        .select('id, title, deadline, completed, description, project_id')
         .eq('workspace_id', workspaceId)
         .gte('deadline', startDate)
         .lte('deadline', endDate)
