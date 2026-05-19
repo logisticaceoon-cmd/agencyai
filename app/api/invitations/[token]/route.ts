@@ -116,7 +116,7 @@ async function autoSetupMemberAccess(
 
     // Para cada cliente asignado, crear proyecto de gestión si no existe
     for (const assignment of assignments) {
-      const client = assignment.clients as { id: string; name: string } | null
+      const client = (assignment.clients as unknown) as { id: string; name: string } | null
       if (!client) continue
 
       // Verificar si ya existe un proyecto de gestión para este cliente y miembro
