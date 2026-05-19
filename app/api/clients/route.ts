@@ -16,10 +16,17 @@ export async function GET(request: Request) {
     const appRole = normalizeRole(role)
     const scope = getDataScope('clients', appRole)
 
-    // Para trafficker/viewer: solo los clientes donde tienen proyectos o tareas asignadas
+    // Para trafficker/viewer: solo los clientes asignados directamente
     let clientIds: string[] | null = null
     if (scope === 'assigned') {
-      // Obtener IDs de proyectos asignados
+      // 1. Asignaciones directas (member_client_assignments — fuente principal)
+      const { data: directAssignments } = await supabase
+        .from('member_client_assignments')
+        .select('client_id')
+        .eq('workspace_id', workspaceId)
+        .eq('member_user_id', userId)
+
+      // 2. Proyectos donde son owner (respaldo / proyectos creados por ellos)
       const { data: myProjects } = await supabase
         .from('projects')
         .select('clientId')
@@ -27,7 +34,7 @@ export async function GET(request: Request) {
         .eq('owner_id', userId)
         .not('clientId', 'is', null)
 
-      // Obtener IDs de clientes de tareas asignadas
+      // 3. Tareas asignadas con clientId
       const { data: myTasks } = await supabase
         .from('tasks')
         .select('clientId')
@@ -35,9 +42,10 @@ export async function GET(request: Request) {
         .contains('assignedTo', [userId])
         .not('clientId', 'is', null)
 
+      const fromDirect = (directAssignments || []).map((a: { client_id: string }) => a.client_id).filter(Boolean)
       const fromProjects = (myProjects || []).map((p: { clientId: string }) => p.clientId).filter(Boolean)
       const fromTasks = (myTasks || []).map((t: { clientId: string }) => t.clientId).filter(Boolean)
-      clientIds = [...new Set([...fromProjects, ...fromTasks])]
+      clientIds = [...new Set([...fromDirect, ...fromProjects, ...fromTasks])]
     }
 
     let query = supabase
