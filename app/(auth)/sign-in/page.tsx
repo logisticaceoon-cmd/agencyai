@@ -88,6 +88,14 @@ export default function SignInPage() {
     setForgotLoading(true)
     setForgotError('')
     try {
+      // Verificar si el email está registrado antes de enviar
+      const checkRes = await fetch(`/api/auth/check-email?email=${encodeURIComponent(targetEmail)}`)
+      const checkData = await checkRes.json()
+      if (!checkData.exists) {
+        setForgotError('Este email no está registrado. Verificá que sea el correcto.')
+        return
+      }
+
       const supabase = createClient()
       const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
         redirectTo: `${window.location.origin}/reset-password`,
