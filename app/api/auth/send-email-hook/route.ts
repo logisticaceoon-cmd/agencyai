@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 
-function verifySecret(request: Request): boolean {
+function verifySecret(request: Request): { ok: boolean; received: string; expected: string } {
   const authHeader = request.headers.get("authorization") || ""
   const secret = process.env.SUPABASE_AUTH_HOOK_SECRET || ""
-  return authHeader === `Bearer ${secret}`
+  const expected = `Bearer ${secret}`
+  return {
+    ok: authHeader === expected,
+    received: authHeader.substring(0, 20) + (authHeader.length > 20 ? "..." : ""),
+    expected: expected.substring(0, 20) + (expected.length > 20 ? "..." : ""),
+  }
 }
 
 function getTransporter() {
@@ -17,15 +22,6 @@ function getTransporter() {
   })
 }
 
-/**
- * Builds the confirmation URL for each email type.
- *
- * All types go through /auth/confirm which calls verifyOtp client-side,
- * establishes the session in the browser, then redirects to the next page.
- *
- * Recovery emails redirect to /reset-password (default in /auth/confirm when type=recovery).
- * All other types redirect to /dashboard.
- */
 function buildConfirmationUrl(
   siteUrl: string,
   tokenHash: string,
@@ -33,7 +29,6 @@ function buildConfirmationUrl(
   redirectTo?: string
 ) {
   const base = siteUrl.replace(/\/$/, "")
-
   let url = `${base}/auth/confirm?token_hash=${tokenHash}&type=${type}`
   if (redirectTo) url += `&next=${encodeURIComponent(redirectTo)}`
   return url
@@ -55,7 +50,6 @@ function getEmailContent(type: string, confirmationUrl: string, userEmail: strin
 
   const subject = subjects[type] || subjects["signup"]
   const btnLabel = labels[type] || labels["signup"]
-
   const intro =
     type === "recovery"
       ? `Recibimos una solicitud para restablecer la contraseña de <strong>${userEmail}</strong>.<br>Hacé click en el botón para crear una nueva contraseña.`
@@ -67,24 +61,19 @@ function getEmailContent(type: string, confirmationUrl: string, userEmail: strin
     <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
     <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">
       <div style="max-width:600px;margin:40px auto;padding:0 20px;">
-        <!-- Header -->
         <div style="background:#2563eb;border-radius:16px 16px 0 0;padding:32px 40px;text-align:center;">
           <h1 style="color:white;margin:0;font-size:24px;font-weight:700;">⚡ AgencyAI</h1>
         </div>
-        <!-- Body -->
         <div style="background:white;padding:40px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 16px 16px;">
           <h2 style="color:#1e293b;margin:0 0 16px;font-size:20px;">${subject}</h2>
           <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 32px;">${intro}</p>
-
           <div style="text-align:center;margin:0 0 32px;">
             <a href="${confirmationUrl}"
                style="background:#2563eb;color:white;padding:14px 40px;border-radius:10px;
-                      text-decoration:none;font-size:16px;font-weight:600;display:inline-block;
-                      letter-spacing:0.01em;">
+                      text-decoration:none;font-size:16px;font-weight:600;display:inline-block;">
               ${btnLabel}
             </a>
           </div>
-
           <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;">
             Este enlace expira en <strong>24 horas</strong>. Si no solicitaste esto, ignorá este email.
           </p>
@@ -92,7 +81,6 @@ function getEmailContent(type: string, confirmationUrl: string, userEmail: strin
             Si el botón no funciona, copiá este link: ${confirmationUrl}
           </p>
         </div>
-        <!-- Footer -->
         <p style="text-align:center;color:#94a3b8;font-size:11px;margin:20px 0;">
           AgencyAI — Sistema de gestión para agencias de marketing
         </p>
@@ -105,7 +93,9 @@ function getEmailContent(type: string, confirmationUrl: string, userEmail: strin
 
 export async function POST(request: Request) {
   try {
-    if (!verifySecret(request)) {
+    const auth = verifySecret(request)
+    if (!auth.ok) {
+      console.error(`[send-email-hook] 401 — header mismatch. received="${auth.received}" expected="${auth.expected}" secret_set=${!!process.env.SUPABASE_AUTH_HOOK_SECRET}`)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -131,9 +121,10 @@ export async function POST(request: Request) {
       html,
     })
 
+    console.log(`[send-email-hook] Email sent OK — type=${actionType} to=${user.email}`)
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Auth hook email error:", error)
+    console.error("[send-email-hook] Error:", error)
     return NextResponse.json({ error: "Error enviando email" }, { status: 500 })
   }
 }
