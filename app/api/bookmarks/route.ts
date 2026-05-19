@@ -12,7 +12,7 @@ export async function GET() {
       .select('*, clients(id, name), projects(id, name)')
       .eq('workspace_id', workspaceId)
       .order('pinned', { ascending: false })
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (error) {
       const { data: fallback } = await supabase
@@ -20,7 +20,7 @@ export async function GET() {
         .select('*')
         .eq('workspace_id', workspaceId)
         .order('pinned', { ascending: false })
-        .order('created_at', { ascending: false })
+        .order('createdAt', { ascending: false })
       return NextResponse.json({ data: fallback || [] })
     }
 
