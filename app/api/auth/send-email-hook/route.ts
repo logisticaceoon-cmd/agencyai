@@ -1,15 +1,73 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
+import { createHmac, timingSafeEqual } from "crypto"
 
-function verifySecret(request: Request): { ok: boolean; received: string; expected: string } {
-  const authHeader = request.headers.get("authorization") || ""
+/**
+ * Verifica la firma Standard Webhooks que envía Supabase.
+ * Formato del secret: v1,whsec_<base64>
+ * Headers esperados: webhook-id, webhook-timestamp, webhook-signature
+ */
+async function verifyWebhookSignature(request: Request): Promise<boolean> {
   const secret = process.env.SUPABASE_AUTH_HOOK_SECRET || ""
-  const expected = `Bearer ${secret}`
-  return {
-    ok: authHeader === expected,
-    received: authHeader.substring(0, 20) + (authHeader.length > 20 ? "..." : ""),
-    expected: expected.substring(0, 20) + (expected.length > 20 ? "..." : ""),
+  if (!secret) {
+    console.error("[send-email-hook] SUPABASE_AUTH_HOOK_SECRET no está configurado")
+    return false
   }
+
+  const webhookId = request.headers.get("webhook-id") || ""
+  const webhookTimestamp = request.headers.get("webhook-timestamp") || ""
+  const webhookSignature = request.headers.get("webhook-signature") || ""
+
+  // Si no hay headers de Standard Webhooks, intentar fallback con Authorization: Bearer
+  if (!webhookId && !webhookTimestamp && !webhookSignature) {
+    const authHeader = request.headers.get("authorization") || ""
+    const bareSecret = secret.replace("v1,whsec_", "")
+    return authHeader === `Bearer ${bareSecret}` || authHeader === `Bearer ${secret}`
+  }
+
+  if (!webhookId || !webhookTimestamp || !webhookSignature) {
+    console.error("[send-email-hook] Faltan headers Standard Webhooks")
+    return false
+  }
+
+  // Validar timestamp (tolerancia de 5 minutos)
+  const now = Math.floor(Date.now() / 1000)
+  const ts = parseInt(webhookTimestamp, 10)
+  if (Math.abs(now - ts) > 300) {
+    console.error("[send-email-hook] Timestamp fuera de rango:", ts, "now:", now)
+    return false
+  }
+
+  // Extraer bytes del secret (base64 decode del whsec_...)
+  const secretBase64 = secret.replace(/^v1,whsec_/, "")
+  const secretBytes = Buffer.from(secretBase64, "base64")
+
+  // Leer body como texto para calcular la firma
+  const body = await request.clone().text()
+  const signedPayload = `${webhookId}.${webhookTimestamp}.${body}`
+
+  // Calcular HMAC-SHA256
+  const expectedSig = createHmac("sha256", secretBytes)
+    .update(signedPayload)
+    .digest("base64")
+
+  // webhook-signature puede tener múltiples firmas: "v1,sig1 v1,sig2"
+  const signatures = webhookSignature.split(" ")
+  for (const sig of signatures) {
+    const sigValue = sig.replace(/^v1,/, "")
+    try {
+      const sigBuf = Buffer.from(sigValue, "base64")
+      const expBuf = Buffer.from(expectedSig, "base64")
+      if (sigBuf.length === expBuf.length && timingSafeEqual(sigBuf, expBuf)) {
+        return true
+      }
+    } catch {
+      continue
+    }
+  }
+
+  console.error("[send-email-hook] Firma inválida. expected:", expectedSig, "received:", webhookSignature)
+  return false
 }
 
 function getTransporter() {
@@ -93,9 +151,8 @@ function getEmailContent(type: string, confirmationUrl: string, userEmail: strin
 
 export async function POST(request: Request) {
   try {
-    const auth = verifySecret(request)
-    if (!auth.ok) {
-      console.error(`[send-email-hook] 401 — header mismatch. received="${auth.received}" expected="${auth.expected}" secret_set=${!!process.env.SUPABASE_AUTH_HOOK_SECRET}`)
+    const isValid = await verifyWebhookSignature(request)
+    if (!isValid) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -121,7 +178,7 @@ export async function POST(request: Request) {
       html,
     })
 
-    console.log(`[send-email-hook] Email sent OK — type=${actionType} to=${user.email}`)
+    console.log(`[send-email-hook] OK — type=${actionType} to=${user.email}`)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("[send-email-hook] Error:", error)
