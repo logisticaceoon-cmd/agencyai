@@ -37,7 +37,8 @@ function ResetContent() {
     // Session should already be established by /api/auth/verify-recovery (server route)
     // Just confirm the session exists
     const supabase = createClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then((result: { data: { session: { user: unknown } | null } }) => {
+      const session = result.data.session
       if (session) {
         setPhase('form')
       } else {
