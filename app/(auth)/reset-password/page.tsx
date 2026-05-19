@@ -22,7 +22,7 @@ function ResetContent() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    // Handle error params passed from /auth/confirm on failure
+    // Check for error param (from verify-recovery route when token is invalid)
     const errorParam = searchParams.get('error')
     if (errorParam === 'link_expired') {
       setErrorMsg('Este link expiró o ya fue utilizado. Solicitá uno nuevo.')
@@ -38,39 +38,39 @@ function ResetContent() {
     const supabase = createClient()
     let resolved = false
 
-    // Listen for PASSWORD_RECOVERY or SIGNED_IN events
-    // (fired by /auth/confirm after calling verifyOtp client-side)
+    function resolve(phase: 'form') {
+      if (resolved) return
+      resolved = true
+      clearTimeout(timeout)
+      setPhase(phase)
+      subscription?.unsubscribe()
+    }
+
+    // Detectar sesión de recovery via eventos de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-      if (resolved) return
       if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
-        resolved = true
-        setPhase('form')
-        subscription.unsubscribe()
+        resolve('form')
       }
     })
 
-    // Also check for an existing session (e.g. user arrived from /auth/confirm which
-    // already called verifyOtp and established the session)
+    // También verificar si ya hay sesión activa (llegó de /auth/confirm)
     supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
-      if (resolved) return
-      if (data.session) {
-        resolved = true
-        setPhase('form')
-        subscription.unsubscribe()
-      }
+      if (data.session) resolve('form')
     })
 
-    // 10 second timeout — enough time for /auth/confirm's 1200ms redirect + session propagation
+    // Timeout — 12s para darle tiempo al redirect de /auth/confirm
     const timeout = setTimeout(() => {
-      if (resolved) return
-      subscription.unsubscribe()
-      setErrorMsg('Sesión no encontrada. Usá el link del email o solicitá uno nuevo.')
-      setPhase('error')
-    }, 10000)
+      if (!resolved) {
+        resolved = true
+        subscription?.unsubscribe()
+        setErrorMsg('Sesión no encontrada. Usá el link del email o solicitá uno nuevo.')
+        setPhase('error')
+      }
+    }, 12000)
 
     return () => {
       clearTimeout(timeout)
-      subscription.unsubscribe()
+      subscription?.unsubscribe()
     }
   }, [searchParams])
 
