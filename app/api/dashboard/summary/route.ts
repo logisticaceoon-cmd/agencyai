@@ -23,7 +23,7 @@ export async function GET() {
       supabase.from('clients').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).eq('status', 'active'),
       supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).neq('status', 'rejected'),
       supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).eq('status', 'completed'),
-      supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).in('status', ['pending', 'in_progress']).lt('due_date', now),
+      supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).in('status', ['pending', 'in_progress']).lt('deadline', now),
       supabase.from('reports').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
       supabase.from('reports').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).in('status', ['validated', 'rejected']),
       supabase.from('reports').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('status', 'pending'),
