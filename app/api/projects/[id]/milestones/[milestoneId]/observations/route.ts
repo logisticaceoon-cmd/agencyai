@@ -15,7 +15,7 @@ export async function GET(
       .from('milestone_observations')
       .select('*')
       .eq('milestone_id', milestoneId)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (error) {
       console.error('Error fetching observations:', error)
