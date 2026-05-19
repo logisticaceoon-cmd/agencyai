@@ -69,7 +69,7 @@ export async function POST(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId, role } = auth
+    const { supabase, workspaceId, userId, role } = auth
 
     const appRole = normalizeRole(role)
     if (appRole === 'viewer') {
@@ -90,7 +90,8 @@ export async function POST(request: Request) {
         startDate: body.startDate || null,
         endDate: body.endDate || null,
         budget: body.budget || null,
-        owner_id: body.ownerId || null,
+        // owner_id: siempre el creador actual (si no se especifica otro)
+        owner_id: body.ownerId || userId,
       })
       .select()
       .single()
