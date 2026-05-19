@@ -12,7 +12,7 @@ export async function GET() {
       .select('*')
       .eq('workspace_id', workspaceId)
       .limit(200)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (error) {
       console.error('Error fetching audits:', error)
