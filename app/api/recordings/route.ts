@@ -11,7 +11,7 @@ export async function GET() {
       .from('recordings')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (error) {
       console.error('Error fetching recordings:', error)
