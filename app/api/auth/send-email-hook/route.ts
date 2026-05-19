@@ -53,17 +53,27 @@ function getTransporter() {
 }
 
 /**
- * Todas las acciones pasan por /auth/confirm que verifica el OTP
- * y redirige al destino correcto (recovery → /reset-password, etc.)
+ * Todas las acciones pasan por /auth/confirm de NUESTRA app (no Supabase).
+ * Ignoramos site_url del payload — Supabase lo manda como su propio dominio.
  */
 function buildConfirmationUrl(
-  siteUrl: string,
+  _siteUrl: string,
   tokenHash: string,
   type: string,
   redirectTo?: string
 ) {
-  const base = siteUrl.replace(/\/$/, "")
-  let url = `${base}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(type)}`
+  // Siempre usar la URL de producción del app, nunca la de Supabase
+  const APP_URL = "https://agencyai-iota.vercel.app"
+
+  if (type === "recovery") {
+    // Recovery siempre termina en /reset-password
+    const next = redirectTo?.includes("/reset-password")
+      ? redirectTo
+      : `${APP_URL}/reset-password`
+    return `${APP_URL}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=recovery&next=${encodeURIComponent(next)}`
+  }
+
+  let url = `${APP_URL}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(type)}`
   if (redirectTo) url += `&next=${encodeURIComponent(redirectTo)}`
   return url
 }
