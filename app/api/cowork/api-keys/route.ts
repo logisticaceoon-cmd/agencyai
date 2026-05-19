@@ -21,7 +21,7 @@ export async function GET() {
       .select('id, name, description, status, last_used_at, created_at')
       .eq('organization_id', workspaceId)
       .eq('status', 'active')
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (error) {
       console.error('Error fetching API keys:', error)
