@@ -14,7 +14,7 @@ export async function GET() {
       .eq('workspace_id', workspaceId)
       .eq('is_active', true)
       .order('is_system', { ascending: false })
-      .order('created_at', { ascending: true })
+      .order('createdAt', { ascending: true })
 
     if (error) {
       // Table might not exist yet — return defaults
