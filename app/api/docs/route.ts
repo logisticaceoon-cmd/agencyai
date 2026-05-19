@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       .from('docs')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .order('updated_at', { ascending: false })
+      .order('updatedAt', { ascending: false })
       .limit(100)
 
     if (category) query = query.eq('category', category)
