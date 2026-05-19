@@ -20,32 +20,51 @@ function ResetContent() {
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
 
-  // ── Step 1: verify the token from the email link ────────────────
   useEffect(() => {
-    const tokenHash = searchParams.get('token_hash')
-    const type = searchParams.get('type')
-
-    if (!tokenHash || type !== 'recovery') {
-      setErrorMsg('Link inválido. Asegurate de usar el botón del email de recuperación.')
+    // Check for error param (from verify-recovery route when token is invalid)
+    const errorParam = searchParams.get('error')
+    if (errorParam === 'link_expired') {
+      setErrorMsg('Este link expiró o ya fue utilizado. Solicitá uno nuevo.')
+      setPhase('error')
+      return
+    }
+    if (errorParam === 'invalid_link') {
+      setErrorMsg('Link inválido. Usá el botón del email de recuperación.')
       setPhase('error')
       return
     }
 
+    // Session should already be established by /api/auth/verify-recovery (server route)
+    // Just confirm the session exists
     const supabase = createClient()
-    supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' })
-      .then((result: { error: { message: string } | null }) => {
-        const error = result.error
-        if (error) {
-          setErrorMsg('Este link expiró o ya fue utilizado. Solicitá uno nuevo.')
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setPhase('form')
+      } else {
+        // Listen for PASSWORD_RECOVERY event (fallback for direct Supabase hash-based flow)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+          if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
+            setPhase('form')
+            subscription.unsubscribe()
+          }
+        })
+
+        // Timeout fallback
+        const timeout = setTimeout(() => {
+          subscription.unsubscribe()
+          setErrorMsg('Sesión no encontrada. Usá el link del email o solicitá uno nuevo.')
           setPhase('error')
-        } else {
-          // Session is now established — show the form
-          setPhase('form')
+        }, 5000)
+
+        return () => {
+          clearTimeout(timeout)
+          subscription.unsubscribe()
         }
-      })
+      }
+    })
   }, [searchParams])
 
-  // ── Step 2: update the password ─────────────────────────────────
+  // ── Update password ──────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setFormError('')
@@ -115,11 +134,6 @@ function ResetContent() {
               </a>
               <a
                 href="/sign-in"
-                onClick={(e) => {
-                  e.preventDefault()
-                  // Trigger forgot view in sign-in page via state — just go to sign-in
-                  router.push('/sign-in')
-                }}
                 className="inline-block w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors text-center"
               >
                 Solicitar nuevo link
@@ -157,7 +171,6 @@ function ResetContent() {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  {/* Strength hint */}
                   {password.length > 0 && (
                     <p className={`mt-1 text-xs ${password.length >= 8 ? 'text-green-600' : 'text-amber-600'}`}>
                       {password.length >= 8 ? '✓ Contraseña válida' : `${8 - password.length} caracteres más`}
@@ -194,14 +207,12 @@ function ResetContent() {
                   )}
                 </div>
 
-                {/* Error */}
                 {formError && (
                   <div className="rounded-lg bg-red-50 border border-red-100 px-3 py-2.5">
                     <p className="text-sm text-red-600">{formError}</p>
                   </div>
                 )}
 
-                {/* Submit */}
                 <button
                   type="submit"
                   disabled={saving}
@@ -226,9 +237,6 @@ function ResetContent() {
               <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
               <h2 className="text-xl font-semibold text-slate-900 mb-2">¡Contraseña actualizada!</h2>
               <p className="text-sm text-slate-500">Ingresando al dashboard...</p>
-              <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-1 bg-blue-600 rounded-full animate-[progress_2.5s_linear_forwards]" style={{ width: '0%', animation: 'none' }} />
-              </div>
             </div>
           )}
 
