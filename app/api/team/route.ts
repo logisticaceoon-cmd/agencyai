@@ -93,7 +93,7 @@ export async function GET() {
     .from('workspace_members')
     .select('*')
     .eq('workspace_id', workspaceId)
-    .order('createdAt', { ascending: true })
+    .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -105,7 +105,7 @@ export async function GET() {
     .eq('workspace_id', workspaceId)
     .is('accepted_at', null)
     .gte('expires_at', new Date().toISOString())
-    .order('createdAt', { ascending: false })
+    .order('created_at', { ascending: false })
 
   return NextResponse.json({ data, pendingInvites: pendingInvites || [] })
 }
@@ -197,6 +197,26 @@ export async function POST(request: Request) {
       const { data: ws } = await adminClient.from('workspaces').select('name').eq('id', workspaceId).single()
       const { data: inviter } = await supabase.from('workspace_members').select('name').eq('workspace_id', workspaceId).eq('user_id', userId).single()
 
+      // Asegurar que el miembro existe en workspace_members como 'invited'
+      const { data: existingMemberInvited } = await adminClient
+        .from('workspace_members')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('email', email)
+        .eq('status', 'invited')
+        .single()
+
+      if (!existingMemberInvited) {
+        await adminClient.from('workspace_members').insert({
+          workspace_id: workspaceId,
+          email,
+          name: name || email.split('@')[0],
+          role: invitedRole,
+          status: 'invited',
+          user_id: `invited_${existingInvite.token}`,
+        })
+      }
+
       await sendInviteEmail({
         to: email,
         inviterName: inviter?.name || 'El equipo',
@@ -235,15 +255,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: inviteError.message }, { status: 500 })
     }
 
-    // También registrar en workspace_members con status 'invited' para mostrar en lista
-    await adminClient.from('workspace_members').upsert({
+    // Registrar en workspace_members con status 'invited' para mostrar en lista
+    // Intentar INSERT — si ya existe con ese email, ignorar el error de duplicado
+    const { error: memberError } = await adminClient.from('workspace_members').insert({
       workspace_id: workspaceId,
       email,
       name: name || email.split('@')[0],
       role: invitedRole,
       status: 'invited',
       user_id: `invited_${token}`,
-    }, { onConflict: 'workspace_id,email' }).select().single()
+    })
+    if (memberError && !memberError.message?.includes('duplicate') && !memberError.code?.includes('23505')) {
+      console.warn('[team/invite] workspace_members insert warn:', memberError.message)
+    }
 
     // Obtener datos para el email
     const { data: ws } = await adminClient.from('workspaces').select('name').eq('id', workspaceId).single()
