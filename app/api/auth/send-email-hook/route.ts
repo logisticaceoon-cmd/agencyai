@@ -17,8 +17,28 @@ function getTransporter() {
   })
 }
 
-function buildConfirmationUrl(siteUrl: string, tokenHash: string, type: string, redirectTo?: string) {
+/**
+ * Builds the confirmation URL for each email type.
+ *
+ * Recovery emails go DIRECTLY to /reset-password so the page can verify
+ * the OTP itself and show the form immediately — no intermediate /auth/confirm.
+ *
+ * All other types (signup, invite, magiclink) go through /auth/confirm.
+ */
+function buildConfirmationUrl(
+  siteUrl: string,
+  tokenHash: string,
+  type: string,
+  redirectTo?: string
+) {
   const base = siteUrl.replace(/\/$/, "")
+
+  if (type === "recovery") {
+    // Direct link → /reset-password handles verifyOtp internally
+    return `${base}/reset-password?token_hash=${tokenHash}&type=recovery`
+  }
+
+  // All other types go through the general confirm page
   let url = `${base}/auth/confirm?token_hash=${tokenHash}&type=${type}`
   if (redirectTo) url += `&next=${encodeURIComponent(redirectTo)}`
   return url
@@ -37,23 +57,54 @@ function getEmailContent(type: string, confirmationUrl: string, userEmail: strin
     invite: "Aceptar invitación",
     magiclink: "Iniciar sesión",
   }
+
   const subject = subjects[type] || subjects["signup"]
   const btnLabel = labels[type] || labels["signup"]
-  const intro = type === "recovery"
-    ? `Recibimos una solicitud para restablecer la contraseña de <strong>${userEmail}</strong>.`
-    : "Hacé click en el botón para continuar."
+
+  const intro =
+    type === "recovery"
+      ? `Recibimos una solicitud para restablecer la contraseña de <strong>${userEmail}</strong>.<br>Hacé click en el botón para crear una nueva contraseña.`
+      : "Hacé click en el botón para continuar."
+
   const html = `
-    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;">
-      <h1 style="color:#2563eb;text-align:center;">⚡ AgencyAI</h1>
-      <h2 style="color:#1e293b;">${subject}</h2>
-      <p style="color:#475569;font-size:16px;line-height:1.6;">${intro}</p>
-      <div style="text-align:center;margin:32px 0;">
-        <a href="${confirmationUrl}" style="background:#2563eb;color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:16px;font-weight:600;display:inline-block;">${btnLabel}</a>
+    <!DOCTYPE html>
+    <html lang="es">
+    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;">
+      <div style="max-width:600px;margin:40px auto;padding:0 20px;">
+        <!-- Header -->
+        <div style="background:#2563eb;border-radius:16px 16px 0 0;padding:32px 40px;text-align:center;">
+          <h1 style="color:white;margin:0;font-size:24px;font-weight:700;">⚡ AgencyAI</h1>
+        </div>
+        <!-- Body -->
+        <div style="background:white;padding:40px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 16px 16px;">
+          <h2 style="color:#1e293b;margin:0 0 16px;font-size:20px;">${subject}</h2>
+          <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 32px;">${intro}</p>
+
+          <div style="text-align:center;margin:0 0 32px;">
+            <a href="${confirmationUrl}"
+               style="background:#2563eb;color:white;padding:14px 40px;border-radius:10px;
+                      text-decoration:none;font-size:16px;font-weight:600;display:inline-block;
+                      letter-spacing:0.01em;">
+              ${btnLabel}
+            </a>
+          </div>
+
+          <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;">
+            Este enlace expira en <strong>24 horas</strong>. Si no solicitaste esto, ignorá este email.
+          </p>
+          <p style="color:#cbd5e1;font-size:12px;margin:0;word-break:break-all;">
+            Si el botón no funciona, copiá este link: ${confirmationUrl}
+          </p>
+        </div>
+        <!-- Footer -->
+        <p style="text-align:center;color:#94a3b8;font-size:11px;margin:20px 0;">
+          AgencyAI — Sistema de gestión para agencias de marketing
+        </p>
       </div>
-      <p style="color:#94a3b8;font-size:13px;">Este enlace expira en 24 horas. Si no solicitaste esto, ignorá este email.</p>
-      <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
-      <p style="color:#94a3b8;font-size:11px;text-align:center;">AgencyAI — Sistema de gestión para agencias de marketing</p>
-    </div>`
+    </body>
+    </html>`
+
   return { subject, html }
 }
 
@@ -62,16 +113,21 @@ export async function POST(request: Request) {
     if (!verifySecret(request)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
     const body = await request.json()
     const { user, email_data } = body
+
     if (!user?.email || !email_data) {
       return NextResponse.json({ error: "Payload inválido" }, { status: 400 })
     }
+
     const { token_hash, email_action_type, site_url, redirect_to } = email_data
     const actionType = email_action_type || "signup"
     const siteUrl = site_url || "https://agencyai-iota.vercel.app"
+
     const confirmationUrl = buildConfirmationUrl(siteUrl, token_hash, actionType, redirect_to)
     const { subject, html } = getEmailContent(actionType, confirmationUrl, user.email)
+
     const transporter = getTransporter()
     await transporter.sendMail({
       from: process.env.EMAIL_FROM || "AgencyAI <logisticaceoon@gmail.com>",
@@ -79,6 +135,7 @@ export async function POST(request: Request) {
       subject,
       html,
     })
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Auth hook email error:", error)
