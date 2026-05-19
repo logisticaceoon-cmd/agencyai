@@ -34,8 +34,9 @@ function buildConfirmationUrl(
   const base = siteUrl.replace(/\/$/, "")
 
   if (type === "recovery") {
-    // Direct link → /reset-password handles verifyOtp internally
-    return `${base}/reset-password?token_hash=${tokenHash}&type=recovery`
+    // Server route verifies OTP, sets session cookie, redirects to /reset-password
+    // This avoids client-side race conditions with the Supabase browser client
+    return `${base}/api/auth/verify-recovery?token_hash=${tokenHash}&type=recovery`
   }
 
   // All other types go through the general confirm page
