@@ -12,7 +12,7 @@ export async function GET() {
       .select('user_id, name, role, status')
       .eq('workspace_id', workspaceId)
       .eq('status', 'active')
-      .order('created_at', { ascending: true })
+      .order('createdAt', { ascending: true })
 
     if (error) {
       console.error('Error fetching users:', error)
