@@ -46,16 +46,38 @@ export async function POST(_: Request, { params }: { params: Promise<{ token: st
       return NextResponse.json({ error: 'This invitation is for a different email address' }, { status: 403 })
     }
 
-    // Add user to workspace
-    await supabase.from('workspace_members').upsert({
-      workspace_id: invitation.workspace_id,
-      user_id: userId,
-      role: invitation.role || 'member',
-      name: email.split('@')[0],
-      status: 'active',
-    }, { onConflict: 'workspace_id,user_id' })
+    // Buscar el entry existente de este email (status: 'invited')
+    const { data: existingMember } = await supabase
+      .from('workspace_members')
+      .select('id')
+      .eq('workspace_id', invitation.workspace_id)
+      .eq('email', email)
+      .single()
 
-    // Mark invitation as accepted
+    if (existingMember) {
+      // Actualizar el entry existente: asignar user_id real y activar
+      await supabase
+        .from('workspace_members')
+        .update({
+          user_id: userId,
+          role: invitation.role || 'trafficker',
+          status: 'active',
+          name: email.split('@')[0],
+        })
+        .eq('id', existingMember.id)
+    } else {
+      // Si no existe (caso raro), insertar nuevo
+      await supabase.from('workspace_members').insert({
+        workspace_id: invitation.workspace_id,
+        user_id: userId,
+        email,
+        role: invitation.role || 'trafficker',
+        name: email.split('@')[0],
+        status: 'active',
+      })
+    }
+
+    // Marcar invitación como aceptada
     await supabase
       .from('workspace_invitations')
       .update({ accepted_at: new Date().toISOString() })
