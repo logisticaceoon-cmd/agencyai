@@ -33,7 +33,8 @@ function ResetContent() {
 
     const supabase = createClient()
     supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' })
-      .then(({ error }) => {
+      .then((result: { error: { message: string } | null }) => {
+        const error = result.error
         if (error) {
           setErrorMsg('Este link expiró o ya fue utilizado. Solicitá uno nuevo.')
           setPhase('error')
