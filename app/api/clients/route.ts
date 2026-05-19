@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
       .limit(200)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (clientIds !== null) {
       if (clientIds.length === 0) return NextResponse.json({ data: [] })
