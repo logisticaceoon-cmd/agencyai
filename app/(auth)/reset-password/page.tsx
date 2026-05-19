@@ -22,7 +22,7 @@ function ResetContent() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    // Check for error param (from verify-recovery route when token is invalid)
+    // Handle error params passed from /auth/confirm on failure
     const errorParam = searchParams.get('error')
     if (errorParam === 'link_expired') {
       setErrorMsg('Este link expiró o ya fue utilizado. Solicitá uno nuevo.')
@@ -36,31 +36,37 @@ function ResetContent() {
     }
 
     const supabase = createClient()
+    let resolved = false
 
-    // The verify-recovery server route redirects here with #access_token=...&type=recovery
-    // Supabase's createBrowserClient automatically detects the hash and fires PASSWORD_RECOVERY
-    // Also handles existing session (e.g. if user is already authenticated)
+    // Listen for PASSWORD_RECOVERY or SIGNED_IN events
+    // (fired by /auth/confirm after calling verifyOtp client-side)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      if (resolved) return
       if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+        resolved = true
         setPhase('form')
         subscription.unsubscribe()
       }
     })
 
-    // Also check if there's already a valid session (e.g. second visit)
+    // Also check for an existing session (e.g. user arrived from /auth/confirm which
+    // already called verifyOtp and established the session)
     supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
+      if (resolved) return
       if (data.session) {
+        resolved = true
         setPhase('form')
         subscription.unsubscribe()
       }
     })
 
-    // Timeout fallback
+    // 10 second timeout — enough time for /auth/confirm's 1200ms redirect + session propagation
     const timeout = setTimeout(() => {
+      if (resolved) return
       subscription.unsubscribe()
       setErrorMsg('Sesión no encontrada. Usá el link del email o solicitá uno nuevo.')
       setPhase('error')
-    }, 6000)
+    }, 10000)
 
     return () => {
       clearTimeout(timeout)
