@@ -165,6 +165,7 @@ export default function FinancesPage() {
   const [chartData, setChartData] = useState<{name:string;ingresos:number;egresos:number}[]>([])
   const [showDeleted, setShowDeleted] = useState(false)
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({})
+  const [subcatFilters, setSubcatFilters] = useState<Record<string, string>>({})
 
   // Modals
   const [showCategoryModal, setShowCategoryModal] = useState(false)
@@ -852,11 +853,93 @@ export default function FinancesPage() {
 
           {/* Empty state + preset categories */}
           {!loading && categories.length === 0 && (
-            <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-              <Briefcase className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <h3 className="text-base font-semibold text-slate-900 mb-1">No tenes categorias aun</h3>
-              <p className="text-sm text-slate-500 mb-5">Queres empezar con categorias predefinidas para agencias?</p>
-              <PresetPicker onCreate={handleCreatePresets} />
+            <div className="space-y-4">
+              {/* Si hay clientes sin categoría, mostrarlos ANTES del picker */}
+              {financeClients.filter(c => !c.deleted_at).length > 0 && (
+                <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                  <div className="flex items-center justify-between px-4 py-3" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                    <div className="flex items-center gap-3">
+                      <span style={{ width: '4px', height: '18px', background: '#94a3b8', borderRadius: '2px', display: 'inline-block' }} />
+                      <span style={{ fontSize: '16px' }}>📋</span>
+                      <div>
+                        <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clientes sin categoría</h3>
+                        <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '1px' }}>{financeClients.filter(c => !c.deleted_at).length} clientes — asignales una categoría para organizarlos</p>
+                      </div>
+                    </div>
+                    <button onClick={() => { setShowClientModal({ categoryId: null }); setEditingClient(null) }} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fff', border: '1px solid #e2e8f0', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
+                      <Plus className="h-3 w-3" /> Agregar
+                    </button>
+                  </div>
+                  <div className="bg-white overflow-x-auto">
+                    <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse', minWidth: '1320px' }}>
+                      <colgroup>
+                        <col style={{ width: '36px' }} /><col style={{ width: '155px' }} /><col style={{ width: '125px' }} />
+                        <col style={{ width: '80px' }} /><col style={{ width: '65px' }} /><col style={{ width: '95px' }} />
+                        <col style={{ width: '125px' }} /><col style={{ width: '100px' }} /><col style={{ width: '90px' }} />
+                        <col style={{ width: '100px' }} /><col /><col style={{ width: '165px' }} />
+                      </colgroup>
+                      <thead>
+                        <tr style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+                          <th style={{ ...thStyle('center'), color: '#cbd5e1', fontSize: '10px' }}>Nº</th>
+                          <th style={thStyle('left')}>Cliente</th>
+                          <th style={thStyle('right')}>Fee mensual</th>
+                          <th style={thStyle('center')}>Comis. %</th>
+                          <th style={thStyle('center')}>Cuentas</th>
+                          <th style={thStyle('center')}>Inicio</th>
+                          <th style={thStyle('right')}>Comisión mes</th>
+                          <th style={thStyle('right')}>Total</th>
+                          <th style={thStyle('right')}>Cancelado</th>
+                          <th style={thStyle('center')}>Asignado</th>
+                          <th style={thStyle('left')}>Observación</th>
+                          <th style={thStyle('center')}>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {financeClients.filter(c => !c.deleted_at).map((c, idx) => {
+                          const sym = getCurrencySymbol(c.currency)
+                          const rec = monthlyRecords.find(r => r.client_id === c.id)
+                          return (
+                            <tr key={c.id} style={{ background: idx % 2 === 0 ? '#ffffff' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}>
+                              <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
+                              <td style={{ padding: '10px 8px', fontSize: '13px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{Number(rec ? rec.billed_amount : c.contract_cost).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center' }}>{Number(c.commission_percent) > 0 ? <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span> : <span style={{ color: '#cbd5e1', fontSize: '12px' }}>$0</span>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right' }}>
+                                {!rec || Number(rec.commission_amount) === 0 ? <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span> : (
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: rec.status === 'paid' ? '#16a34a' : '#f59e0b', display: 'inline-block' }} />
+                                    <span style={{ color: rec.status === 'paid' ? '#16a34a' : '#92400e', fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>{sym}{Number(rec.commission_amount).toLocaleString()}</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{(Number(rec ? rec.billed_amount : c.contract_cost) + (rec ? Number(rec.commission_amount) : 0)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                <div style={{ display: 'inline-flex', gap: '3px' }}>
+                                  <button onClick={() => setClosingClient(c)} style={{ background: '#f0fdf4', color: '#16a34a', padding: '5px 9px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bbf7d0', cursor: 'pointer' }}>Comisión</button>
+                                  <button onClick={() => { setEditingClient(c); setShowClientModal({ categoryId: c.category_id }) }} style={{ background: '#f8fafc', color: '#475569', padding: '5px 7px', borderRadius: '6px', border: '1px solid #e2e8f0', cursor: 'pointer' }}><Pencil style={{ width: '13px', height: '13px' }} /></button>
+                                  <button onClick={() => setDeletingClient(c)} style={{ background: '#fff5f5', color: '#dc2626', padding: '5px 7px', borderRadius: '6px', border: '1px solid #fecaca', cursor: 'pointer' }}><Trash2 style={{ width: '13px', height: '13px' }} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {/* Preset picker siempre visible para crear categorías */}
+              <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                <Briefcase className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <h3 className="text-base font-semibold text-slate-900 mb-1">No tenes categorias aun</h3>
+                <p className="text-sm text-slate-500 mb-5">Queres empezar con categorias predefinidas para agencias?</p>
+                <PresetPicker onCreate={handleCreatePresets} />
+              </div>
             </div>
           )}
 
@@ -912,6 +995,27 @@ export default function FinancesPage() {
                         {catClients.length === 0 ? (
                           <p className="text-center text-sm text-slate-400 py-6">No hay clientes en esta categoria</p>
                         ) : (
+                          <>
+                          {/* Subcategory tabs — derived from company_name values */}
+                          {(() => {
+                            const subcats = Array.from(new Set(catClients.filter(c => !c.deleted_at && c.company_name).map(c => c.company_name as string)))
+                            if (subcats.length < 2) return null
+                            const current = subcatFilters[cat.id] || 'Todos'
+                            return (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '10px 14px', borderBottom: '1px solid #f1f5f9', background: '#fafafa' }}>
+                                {['Todos', ...subcats].map(s => {
+                                  const count = s === 'Todos' ? catClients.filter(c => !c.deleted_at).length : catClients.filter(c => !c.deleted_at && c.company_name === s).length
+                                  return (
+                                    <button
+                                      key={s}
+                                      onClick={() => setSubcatFilters(prev => ({ ...prev, [cat.id]: s }))}
+                                      style={{ padding: '4px 12px', borderRadius: '999px', fontSize: '11px', fontWeight: 600, border: '1px solid', background: current === s ? cat.color : '#fff', color: current === s ? '#fff' : '#64748b', borderColor: current === s ? cat.color : '#e2e8f0', cursor: 'pointer', transition: 'all 0.15s' }}
+                                    >{s} <span style={{ opacity: 0.75 }}>({count})</span></button>
+                                  )
+                                })}
+                              </div>
+                            )
+                          })()}
                           <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse', minWidth: '1320px' }}>
                             <colgroup>
                               <col style={{ width: '36px' }} />
@@ -944,7 +1048,11 @@ export default function FinancesPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {catClients.map((c, idx) => {
+                              {catClients.filter(c => {
+                                const sub = subcatFilters[cat.id] || 'Todos'
+                                if (sub === 'Todos') return true
+                                return c.company_name === sub
+                              }).map((c, idx) => {
                                 const isDeleted = !!c.deleted_at
                                 const sym = getCurrencySymbol(c.currency)
                                 const rowBg = idx % 2 === 0 ? '#ffffff' : '#fafafa'
@@ -1086,6 +1194,7 @@ export default function FinancesPage() {
                               </tr>
                             </tfoot>
                           </table>
+                          </>
                         )}
                       </div>
                     )}
@@ -1093,11 +1202,78 @@ export default function FinancesPage() {
                 )
               })}
 
-              {/* Uncategorized */}
+              {/* Uncategorized — tabla completa */}
               {clientsByCategory.__uncategorized__ && clientsByCategory.__uncategorized__.length > 0 && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <h4 className="text-sm font-semibold text-slate-600 mb-2">Sin categoria ({clientsByCategory.__uncategorized__.length})</h4>
-                  <p className="text-xs text-slate-500">Hay clientes sin categoria. Editalos para asignarlos.</p>
+                <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid #fbbf24' }}>
+                  <div className="flex items-center justify-between px-4 py-3" style={{ background: '#fffbeb', borderBottom: '1px solid #fde68a' }}>
+                    <div className="flex items-center gap-3">
+                      <span style={{ width: '4px', height: '18px', background: '#f59e0b', borderRadius: '2px', display: 'inline-block' }} />
+                      <span style={{ fontSize: '16px' }}>⚠️</span>
+                      <div>
+                        <h3 style={{ fontSize: '12px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sin categoría</h3>
+                        <p style={{ fontSize: '11px', color: '#b45309', marginTop: '1px' }}>{clientsByCategory.__uncategorized__.filter(c => !c.deleted_at).length} clientes — editá cada uno para asignarles una categoría</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-white overflow-x-auto">
+                    <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse', minWidth: '1320px' }}>
+                      <colgroup>
+                        <col style={{ width: '36px' }} /><col style={{ width: '155px' }} /><col style={{ width: '125px' }} />
+                        <col style={{ width: '80px' }} /><col style={{ width: '65px' }} /><col style={{ width: '95px' }} />
+                        <col style={{ width: '125px' }} /><col style={{ width: '100px' }} /><col style={{ width: '90px' }} />
+                        <col style={{ width: '100px' }} /><col /><col style={{ width: '165px' }} />
+                      </colgroup>
+                      <thead>
+                        <tr style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+                          <th style={{ ...thStyle('center'), color: '#cbd5e1', fontSize: '10px' }}>Nº</th>
+                          <th style={thStyle('left')}>Cliente</th>
+                          <th style={thStyle('right')}>Fee mensual</th>
+                          <th style={thStyle('center')}>Comis. %</th>
+                          <th style={thStyle('center')}>Cuentas</th>
+                          <th style={thStyle('center')}>Inicio</th>
+                          <th style={thStyle('right')}>Comisión mes</th>
+                          <th style={thStyle('right')}>Total</th>
+                          <th style={thStyle('right')}>Cancelado</th>
+                          <th style={thStyle('center')}>Asignado</th>
+                          <th style={thStyle('left')}>Observación</th>
+                          <th style={thStyle('center')}>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {clientsByCategory.__uncategorized__.map((c, idx) => {
+                          const sym = getCurrencySymbol(c.currency)
+                          const rec = monthlyRecords.find(r => r.client_id === c.id)
+                          const isDeleted = !!c.deleted_at
+                          return (
+                            <tr key={c.id} style={{ background: isDeleted ? '#f8fafc' : idx % 2 === 0 ? '#ffffff' : '#fafafa', borderBottom: '1px solid #f1f5f9', opacity: isDeleted ? 0.7 : 1 }}>
+                              <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
+                              <td style={{ padding: '10px 8px', fontSize: '13px', fontWeight: 700, color: '#0f172a', textDecoration: isDeleted ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}{isDeleted && <span style={{ marginLeft: '6px', fontSize: '10px', background: '#e2e8f0', color: '#64748b', padding: '1px 6px', borderRadius: '4px' }}>Eliminado</span>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{Number(rec ? rec.billed_amount : c.contract_cost).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center' }}>{Number(c.commission_percent) > 0 ? <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span> : <span style={{ color: '#cbd5e1', fontSize: '12px' }}>$0</span>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right' }}>{!rec || Number(rec.commission_amount) === 0 ? <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span> : <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '6px', height: '6px', borderRadius: '50%', background: rec.status === 'paid' ? '#16a34a' : '#f59e0b', display: 'inline-block' }} /><span style={{ color: rec.status === 'paid' ? '#16a34a' : '#92400e', fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>{sym}{Number(rec.commission_amount).toLocaleString()}</span></div>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{(Number(rec ? rec.billed_amount : c.contract_cost) + (rec ? Number(rec.commission_amount) : 0)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                                {!isDeleted ? (
+                                  <div style={{ display: 'inline-flex', gap: '3px' }}>
+                                    <button onClick={() => setClosingClient(c)} style={{ background: '#f0fdf4', color: '#16a34a', padding: '5px 9px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bbf7d0', cursor: 'pointer' }}>Comisión</button>
+                                    <button onClick={() => { setEditingClient(c); setShowClientModal({ categoryId: c.category_id }) }} style={{ background: '#f8fafc', color: '#475569', padding: '5px 7px', borderRadius: '6px', border: '1px solid #e2e8f0', cursor: 'pointer' }}><Pencil style={{ width: '13px', height: '13px' }} /></button>
+                                    <button onClick={() => setDeletingClient(c)} style={{ background: '#fff5f5', color: '#dc2626', padding: '5px 7px', borderRadius: '6px', border: '1px solid #fecaca', cursor: 'pointer' }}><Trash2 style={{ width: '13px', height: '13px' }} /></button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => handleRestoreClient(c)} style={{ background: '#f8fafc', color: '#2563eb', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bfdbfe', cursor: 'pointer' }}>Restaurar</button>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -1124,6 +1300,157 @@ export default function FinancesPage() {
                   <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Neto (− cancelados)</p>
                   <p style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>${(totalBilled + totalCommissions - totalCancelled).toLocaleString()}</p>
                 </div>
+              </div>
+            </div>
+          )}
+          {/* ═══ RESUMEN DE INGRESOS POR SERVICIO + DONA POR CLIENTE ═══ */}
+          {!loading && activeClients.length > 0 && (
+            <div style={{ marginTop: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', paddingTop: '4px' }}>
+                <div style={{ width: '3px', height: '20px', background: '#2563eb', borderRadius: '2px' }} />
+                <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ingresos por servicio — {MONTHS[month - 1]} {year}</h3>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px', alignItems: 'start' }}>
+
+                {/* Tabla de ingresos por categoría */}
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc' }}>
+                        <th style={{ ...thStyle('left'), padding: '10px 14px' }}>Servicio / Categoría</th>
+                        <th style={{ ...thStyle('center'), padding: '10px 10px' }}>Clientes</th>
+                        <th style={{ ...thStyle('right'), padding: '10px 14px' }}>Fees</th>
+                        <th style={{ ...thStyle('right'), padding: '10px 14px' }}>Comisiones</th>
+                        <th style={{ ...thStyle('right'), padding: '10px 14px' }}>Total</th>
+                        <th style={{ ...thStyle('right'), padding: '10px 14px', minWidth: '90px' }}>% del total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {categories.map(cat => {
+                        const cc = (clientsByCategory[cat.id] || []).filter(c => !c.deleted_at)
+                        const catRecs = monthlyRecords.filter(r => cc.some(c => c.id === r.client_id))
+                        const catFee = cc.reduce((s, c) => { const r = catRecs.find(x => x.client_id === c.id); return s + (r ? Number(r.billed_amount) : Number(c.contract_cost)) }, 0)
+                        const catComm = catRecs.filter(r => cc.some(c => c.id === r.client_id)).reduce((s, r) => s + Number(r.commission_amount), 0)
+                        const catTotal = catFee + catComm
+                        const grandTotal = totalBilled + totalCommissions
+                        const pct = grandTotal > 0 ? (catTotal / grandTotal) * 100 : 0
+                        return (
+                          <tr key={cat.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '10px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ width: '4px', height: '18px', background: cat.color, borderRadius: '2px', display: 'inline-block', flexShrink: 0 }} />
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{cat.icon} {cat.name}</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '10px 10px', textAlign: 'center', fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{cc.length}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>${catFee.toLocaleString()}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>{catComm > 0 ? `$${catComm.toLocaleString()}` : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>${catTotal.toLocaleString()}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                                <div style={{ width: '52px', height: '5px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${pct}%`, height: '100%', background: cat.color, borderRadius: '999px', transition: 'width 0.4s ease' }} />
+                                </div>
+                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', minWidth: '28px', textAlign: 'right' }}>{pct.toFixed(0)}%</span>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {/* Uncategorized row if any */}
+                      {(clientsByCategory.__uncategorized__ || []).filter(c => !c.deleted_at).length > 0 && (() => {
+                        const uc = (clientsByCategory.__uncategorized__ || []).filter(c => !c.deleted_at)
+                        const ucRecs = monthlyRecords.filter(r => uc.some(c => c.id === r.client_id))
+                        const ucFee = uc.reduce((s, c) => { const r = ucRecs.find(x => x.client_id === c.id); return s + (r ? Number(r.billed_amount) : Number(c.contract_cost)) }, 0)
+                        const ucComm = ucRecs.reduce((s, r) => s + Number(r.commission_amount), 0)
+                        const ucTotal = ucFee + ucComm
+                        const grandTotal = totalBilled + totalCommissions
+                        const pct = grandTotal > 0 ? (ucTotal / grandTotal) * 100 : 0
+                        return (
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '10px 14px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ width: '4px', height: '18px', background: '#94a3b8', borderRadius: '2px', display: 'inline-block' }} />
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>📋 Sin categoría</span>
+                              </div>
+                            </td>
+                            <td style={{ padding: '10px 10px', textAlign: 'center', fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{uc.length}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>${ucFee.toLocaleString()}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>{ucComm > 0 ? `$${ucComm.toLocaleString()}` : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>${ucTotal.toLocaleString()}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                                <div style={{ width: '52px', height: '5px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${pct}%`, height: '100%', background: '#94a3b8', borderRadius: '999px' }} />
+                                </div>
+                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', minWidth: '28px', textAlign: 'right' }}>{pct.toFixed(0)}%</span>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })()}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ background: '#0f172a' }}>
+                        <td style={{ padding: '11px 14px', fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TOTAL</td>
+                        <td style={{ padding: '11px 10px', textAlign: 'center', color: '#64748b', fontSize: '12px', fontWeight: 700 }}>{activeClients.length}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#e2e8f0' }}>${totalBilled.toLocaleString()}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#4ade80' }}>${totalCommissions.toLocaleString()}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 800, color: '#f0fdf4' }}>${(totalBilled + totalCommissions).toLocaleString()}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', color: '#64748b', fontSize: '12px', fontWeight: 700 }}>100%</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Gráfica de dona: ingresos por cliente */}
+                {(() => {
+                  const PIE_CLIENT_COLORS = ['#2563eb','#16a34a','#ea580c','#9333ea','#0d9488','#dc2626','#f59e0b','#3b82f6','#ec4899','#64748b']
+                  const clientPie = activeClients.map((c, i) => {
+                    const rec = monthlyRecords.find(r => r.client_id === c.id)
+                    const fee = rec ? Number(rec.billed_amount) : Number(c.contract_cost)
+                    const comm = rec ? Number(rec.commission_amount) : 0
+                    return { name: c.client_name, value: fee + comm, color: PIE_CLIENT_COLORS[i % PIE_CLIENT_COLORS.length] }
+                  }).filter(x => x.value > 0)
+                  const totalPie = clientPie.reduce((s, x) => s + x.value, 0)
+                  if (!totalPie || clientPie.length === 0) return null
+                  const RADIAN = Math.PI / 180
+                  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+                    if (percent < 0.07) return null
+                    const r = innerRadius + (outerRadius - innerRadius) * 0.5
+                    const x = cx + r * Math.cos(-midAngle * RADIAN)
+                    const y = cy + r * Math.sin(-midAngle * RADIAN)
+                    return <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" style={{ fontSize: '11px', fontWeight: 700 }}>{`${(percent * 100).toFixed(0)}%`}</text>
+                  }
+                  return (
+                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 20px 16px', minWidth: '260px', maxWidth: '300px' }}>
+                      <p style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>Por cliente</p>
+                      <PieChart width={220} height={220} style={{ display: 'block', margin: '0 auto' }}>
+                        <Pie data={clientPie} cx={110} cy={110} innerRadius={60} outerRadius={98} paddingAngle={2} dataKey="value" labelLine={false} label={renderLabel}>
+                          {clientPie.map((e, i) => <Cell key={i} fill={e.color} />)}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)', fontSize: '12px' }}
+                          formatter={(v: any, name: any) => [`$${Number(v).toLocaleString()} · ${((Number(v) / totalPie) * 100).toFixed(1)}%`, name]}
+                        />
+                      </PieChart>
+                      <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                        {clientPie.sort((a, b) => b.value - a.value).map((e, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: e.color, flexShrink: 0, display: 'inline-block' }} />
+                              <span style={{ fontSize: '12px', color: '#334155', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                              <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>{((e.value / totalPie) * 100).toFixed(0)}%</span>
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${e.value.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           )}
@@ -1761,8 +2088,9 @@ function ClientModal({ client, categoryId, categories, onSave, onClose }: {
               <input value={clientName} onChange={e => setClientName(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" required />
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1 block font-medium">Empresa (opcional)</label>
-              <input value={companyName} onChange={e => setCompanyName(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+              <label className="text-xs text-slate-500 mb-1 block font-medium">Subcategoría / Plataforma</label>
+              <input value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="ej: Meta Ads, TikTok Ads, Google Ads..." className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+              <p className="text-[10px] text-slate-400 mt-0.5">Agrupa clientes dentro de la misma categoría por plataforma o tipo de servicio.</p>
             </div>
             <div>
               <label className="text-xs text-slate-500 mb-1 block font-medium">Asignado a *</label>
