@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       .from('invoices')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .order('createdAt', { ascending: false })
+      .order('created_at', { ascending: false })
 
     if (status) query = query.eq('status', status)
 
