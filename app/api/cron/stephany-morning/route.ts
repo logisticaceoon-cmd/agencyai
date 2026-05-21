@@ -60,22 +60,18 @@ export async function GET(request: Request) {
     ))
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000 - 1)
 
-    // Get all clients to find Stephany's
-    const { data: clients } = await supabase
-      .from('clients')
-      .select('id, name')
+    // Stephany's user ID and workspace
+    const WORKSPACE_ID = '41b4b8ab-2483-418d-bb29-d39084ca36f0'
+    const STEPHANY_USER_ID = '079cb567-1bb8-4726-b6ae-deaaf83ecbda'
 
-    const stephanyClientIds = (clients || [])
-      .filter(c => STEPHANY_CLIENT_NAMES.some(name =>
-        c.name?.toUpperCase().includes(name.replace(' SPA', '').replace('.CL', '').split('.')[0])
-      ))
-      .map(c => c.id)
-
-    // Get pending/in_progress tasks (general + Stephany's clients)
+    // Get ONLY tasks assigned to Stephany in this workspace
     const { data: allTasks } = await supabase
       .from('tasks')
       .select('id, title, priority, deadline, status, clientId')
+      .eq('workspace_id', WORKSPACE_ID)
+      .contains('assignedTo', [STEPHANY_USER_ID])
       .in('status', ['pending', 'in_progress'])
+      .is('deleted_at', null)
       .order('deadline', { ascending: true })
       .limit(50)
 
