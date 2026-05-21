@@ -14,36 +14,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    // Get AI config for this workspace
-    const { data: aiConfig } = await supabase
-      .from('workspace_ai_config')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .maybeSingle()
+    // Fetch all context in parallel
+    const [aiConfigRes, workspaceRes, currentUserRes] = await Promise.all([
+      supabase.from('workspace_ai_config').select('*').eq('workspace_id', workspaceId).maybeSingle(),
+      supabase.from('workspaces').select('name, professional_type_id, owner_id').eq('id', workspaceId).maybeSingle(),
+      supabase.from('users').select('id, email, fullName, role, department').eq('id', userId).maybeSingle(),
+    ])
 
-    // Get workspace info
-    const { data: workspaceRow } = await supabase
-      .from('workspaces')
-      .select('name, professional_type_id, owner_id')
-      .eq('id', workspaceId)
-      .maybeSingle()
-
-    // Get current user profile
-    const { data: currentUser } = await supabase
-      .from('users')
-      .select('id, email, fullName, role, department')
-      .eq('id', userId)
-      .maybeSingle()
+    const aiConfig = aiConfigRes.data
+    const workspaceRow = workspaceRes.data
+    const currentUser = currentUserRes.data
 
     const userName = currentUser?.fullName || currentUser?.email || 'Usuario'
-    const userRole = currentUser?.role || 'Equipo'
+    const userRole = (currentUser?.role || 'viewer') as string
     const isOwner = workspaceRow?.owner_id === userId
+    const effectiveRole = isOwner ? 'owner' : userRole
 
-    // Get workspace context (general)
-    const workspaceContext = await getWorkspaceContext(supabase, workspaceId)
+    // Load role-specific AI context from DB (with fallback to built-in defaults)
+    const { data: roleCtx } = await supabase
+      .from('role_ai_context')
+      .select('*')
+      .eq('role', effectiveRole)
+      .maybeSingle()
 
-    // Get user-specific context (tasks and clients assigned to this user)
-    const userContext = await getUserContext(supabase, workspaceId, userId)
+    // Get workspace context (general) and user context
+    const [workspaceContext, userContext] = await Promise.all([
+      getWorkspaceContext(supabase, workspaceId),
+      getUserContext(supabase, workspaceId, userId),
+    ])
 
     // Build Ceonyx persona system prompt
     const now = new Date()
@@ -55,7 +53,8 @@ export async function POST(request: Request) {
     const agencyName = workspaceRow?.name || 'la agencia'
     const agentName = 'Ceonyx'
 
-    const ownerContext = isOwner ? `
+    // Role-based user context block — from DB or fallback
+    const roleSystemAddition = roleCtx?.system_prompt_addition || (isOwner ? `
 Estás hablando con ${userName}, el CEO y fundador de la agencia.
 - Tiene acceso completo a todo el sistema
 - Priorizar siempre por: 1) impacto en ingresos, 2) crecimiento, 3) urgencia real
@@ -67,7 +66,30 @@ Estás hablando con ${userName}, ${userRole} del equipo.
 - Sus clientes asignados: ${userContext.assignedClientNames.length > 0 ? userContext.assignedClientNames.join(', ') : 'ver tareas asignadas'}
 - Tiene acceso a sus tareas y clientes asignados
 - Ser claro, directo y práctico en las respuestas
-`
+`)
+
+    const toneInstruction = roleCtx?.tone_instruction || ''
+
+    // Allowed/restricted topics block (only inject if defined in DB)
+    const allowedTopics = roleCtx?.allowed_topics as string[] | undefined
+    const restrictedTopics = roleCtx?.restricted_topics as string[] | undefined
+    const topicsBlock = [
+      allowedTopics?.length
+        ? `TEMAS PERMITIDOS PARA ESTE ROL: ${allowedTopics.join(', ')}`
+        : '',
+      restrictedTopics?.length
+        ? `TEMAS RESTRINGIDOS — NO ABORDAR: ${restrictedTopics.join(', ')}`
+        : '',
+    ].filter(Boolean).join('\n')
+
+    // Finance/team context only for roles with permission
+    const canViewFinances = roleCtx?.can_view_finances ?? isOwner
+    const canViewTeam = roleCtx?.can_view_team ?? isOwner
+    const canViewAllClients = roleCtx?.can_view_all_clients ?? isOwner
+
+    const financesLine = canViewFinances
+      ? `- Ingresos del mes: $${workspaceContext.monthlyIncome.toLocaleString()}`
+      : ''
 
     const systemPrompt = `Sos ${agentName}, el agente de inteligencia artificial interno de ${agencyName}.
 
@@ -78,23 +100,25 @@ IDENTIDAD:
 - Cuando algo está mal lo decís. Cuando está bien lo reconocés en una línea y seguís.
 - Hablás en español latinoamericano. Sin emojis excesivos.
 - Firmás siempre como: Ceonyx · Agente IA — ${agencyName}
+${toneInstruction ? `\nTONO: ${toneInstruction}` : ''}
 
-CONTEXTO DEL USUARIO:
-${ownerContext}
+ROL DEL USUARIO — ${(roleCtx?.display_name || effectiveRole).toUpperCase()}:
+${roleSystemAddition.trim()}
+${topicsBlock ? `\n${topicsBlock}` : ''}
 
 CONTEXTO HOY — ${dateStr} ${timeStr}:
-- Clientes activos en la agencia: ${workspaceContext.activeClients}
+- Clientes activos en la agencia: ${canViewAllClients ? workspaceContext.activeClients : 'ver clientes asignados'}
 - Proyectos activos: ${workspaceContext.activeProjects}
-- Ingresos del mes: $${workspaceContext.monthlyIncome.toLocaleString()}
+${financesLine}
 
 TAREAS ASIGNADAS A ${userName.toUpperCase()}:
 - Pendientes/En progreso: ${userContext.pendingTasks} tareas
 - Vencidas: ${userContext.overdueTasks} tareas${userContext.overdueList.length > 0 ? '\n  → ' + userContext.overdueList.map((t: any) => `"${t.title}"`).join(', ') : ''}
 - Para hoy: ${userContext.todayTasks} tareas${userContext.todayList.length > 0 ? '\n  → ' + userContext.todayList.map((t: any) => `"${t.title}"`).join(', ') : ''}
-
+${canViewAllClients ? `
 TAREAS GENERALES DEL WORKSPACE:
 - Vencidas en total: ${workspaceContext.overdueTasks}
-- Para hoy en total: ${workspaceContext.todayTasks}
+- Para hoy en total: ${workspaceContext.todayTasks}` : ''}
 - Módulo actual: ${module || 'dashboard'}
 
 CAPACIDADES — ACCIONES EJECUTABLES:
