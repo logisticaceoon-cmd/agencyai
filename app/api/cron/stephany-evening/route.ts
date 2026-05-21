@@ -54,11 +54,18 @@ export async function GET(request: Request) {
     const tomorrowStart = new Date(todayEnd.getTime() + 1)
     const tomorrowEnd = new Date(tomorrowStart.getTime() + 24 * 60 * 60 * 1000 - 1)
 
-    // Get tasks
+    // Stephany's user ID and workspace
+    const WORKSPACE_ID = '41b4b8ab-2483-418d-bb29-d39084ca36f0'
+    const STEPHANY_USER_ID = '079cb567-1bb8-4726-b6ae-deaaf83ecbda'
+
+    // Get ONLY tasks assigned to Stephany in this workspace
     const { data: allTasks } = await supabase
       .from('tasks')
       .select('id, title, priority, deadline, status')
+      .eq('workspace_id', WORKSPACE_ID)
+      .contains('assignedTo', [STEPHANY_USER_ID])
       .in('status', ['pending', 'in_progress'])
+      .is('deleted_at', null)
       .order('deadline', { ascending: true })
       .limit(40)
 
