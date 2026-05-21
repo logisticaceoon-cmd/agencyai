@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     }
 
     const { data: clients, error: clientsError } = await query
-      .order('createdAt', { ascending: false })
+      .order('created_at', { ascending: false })
 
     if (clientsError) {
       return NextResponse.json({ error: clientsError.message }, { status: 500 })
