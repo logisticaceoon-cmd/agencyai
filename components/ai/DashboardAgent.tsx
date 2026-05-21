@@ -28,7 +28,7 @@ export function DashboardAgent({ stats }: DashboardAgentProps) {
       .then(r => r.json())
       .then(d => {
         if (d.data) {
-          setAgentName(d.data.agent_name || 'Asistente AgencyAI')
+          setAgentName(d.data.agent_name || 'Ceonyx')
           setAgentAvatar(d.data.agent_avatar || '🤖')
         }
       })
