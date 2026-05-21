@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
-// Reports se calculan en tiempo real desde tasks (workspace_id correcto)
-
 type TaskRow = {
   id: string
   title: string
@@ -42,19 +40,17 @@ export async function GET(request: Request) {
     const targetMonth = parseInt(month)
     const targetYear = parseInt(year)
 
-    // Completed tasks for this user in the given month/year
+    // Completed tasks assigned to this user in the given month/year (filter by updatedAt)
     const { data: allCompleted } = await supabase
       .from('tasks')
-      .select('id, title, status, createdById, assignedTo, deadline, createdAt, clientId')
+      .select('id, title, status, createdById, assignedTo, deadline, createdAt, updatedAt, clientId')
       .eq('workspace_id', workspaceId)
       .eq('status', 'completed')
+      .contains('assignedTo', [userId])
       .is('deleted_at', null)
       .limit(500)
 
     const userCompleted = ((allCompleted || []) as TaskRow[]).filter(t => {
-      const isUser = t.createdById === userId ||
-        (Array.isArray(t.assignedTo) && t.assignedTo.includes(userId))
-      if (!isUser) return false
       const d = getCompletedAt(t)
       return d.getMonth() + 1 === targetMonth && d.getFullYear() === targetYear
     })
@@ -64,11 +60,12 @@ export async function GET(request: Request) {
       ? Math.round(((userCompleted.length - delayed.length) / userCompleted.length) * 100)
       : 0
 
-    // Pending tasks assigned to this user
+    // Pending tasks assigned to this user (current state, no month filter)
     const { data: pending } = await supabase
       .from('tasks')
       .select('id')
       .eq('workspace_id', workspaceId)
+      .contains('assignedTo', [userId])
       .is('deleted_at', null)
       .in('status', ['pending', 'in_progress'])
 
@@ -112,16 +109,14 @@ export async function POST(request: Request) {
 
     const { data: allCompleted } = await supabase
       .from('tasks')
-      .select('id, title, status, createdById, assignedTo, deadline, createdAt, clientId')
+      .select('id, title, status, createdById, assignedTo, deadline, createdAt, updatedAt, clientId')
       .eq('workspace_id', workspaceId)
       .eq('status', 'completed')
+      .contains('assignedTo', [userId])
       .is('deleted_at', null)
       .limit(500)
 
     const userCompleted = ((allCompleted || []) as TaskRow[]).filter(t => {
-      const isUser = t.createdById === userId ||
-        (Array.isArray(t.assignedTo) && t.assignedTo.includes(userId))
-      if (!isUser) return false
       const d = new Date(t.updatedAt || t.createdAt)
       return d.getMonth() + 1 === targetMonth && d.getFullYear() === targetYear
     })
