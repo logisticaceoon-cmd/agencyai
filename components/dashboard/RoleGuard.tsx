@@ -16,9 +16,21 @@ export function RoleGuard({ children }: { children: React.ReactNode }) {
       router.replace('/sign-in')
       return
     }
-    const segment = '/' + pathname.split('/')[1]
+
     const role = normalizeRole(user.role)
-    if (!canAccessSection(role, segment)) {
+
+    // Check exact path first (most specific), then fall back to first-level segment.
+    // This allows sub-routes like /settings/account to have independent permissions
+    // separate from the parent /settings route.
+    let allowed = canAccessSection(role, pathname)
+    if (!allowed) {
+      const segment = '/' + pathname.split('/')[1]
+      if (segment !== pathname) {
+        allowed = canAccessSection(role, segment)
+      }
+    }
+
+    if (!allowed) {
       router.replace('/dashboard')
     }
   }, [user, isLoading, pathname, router])
