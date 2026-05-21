@@ -48,8 +48,13 @@ export const SECTION_PERMISSIONS: Record<string, AppRole[]> = {
   '/finances':    ['owner', 'admin'],
   '/recordings':  ['owner', 'admin'],
   '/alerts':      ['owner', 'admin'],
-  '/settings':    ['owner'],
-  '/settings/roles': ['owner'],
+  '/settings':           ['owner'],
+  '/settings/account':   ['owner', 'admin', 'trafficker', 'viewer'],
+  '/settings/team':      ['owner', 'admin'],
+  '/settings/billing':   ['owner'],
+  '/settings/workspace': ['owner'],
+  '/settings/api-keys':  ['owner'],
+  '/settings/roles':     ['owner'],
 }
 
 // ─── Permisos de datos (filtrado en API) ─────────────────────────────────────
