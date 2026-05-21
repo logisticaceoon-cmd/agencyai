@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
 import prisma from '@/lib/prisma'
 
 // Endpoint de setup — crea la tabla role_ai_context y siembra reglas por rol.
@@ -39,9 +38,7 @@ export async function GET(request: Request) {
     console.warn('[setup-role-context] DDL warning:', err?.message)
   }
 
-  // ── 2. Seed — upsert de los 4 roles ──────────────────────────────────────
-  const supabase = createAdminClient()
-
+  // ── 2. Seed — upsert de los 4 roles via Prisma (bypasses PostgREST cache) ──
   const roles = [
     {
       role: 'owner',
@@ -152,12 +149,54 @@ export async function GET(request: Request) {
   const results: Record<string, string> = {}
 
   for (const roleData of roles) {
-    const { error } = await supabase
-      .from('role_ai_context')
-      .upsert(roleData, { onConflict: 'role' })
-
-    results[roleData.role] = error ? `ERROR: ${error.message}` : 'OK'
+    try {
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO role_ai_context (
+          role, display_name, allowed_topics, restricted_topics,
+          system_prompt_addition, can_create_tasks, can_view_finances,
+          can_view_team, can_view_all_clients, can_view_performance,
+          can_view_reports, tone_instruction
+        ) VALUES (
+          $1, $2, $3::jsonb, $4::jsonb,
+          $5, $6, $7, $8, $9, $10, $11, $12
+        )
+        ON CONFLICT (role) DO UPDATE SET
+          display_name = EXCLUDED.display_name,
+          allowed_topics = EXCLUDED.allowed_topics,
+          restricted_topics = EXCLUDED.restricted_topics,
+          system_prompt_addition = EXCLUDED.system_prompt_addition,
+          can_create_tasks = EXCLUDED.can_create_tasks,
+          can_view_finances = EXCLUDED.can_view_finances,
+          can_view_team = EXCLUDED.can_view_team,
+          can_view_all_clients = EXCLUDED.can_view_all_clients,
+          can_view_performance = EXCLUDED.can_view_performance,
+          can_view_reports = EXCLUDED.can_view_reports,
+          tone_instruction = EXCLUDED.tone_instruction,
+          updated_at = now()
+      `,
+        roleData.role,
+        roleData.display_name,
+        JSON.stringify(roleData.allowed_topics),
+        JSON.stringify(roleData.restricted_topics),
+        roleData.system_prompt_addition,
+        roleData.can_create_tasks,
+        roleData.can_view_finances,
+        roleData.can_view_team,
+        roleData.can_view_all_clients,
+        roleData.can_view_performance,
+        roleData.can_view_reports,
+        roleData.tone_instruction,
+      )
+      results[roleData.role] = 'OK'
+    } catch (err: any) {
+      results[roleData.role] = `ERROR: ${err?.message}`
+    }
   }
+
+  // Notificar a PostgREST para refrescar schema cache
+  try {
+    await prisma.$executeRawUnsafe(`NOTIFY pgrst, 'reload schema'`)
+  } catch { /* no fatal */ }
 
   const allOk = Object.values(results).every(v => v === 'OK')
 
