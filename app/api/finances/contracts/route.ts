@@ -18,7 +18,7 @@ export async function GET(request: Request) {
       .from('trafficker_contracts')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .order('createdAt', { ascending: false })
+      .order('created_at', { ascending: false })
 
     if (!includeDeleted) {
       query = query.neq('status', 'deleted')
