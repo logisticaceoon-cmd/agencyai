@@ -740,24 +740,28 @@ export default function FinancesPage() {
             const PIE_CLIENT_COLORS = ['#2563eb','#16a34a','#ea580c','#9333ea','#0d9488','#dc2626','#f59e0b','#3b82f6','#ec4899','#64748b']
 
             // ── Egresos ──
-            const pieRows: { name: string; value: number; color: string }[] = []
-            if (totalPayroll > 0) pieRows.push({ name: 'Nóminas', value: totalPayroll, color: '#7c3aed' })
+            const eRows: { name: string; value: number; color: string }[] = []
+            if (totalPayroll > 0) eRows.push({ name: 'Nóminas', value: totalPayroll, color: '#7c3aed' })
             Object.entries(expenseByCategory).filter(([, v]) => v > 0).forEach(([cat, val], i) => {
-              pieRows.push({ name: EXPENSE_CATEGORY_LABELS[cat] || cat, value: val, color: PIE_COLORS[(i + 1) % PIE_COLORS.length] })
+              eRows.push({ name: EXPENSE_CATEGORY_LABELS[cat] || cat, value: val, color: PIE_COLORS[(i + 1) % PIE_COLORS.length] })
             })
-            const totalEgresos = pieRows.reduce((s, r) => s + r.value, 0)
+            const totalEgr = eRows.reduce((s, r) => s + r.value, 0)
 
             // ── Ingresos por cliente ──
-            const incomeRows: { name: string; value: number; color: string }[] = activeClients.map((c, i) => {
+            const iRows: { name: string; value: number; color: string }[] = activeClients.map((c, i) => {
               const rec = monthlyRecords.find(r => r.client_id === c.id)
               const fee = Number(rec?.billed_amount ?? c.contract_cost ?? 0)
               const comm = Number(rec?.commission_amount ?? 0)
               return { name: c.client_name, value: fee + comm, color: PIE_CLIENT_COLORS[i % PIE_CLIENT_COLORS.length] }
             }).filter(r => r.value > 0)
-            const totalIngresos = incomeRows.reduce((s, r) => s + r.value, 0)
+            const totalIng = iRows.reduce((s, r) => s + r.value, 0)
+
+            const hasE = eRows.length > 0 && totalEgr > 0
+            const hasI = iRows.length > 0 && totalIng > 0
+            if (!hasE && !hasI) return null
 
             const RADIAN = Math.PI / 180
-            const renderLabel = (innerTotal: number) => ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+            const mkLabel = (total: number) => ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
               if (percent < 0.05) return null
               const r = innerRadius + (outerRadius - innerRadius) * 0.5
               const x = cx + r * Math.cos(-midAngle * RADIAN)
@@ -765,84 +769,93 @@ export default function FinancesPage() {
               return <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" style={{ fontSize: '11px', fontWeight: 700 }}>{`${(percent * 100).toFixed(0)}%`}</text>
             }
 
-            const hasEgresos = pieRows.length > 0 && totalEgresos > 0
-            const hasIngresos = incomeRows.length > 0 && totalIngresos > 0
-            if (!hasEgresos && !hasIngresos) return null
-
-            const DonutList = ({ rows, total }: { rows: { name: string; value: number; color: string }[]; total: number }) => (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '180px', maxWidth: '280px' }}>
-                {[...rows].sort((a, b) => b.value - a.value).map((row, i) => {
-                  const pct = (row.value / total) * 100
-                  return (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: row.color, flexShrink: 0, display: 'inline-block' }} />
-                          <span style={{ fontSize: '13px', color: '#334155', fontWeight: 500 }}>{row.name}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, width: '32px', textAlign: 'right' }}>{pct.toFixed(0)}%</span>
-                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums', width: '64px', textAlign: 'right' }}>${row.value.toLocaleString()}</span>
-                        </div>
-                      </div>
-                      <div style={{ height: '4px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
-                        <div style={{ width: `${pct}%`, height: '100%', background: row.color, borderRadius: '999px', transition: 'width 0.4s ease' }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )
-
             return (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-                {/* ── Dona Egresos ── */}
-                {hasEgresos && (
+
+                {/* Dona Egresos */}
+                {hasE && (
                   <div className="rounded-xl border border-slate-200 bg-white p-6">
                     <div className="mb-5">
                       <h3 className="text-sm font-semibold text-slate-900">Distribución de egresos — {MONTHS[month - 1]} {year}</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">Total: <span className="font-semibold text-slate-600">${totalEgresos.toLocaleString()}</span></p>
+                      <p className="text-xs text-slate-400 mt-0.5">Total: <span className="font-semibold text-slate-600">${totalEgr.toLocaleString()}</span></p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
                       <div style={{ flexShrink: 0 }}>
                         <PieChart width={260} height={260}>
-                          <Pie data={pieRows} cx={130} cy={130} innerRadius={72} outerRadius={117} paddingAngle={2} dataKey="value" labelLine={false} label={renderLabel(totalEgresos)}>
-                            {pieRows.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                          <Pie data={eRows} cx={130} cy={130} innerRadius={72} outerRadius={117} paddingAngle={2} dataKey="value" labelLine={false} label={mkLabel(totalEgr)}>
+                            {eRows.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
                           </Pie>
-                          <Tooltip
-                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                            formatter={(v, name) => [`$${Number(v ?? 0).toLocaleString()} · ${((Number(v ?? 0) / totalEgresos) * 100).toFixed(1)}%`, name]}
-                          />
+                          <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }} formatter={(v: any) => [`$${Number(v ?? 0).toLocaleString()} · ${((Number(v ?? 0) / totalEgr) * 100).toFixed(1)}%`]} />
                         </PieChart>
                       </div>
-                      <DonutList rows={pieRows} total={totalEgresos} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '180px', maxWidth: '280px' }}>
+                        {[...eRows].sort((a, b) => b.value - a.value).map((row, idx) => {
+                          const pct = (row.value / totalEgr) * 100
+                          return (
+                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: row.color, flexShrink: 0, display: 'inline-block' }} />
+                                  <span style={{ fontSize: '13px', color: '#334155', fontWeight: 500 }}>{row.name}</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, width: '32px', textAlign: 'right' }}>{pct.toFixed(0)}%</span>
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums', width: '64px', textAlign: 'right' }}>${row.value.toLocaleString()}</span>
+                                </div>
+                              </div>
+                              <div style={{ height: '4px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
+                                <div style={{ width: `${pct}%`, height: '100%', background: row.color, borderRadius: '999px', transition: 'width 0.4s ease' }} />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* ── Dona Ingresos ── */}
-                {hasIngresos && (
+                {/* Dona Ingresos */}
+                {hasI && (
                   <div className="rounded-xl border border-slate-200 bg-white p-6">
                     <div className="mb-5">
                       <h3 className="text-sm font-semibold text-slate-900">Distribución de ingresos — {MONTHS[month - 1]} {year}</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">Total: <span className="font-semibold text-slate-600">${totalIngresos.toLocaleString()}</span></p>
+                      <p className="text-xs text-slate-400 mt-0.5">Total: <span className="font-semibold text-slate-600">${totalIng.toLocaleString()}</span></p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
                       <div style={{ flexShrink: 0 }}>
                         <PieChart width={260} height={260}>
-                          <Pie data={incomeRows} cx={130} cy={130} innerRadius={72} outerRadius={117} paddingAngle={2} dataKey="value" labelLine={false} label={renderLabel(totalIngresos)}>
-                            {incomeRows.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                          <Pie data={iRows} cx={130} cy={130} innerRadius={72} outerRadius={117} paddingAngle={2} dataKey="value" labelLine={false} label={mkLabel(totalIng)}>
+                            {iRows.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
                           </Pie>
-                          <Tooltip
-                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }}
-                            formatter={(v, name) => [`$${Number(v ?? 0).toLocaleString()} · ${((Number(v ?? 0) / totalIngresos) * 100).toFixed(1)}%`, name]}
-                          />
+                          <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }} formatter={(v: any) => [`$${Number(v ?? 0).toLocaleString()} · ${((Number(v ?? 0) / totalIng) * 100).toFixed(1)}%`]} />
                         </PieChart>
                       </div>
-                      <DonutList rows={incomeRows} total={totalIngresos} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '180px', maxWidth: '280px' }}>
+                        {[...iRows].sort((a, b) => b.value - a.value).map((row, idx) => {
+                          const pct = (row.value / totalIng) * 100
+                          return (
+                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: row.color, flexShrink: 0, display: 'inline-block' }} />
+                                  <span style={{ fontSize: '13px', color: '#334155', fontWeight: 500 }}>{row.name}</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, width: '32px', textAlign: 'right' }}>{pct.toFixed(0)}%</span>
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums', width: '64px', textAlign: 'right' }}>${row.value.toLocaleString()}</span>
+                                </div>
+                              </div>
+                              <div style={{ height: '4px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
+                                <div style={{ width: `${pct}%`, height: '100%', background: row.color, borderRadius: '999px', transition: 'width 0.4s ease' }} />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}
+
               </div>
             )
           })()}
