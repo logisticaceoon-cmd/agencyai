@@ -1,19 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type ActivityLogRow = {
-  id: string
-  userId: string
-  organizationId: string
-  taskId?: string | null
-  actionType: string
-  description?: string | null
-  changes?: Record<string, unknown> | null
-  createdAt: string
-}
-
 export async function GET(request: Request) {
   try {
     const auth = await getAuthContext()
@@ -25,73 +12,56 @@ export async function GET(request: Request) {
     const month = searchParams.get('month')
     const year = searchParams.get('year')
 
-    // Get tasks assigned to this member (no deleted_at column in schema)
-    let tasksQuery = supabase
+    // Fetch all tasks for this user in this workspace (from tasks table only)
+    let query = supabase
       .from('tasks')
       .select('id, title, status, deadline, assignedTo, clientId, createdAt, updatedAt')
       .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .limit(500)
 
-    if (userId) tasksQuery = tasksQuery.contains('assignedTo', [userId])
+    if (userId) {
+      query = query.contains('assignedTo', [userId])
+    }
 
-    const { data: tasks, error: tasksError } = await tasksQuery
+    const { data: tasks, error: tasksError } = await query
 
     if (tasksError) {
       console.warn('Error fetching tasks for performance:', tasksError)
-      // Don't return 500 — gracefully continue with empty tasks
     }
 
-    // Get performance logs from activity_log
-    let logsQuery = supabase
-      .from('activity_log')
-      .select('*')
-      .eq('organizationId', workspaceId)
-      .eq('actionType', 'performance_task_completed')
-      .order('createdAt', { ascending: false })
-      .limit(200)
-
-    if (userId) logsQuery = logsQuery.eq('userId', userId)
-
-    const { data: logsRaw } = await logsQuery
-
-    // Filter by month/year from changes JSON
-    let logs = ((logsRaw || []) as ActivityLogRow[]).map(row => {
-      const c = (row.changes || {}) as Record<string, unknown>
-      return {
-        id: row.id,
-        user_id: row.userId,
-        task_id: row.taskId || null,
-        was_on_time: c.wasOnTime !== false,
-        delay_hours: (c.delayHours as number) || null,
-        hours_spent: (c.hoursSpent as number) || null,
-        month: (c.month as number) || new Date(row.createdAt).getMonth() + 1,
-        year: (c.year as number) || new Date(row.createdAt).getFullYear(),
-        created_at: row.createdAt,
-      }
-    })
-
-    if (month) logs = logs.filter(l => l.month === parseInt(month))
-    if (year) logs = logs.filter(l => l.year === parseInt(year))
-
-    // Calculate summary from tasks + logs
     const taskList = tasks || []
     const now = new Date()
-    const overdueTasks = taskList.filter(t => {
+    const deadline48hAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000)
+
+    // Completed in selected period — filter by updatedAt month/year
+    const completedInPeriod = taskList.filter((t: { status: string; updatedAt?: string | null; createdAt: string }) => {
+      if (t.status !== 'completed') return false
+      const d = new Date(t.updatedAt || t.createdAt)
+      if (month && d.getMonth() + 1 !== parseInt(month)) return false
+      if (year && d.getFullYear() !== parseInt(year)) return false
+      return true
+    })
+
+    // Overdue: deadline > 48h ago, not completed, assigned to user
+    const overdueTasks = taskList.filter((t: { deadline: string | null; status: string }) => {
       if (!t.deadline) return false
       if (t.status === 'completed') return false
-      const deadline = new Date(t.deadline)
-      const diffHours = (now.getTime() - deadline.getTime()) / (1000 * 60 * 60)
-      return diffHours > 48
+      return new Date(t.deadline) < deadline48hAgo
     })
+
+    const pending = taskList.filter((t: { status: string }) => t.status === 'pending')
+    const inProgress = taskList.filter((t: { status: string }) => t.status === 'in_progress')
 
     return NextResponse.json({
       tasks: taskList,
-      logs,
+      logs: completedInPeriod,
       alerts: overdueTasks,
       summary: {
         total: taskList.length,
-        completed: logs.length, // logs = completed in period
-        pending: taskList.filter((t: { status: string }) => t.status === 'pending').length,
-        in_progress: taskList.filter((t: { status: string }) => t.status === 'in_progress').length,
+        completed: completedInPeriod.length,
+        pending: pending.length,
+        in_progress: inProgress.length,
         overdue: overdueTasks.length,
       }
     })
