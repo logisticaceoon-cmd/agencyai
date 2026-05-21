@@ -1,14 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
-// Rendimiento: lee directamente de la tabla tasks (workspace_id funciona correctamente)
-// activity_log tiene FK a organizations (tabla legacy) que no coincide con workspace_id
-
 type TaskRow = {
   id: string
   title: string
   status: string
-  createdById: string | null
   assignedTo: string[] | null
   deadline: string | null
   updatedAt?: string | null
@@ -17,12 +13,20 @@ type TaskRow = {
 }
 
 function mapTaskToLog(task: TaskRow, userId: string) {
-  const completedAt = task.updatedAt || task.createdAt
-  const completedDate = new Date(completedAt)
+  // For completed tasks use updatedAt (= completion date); otherwise use createdAt
+  const eventDate = task.status === 'completed'
+    ? (task.updatedAt || task.createdAt)
+    : task.createdAt
+  const eventTime = new Date(eventDate)
   const deadline = task.deadline ? new Date(task.deadline) : null
-  const wasOnTime = deadline ? completedDate <= deadline : true
-  const delayHours = (!wasOnTime && deadline)
-    ? Math.round((completedDate.getTime() - deadline.getTime()) / 3600000)
+
+  // was_on_time only meaningful for completed tasks
+  const wasOnTime = task.status === 'completed'
+    ? (deadline ? eventTime <= deadline : true)
+    : true
+
+  const delayHours = (task.status === 'completed' && !wasOnTime && deadline)
+    ? Math.round((eventTime.getTime() - deadline.getTime()) / 3600000)
     : null
 
   return {
@@ -31,14 +35,15 @@ function mapTaskToLog(task: TaskRow, userId: string) {
     user_id: userId,
     task_id: task.id,
     client_id: task.clientId || null,
-    action_type: 'task_completed',
+    action_type: task.status === 'completed' ? 'task_completed' : 'task_active',
     title: task.title,
+    status: task.status,
     was_on_time: wasOnTime,
     delay_hours: delayHours,
     hours_spent: null,
-    month: completedDate.getMonth() + 1,
-    year: completedDate.getFullYear(),
-    created_at: completedAt,
+    month: eventTime.getMonth() + 1,
+    year: eventTime.getFullYear(),
+    created_at: eventDate,
   }
 }
 
@@ -53,37 +58,47 @@ export async function GET(request: Request) {
     const month = searchParams.get('month')
     const year = searchParams.get('year')
 
-    // Query completed tasks for this workspace
+    // Fetch all tasks assigned to this user in this workspace
     let query = supabase
       .from('tasks')
-      .select('id, title, status, createdById, assignedTo, deadline, createdAt, clientId')
+      .select('id, title, status, assignedTo, deadline, createdAt, updatedAt, clientId')
       .eq('workspace_id', workspaceId)
-      .eq('status', 'completed')
       .is('deleted_at', null)
-      .order('createdAt', { ascending: false })
+      .order('updatedAt', { ascending: false })
       .limit(500)
+
+    if (userId) {
+      query = query.contains('assignedTo', [userId])
+    }
 
     const { data, error } = await query
 
     if (error) {
-      console.warn('Error fetching tasks for performance:', error)
+      console.warn('Error fetching tasks for performance logs:', error)
       return NextResponse.json({ data: [] })
     }
 
     const tasks = (data || []) as TaskRow[]
 
-    // Filter by userId: tasks created by or assigned to this user
-    const filtered = userId
-      ? tasks.filter(t =>
-          t.createdById === userId ||
-          (Array.isArray(t.assignedTo) && t.assignedTo.includes(userId))
-        )
-      : tasks
+    let rows = tasks.map(t => mapTaskToLog(t, userId || ''))
 
-    let rows = filtered.map(t => mapTaskToLog(t, userId || t.createdById || ''))
+    // Filter by month/year using the event date (updatedAt for completed, createdAt for others)
+    if (month || year) {
+      rows = rows.filter(r => {
+        if (month && r.month !== parseInt(month)) return false
+        if (year && r.year !== parseInt(year)) return false
+        return true
+      })
+    }
 
-    if (month) rows = rows.filter(r => r.month === parseInt(month))
-    if (year) rows = rows.filter(r => r.year === parseInt(year))
+    // Sort: completed first by date desc, then active by createdAt desc
+    rows.sort((a, b) => {
+      const aCompleted = a.action_type === 'task_completed'
+      const bCompleted = b.action_type === 'task_completed'
+      if (aCompleted && !bCompleted) return -1
+      if (!aCompleted && bCompleted) return 1
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
 
     return NextResponse.json({ data: rows })
   } catch (err) {
@@ -92,7 +107,6 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
-  // POST no es necesario en el nuevo modelo (las tareas se registran al completarse)
+export async function POST() {
   return NextResponse.json({ success: true, message: 'Log auto-generado desde tasks' })
 }
