@@ -12,7 +12,7 @@ export async function GET(request: Request) {
       .select('*')
       .eq('workspace_id', workspaceId)
       .order('position', { ascending: true })
-      .order('createdAt', { ascending: true })
+      .order('created_at', { ascending: true })
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })
