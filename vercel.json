@@ -39,6 +39,14 @@
     {
       "path": "/api/cron/comisiones",
       "schedule": "0 11 1-3 * *"
+    },
+    {
+      "path": "/api/cron/email-check",
+      "schedule": "0 13 * * 1-5"
+    },
+    {
+      "path": "/api/cron/email-check",
+      "schedule": "0 21 * * 1-5"
     }
   ]
 }
