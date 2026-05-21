@@ -118,9 +118,14 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabaseUrl = process.env.SUPABASE_URL_REAL || ''
-    const supabaseKey = process.env.SUPABASE_SERVICE_KEY_REAL || ''
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
     const workspaceId = '41b4b8ab-2483-418d-bb29-d39084ca36f0'
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('daily-bitacora: faltan variables NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY')
+      return NextResponse.json({ error: 'Configuración de Supabase no disponible' }, { status: 500 })
+    }
 
     const argNow = new Date(Date.now() - 3 * 60 * 60 * 1000)
     const dayName = DAYS_ES[argNow.getUTCDay()]
