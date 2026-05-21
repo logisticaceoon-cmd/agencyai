@@ -21,76 +21,99 @@ export async function POST(request: Request) {
       .eq('workspace_id', workspaceId)
       .maybeSingle()
 
-    // Get professional type context
+    // Get workspace info
     const { data: workspaceRow } = await supabase
       .from('workspaces')
-      .select('professional_type_id')
+      .select('name, professional_type_id, owner_id')
       .eq('id', workspaceId)
       .maybeSingle()
 
-    let professionalContext = ''
-    let professionalName = 'agencia'
-    if (workspaceRow?.professional_type_id) {
-      const { data: ptype } = await supabase
-        .from('professional_types')
-        .select('name, ai_agent_context')
-        .eq('id', workspaceRow.professional_type_id)
-        .maybeSingle()
-      if (ptype) {
-        professionalContext = ptype.ai_agent_context || ''
-        professionalName = ptype.name || 'agencia'
-      }
-    }
+    // Get current user profile
+    const { data: currentUser } = await supabase
+      .from('users')
+      .select('id, email, fullName, role, department')
+      .eq('id', userId)
+      .maybeSingle()
 
-    // Get workspace context
+    const userName = currentUser?.fullName || currentUser?.email || 'Usuario'
+    const userRole = currentUser?.role || 'Equipo'
+    const isOwner = workspaceRow?.owner_id === userId
+
+    // Get workspace context (general)
     const workspaceContext = await getWorkspaceContext(supabase, workspaceId)
 
-    const agentName = aiConfig?.agent_name || 'Asistente AgencyAI'
-    const personality = aiConfig?.agent_personality || 'profesional'
+    // Get user-specific context (tasks and clients assigned to this user)
+    const userContext = await getUserContext(supabase, workspaceId, userId)
 
-    const personalityDesc =
-      personality === 'amigable' ? 'cercana y calida' :
-      personality === 'directo' ? 'concisa y al punto' :
-      personality === 'motivacional' ? 'motivadora y energica' :
-      personality === 'analitico' ? 'analitica y basada en datos' :
-      'profesional pero accesible'
-
+    // Build Ceonyx persona system prompt
     const now = new Date()
-    const dateStr = now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
+    const dateStr = now.toLocaleDateString('es-AR', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    })
+    const timeStr = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 
-    const systemPrompt = `Sos ${agentName}, el asistente de IA para ${professionalName}.
-${professionalContext ? professionalContext + '\n' : ''}Tu personalidad es: ${personality}. Respondes de forma ${personalityDesc}.
-Hoy es ${dateStr}.
+    const agencyName = workspaceRow?.name || 'la agencia'
+    const agentName = 'Ceonyx'
 
-DATOS ACTUALES DE LA AGENCIA:
-- Clientes activos: ${workspaceContext.activeClients}
+    const ownerContext = isOwner ? `
+Estás hablando con ${userName}, el CEO y fundador de la agencia.
+- Tiene acceso completo a todo el sistema
+- Priorizar siempre por: 1) impacto en ingresos, 2) crecimiento, 3) urgencia real
+- Máximo 3 tareas críticas por día
+- Es directo — no quiere listas largas ni texto de relleno
+- Si se está dispersando en tareas de bajo valor, señalarlo
+` : `
+Estás hablando con ${userName}, ${userRole} del equipo.
+- Sus clientes asignados: ${userContext.assignedClientNames.length > 0 ? userContext.assignedClientNames.join(', ') : 'ver tareas asignadas'}
+- Tiene acceso a sus tareas y clientes asignados
+- Ser claro, directo y práctico en las respuestas
+`
+
+    const systemPrompt = `Sos ${agentName}, el agente de inteligencia artificial interno de ${agencyName}.
+
+IDENTIDAD:
+- Nombre: Ceonyx
+- Rol: Agente de IA — ${agencyName}
+- Carácter: Directo, sin relleno. Hablás como socio senior, no como asistente. Tenés criterio propio.
+- Cuando algo está mal lo decís. Cuando está bien lo reconocés en una línea y seguís.
+- Hablás en español latinoamericano. Sin emojis excesivos.
+- Firmás siempre como: Ceonyx · Agente IA — ${agencyName}
+
+CONTEXTO DEL USUARIO:
+${ownerContext}
+
+CONTEXTO HOY — ${dateStr} ${timeStr}:
+- Clientes activos en la agencia: ${workspaceContext.activeClients}
 - Proyectos activos: ${workspaceContext.activeProjects}
-- Tareas vencidas: ${workspaceContext.overdueTasks}
-${workspaceContext.overdueList.length > 0 ? `- Tareas vencidas: ${workspaceContext.overdueList.map((t: any) => `"${t.title}"`).join(', ')}` : ''}
-- Tareas de hoy: ${workspaceContext.todayTasks}
-${workspaceContext.todayList.length > 0 ? `- Tareas de hoy: ${workspaceContext.todayList.map((t: any) => `"${t.title}"`).join(', ')}` : ''}
 - Ingresos del mes: $${workspaceContext.monthlyIncome.toLocaleString()}
-- Modulo actual: ${module || 'dashboard'}
 
-CAPACIDADES:
-Podes ejecutar acciones reales. Cuando el usuario pide ejecutar algo, responde normalmente
-Y al final agrega exactamente este formato (sin espacios extra):
+TAREAS ASIGNADAS A ${userName.toUpperCase()}:
+- Pendientes/En progreso: ${userContext.pendingTasks} tareas
+- Vencidas: ${userContext.overdueTasks} tareas${userContext.overdueList.length > 0 ? '\n  → ' + userContext.overdueList.map((t: any) => `"${t.title}"`).join(', ') : ''}
+- Para hoy: ${userContext.todayTasks} tareas${userContext.todayList.length > 0 ? '\n  → ' + userContext.todayList.map((t: any) => `"${t.title}"`).join(', ') : ''}
+
+TAREAS GENERALES DEL WORKSPACE:
+- Vencidas en total: ${workspaceContext.overdueTasks}
+- Para hoy en total: ${workspaceContext.todayTasks}
+- Módulo actual: ${module || 'dashboard'}
+
+CAPACIDADES — ACCIONES EJECUTABLES:
+Cuando el usuario pida ejecutar algo, respondé normalmente y al final agregá exactamente:
 [ACTION:{"type":"TIPO","data":{...}}]
 
-Tipos de accion disponibles:
+Tipos disponibles:
 - create_task: {"title":"X","priority":"high|medium|low","dueDate":"YYYY-MM-DD","description":"X"}
 - complete_task: {"taskId":"X"}
 - create_report: {"title":"X","type":"weekly|monthly"}
 - get_tasks: {}
 - get_projects: {}
 
-IMPORTANTE:
-- Se conversacional. Hace UNA pregunta a la vez.
-- No hagas listas enormes sin que te las pidan.
-- Cuando el usuario salude, responde con saludo contextual del dia y UNA pregunta concreta.
-- Si el mensaje empieza con [SISTEMA:] es un trigger automatico, responde como si fuera un saludo inicial.
-- Habla en espanol neutro latinoamericano (tu, tienes, puedes).
-- Maximo 1-2 emojis por mensaje.`
+REGLAS DE COMUNICACIÓN:
+- Sé conversacional. Una pregunta a la vez.
+- No hagas listas largas sin que te las pidan.
+- Si el mensaje empieza con [SISTEMA:] es un trigger automático, respondé como saludo inicial contextual.
+- Máximo 2 emojis por mensaje.
+- Cuando alguien saluda, respondé con el estado real de sus tareas del día.`
 
     // Build API messages
     const apiMessages = messages && messages.length > 0
@@ -109,7 +132,6 @@ IMPORTANTE:
     let usedAI = false
 
     if (provider === 'openai' && hasValidOpenaiKey) {
-      // OpenAI
       try {
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -129,7 +151,6 @@ IMPORTANTE:
     }
 
     if (!usedAI && hasValidAnthropicKey) {
-      // Anthropic
       try {
         const res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -153,8 +174,7 @@ IMPORTANTE:
       } catch { /* fall through */ }
     }
 
-    if (!usedAI && !hasValidAnthropicKey && hasValidOpenaiKey) {
-      // Try OpenAI as fallback
+    if (!usedAI && hasValidOpenaiKey) {
       try {
         const res = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -174,9 +194,7 @@ IMPORTANTE:
     }
 
     if (!usedAI) {
-      // Smart fallback without AI
-      const lastMsg = message || apiMessages[apiMessages.length - 1]?.content || ''
-      responseText = generateSmartFallback(workspaceContext, lastMsg, agentName)
+      responseText = generateSmartFallback(workspaceContext, userContext, userName, message || apiMessages[apiMessages.length - 1]?.content || '')
     }
 
     // Parse action from response
@@ -205,6 +223,7 @@ IMPORTANTE:
       action,
       provider: usedAI ? provider : 'fallback',
       hasAI: usedAI || hasValidAnthropicKey || hasValidOpenaiKey,
+      agent: agentName,
     })
   } catch (err) {
     console.error('Error en /api/ai/chat:', err)
@@ -212,6 +231,7 @@ IMPORTANTE:
       response: 'Hubo un error al procesar tu mensaje. Intenta de nuevo.',
       action: null,
       hasAI: false,
+      agent: 'Ceonyx',
     })
   }
 }
@@ -228,11 +248,12 @@ async function getWorkspaceContext(supabase: any, workspaceId: string) {
       .eq('workspace_id', workspaceId).eq('status', 'active'),
     supabase.from('tasks').select('id, title')
       .eq('workspace_id', workspaceId).in('status', ['pending', 'in_progress'])
-      .lt('deadline', todayStr).not('deadline', 'is', null).limit(5),
+      .lt('deadline', todayStr).not('deadline', 'is', null).is('deleted_at', null).limit(5),
     supabase.from('tasks').select('id, title, priority')
       .eq('workspace_id', workspaceId).in('status', ['pending', 'in_progress'])
-      .gte('deadline', todayStr).lt('deadline', new Date(now.getTime() + 86400000).toISOString().split('T')[0])
-      .limit(5),
+      .gte('deadline', `${todayStr}T00:00:00Z`)
+      .lte('deadline', `${todayStr}T23:59:59Z`)
+      .is('deleted_at', null).limit(5),
     supabase.from('transactions').select('amount')
       .eq('workspace_id', workspaceId).eq('type', 'income').gte('date', monthStart),
   ])
@@ -248,35 +269,81 @@ async function getWorkspaceContext(supabase: any, workspaceId: string) {
   }
 }
 
-function generateSmartFallback(ctx: any, userMessage: string, agentName: string): string {
+async function getUserContext(supabase: any, workspaceId: string, userId: string) {
+  const now = new Date()
+  const todayStr = now.toISOString().split('T')[0]
+
+  const [assignedRes, overdueRes, todayRes, clientsRes] = await Promise.all([
+    // All pending tasks assigned to this user
+    supabase.from('tasks').select('id, title, status, priority, deadline, clientId')
+      .eq('workspace_id', workspaceId)
+      .in('status', ['pending', 'in_progress'])
+      .contains('assignedTo', [userId])
+      .is('deleted_at', null)
+      .limit(20),
+    // Overdue tasks for this user
+    supabase.from('tasks').select('id, title, deadline')
+      .eq('workspace_id', workspaceId)
+      .in('status', ['pending', 'in_progress'])
+      .contains('assignedTo', [userId])
+      .lt('deadline', todayStr)
+      .not('deadline', 'is', null)
+      .is('deleted_at', null)
+      .limit(5),
+    // Today's tasks for this user
+    supabase.from('tasks').select('id, title, priority')
+      .eq('workspace_id', workspaceId)
+      .in('status', ['pending', 'in_progress'])
+      .contains('assignedTo', [userId])
+      .gte('deadline', `${todayStr}T00:00:00Z`)
+      .lte('deadline', `${todayStr}T23:59:59Z`)
+      .is('deleted_at', null)
+      .limit(5),
+    // Clients in workspace (for context)
+    supabase.from('clients').select('id, name')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'active')
+      .limit(10),
+  ])
+
+  return {
+    pendingTasks: assignedRes.data?.length || 0,
+    overdueTasks: overdueRes.data?.length || 0,
+    overdueList: overdueRes.data || [],
+    todayTasks: todayRes.data?.length || 0,
+    todayList: todayRes.data || [],
+    assignedClientNames: (clientsRes.data || []).map((c: any) => c.name),
+  }
+}
+
+function generateSmartFallback(
+  ctx: any,
+  userCtx: any,
+  userName: string,
+  userMessage: string
+): string {
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Buenos dias' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
+  const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
   const lower = userMessage.toLowerCase()
 
   if (lower.includes('[sistema:') || lower.includes('hola') || lower.includes('buenos') || lower.includes('buenas')) {
-    let msg = `${greeting}! Soy ${agentName}. `
-    if (ctx.overdueTasks > 0) {
-      msg += `Tenes ${ctx.overdueTasks} tarea${ctx.overdueTasks > 1 ? 's' : ''} vencida${ctx.overdueTasks > 1 ? 's' : ''} que necesitan atencion. `
+    let msg = `${greeting}, ${userName}. `
+    if (userCtx.overdueTasks > 0) {
+      msg += `Tenés ${userCtx.overdueTasks} tarea${userCtx.overdueTasks > 1 ? 's' : ''} vencida${userCtx.overdueTasks > 1 ? 's' : ''}. `
     }
-    if (ctx.todayTasks > 0) {
-      msg += `Hoy vencen ${ctx.todayTasks} tarea${ctx.todayTasks > 1 ? 's' : ''}. `
+    if (userCtx.todayTasks > 0) {
+      msg += `Hoy vencen ${userCtx.todayTasks} tarea${userCtx.todayTasks > 1 ? 's' : ''}. `
     }
-    msg += `Tenes ${ctx.activeClients} clientes y ${ctx.activeProjects} proyectos activos. `
-    msg += '\n\nPara activar mis capacidades completas de IA, configura tu API key en "Agente de IA". Queres que te lleve a la configuracion?'
+    if (userCtx.pendingTasks === 0 && userCtx.overdueTasks === 0) {
+      msg += `No tenés tareas pendientes asignadas. `
+    }
+    msg += '\n\nPara mis capacidades completas de IA, configurá la API key en Ajustes → Agente de IA.'
     return msg
   }
 
-  if (lower.includes('tarea') || lower.includes('pendiente') || lower.includes('urgente')) {
-    return `Tenes ${ctx.overdueTasks} tareas vencidas y ${ctx.todayTasks} para hoy. Para respuestas mas detalladas, configura tu API key de Claude o ChatGPT en la seccion "Agente de IA".`
+  if (lower.includes('tarea') || lower.includes('pendiente')) {
+    return `Tenés ${userCtx.pendingTasks} tareas pendientes (${userCtx.overdueTasks} vencidas, ${userCtx.todayTasks} para hoy). Para análisis detallado, configurá la API key en Ajustes.`
   }
 
-  if (lower.includes('proyecto')) {
-    return `Tenes ${ctx.activeProjects} proyectos activos. Para un analisis detallado, configura tu API key en "Agente de IA".`
-  }
-
-  if (lower.includes('reporte') || lower.includes('analisis') || lower.includes('mes')) {
-    return `Este mes llevas $${ctx.monthlyIncome.toLocaleString()} en ingresos con ${ctx.activeClients} clientes activos. Para un analisis completo con IA, configura tu API key en "Agente de IA".`
-  }
-
-  return `Entendi tu mensaje. Para respuestas inteligentes y contextuales, configura tu API key de Claude o ChatGPT en la seccion "Agente de IA". Queres ir a configurarla?`
+  return `Entendido. Para respuestas completas con IA, configurá tu API key en Ajustes → Agente de IA.`
 }
