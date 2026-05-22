@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Loader2, Settings, ArrowRight, Paperclip, X as XIcon, Image as ImageIcon } from 'lucide-react'
+import { Send, Loader2, Settings, ArrowRight, Paperclip, X as XIcon, Image as ImageIcon, Maximize2, Minimize2, Smile } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import Link from 'next/link'
@@ -30,6 +30,12 @@ const QUICK_CHIPS = [
   'Cómo estoy este mes?',
 ]
 
+const STICKERS = [
+  '🔥', '💪', '✅', '🚀', '👍', '❤️',
+  '😂', '🎯', '💡', '⚡', '🙌', '😎',
+  '📈', '💰', '🏆', '😅', '👀', '🤝',
+]
+
 function generateId() {
   return Math.random().toString(36).slice(2, 10)
 }
@@ -54,6 +60,8 @@ export function AgentChat() {
   const [hasAI, setHasAI] = useState<boolean | null>(null)
   const [greeted, setGreeted] = useState(false)
   const [attachment, setAttachment] = useState<ImageAttachment | null>(null)
+  const [expanded, setExpanded] = useState(false)
+  const [showStickers, setShowStickers] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -254,7 +262,20 @@ export function AgentChat() {
   const showChips = messages.length === 0 || (messages.length <= 1 && messages[0]?.role === 'assistant')
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-[var(--radius-lg)] border border-[var(--border-base)] overflow-hidden">
+    <div className={cn(
+      "flex flex-col bg-white border border-[var(--border-base)] overflow-hidden transition-all duration-200",
+      expanded
+        ? "fixed inset-4 z-50 rounded-2xl shadow-2xl"
+        : "h-full rounded-[var(--radius-lg)]"
+    )}>
+      {/* Backdrop when expanded */}
+      {expanded && (
+        <div
+          className="fixed inset-0 bg-black/30 -z-10"
+          onClick={() => setExpanded(false)}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-base)] bg-white flex-shrink-0">
         <div className="h-9 w-9 rounded-full bg-blue-100 flex items-center justify-center text-lg flex-shrink-0">
@@ -272,6 +293,13 @@ export function AgentChat() {
             </span>
           </div>
         </div>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] transition-colors"
+          title={expanded ? 'Reducir' : 'Expandir chat'}
+        >
+          {expanded ? <Minimize2 size={14} strokeWidth={1.5} /> : <Maximize2 size={14} strokeWidth={1.5} />}
+        </button>
         <Link
           href="/settings/ai"
           className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] transition-colors"
@@ -407,10 +435,30 @@ export function AgentChat() {
         </div>
       )}
 
+      {/* Sticker picker */}
+      {showStickers && (
+        <div className="border-t border-[var(--border-base)] bg-white px-3 pt-2 pb-1 flex-shrink-0">
+          <div className="grid grid-cols-9 gap-1">
+            {STICKERS.map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  sendToApi(s)
+                  setShowStickers(false)
+                }}
+                className="h-8 w-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-lg transition-colors"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Input area */}
       <div className="border-t border-[var(--border-base)] bg-white p-3 flex-shrink-0">
         <div className="flex items-end gap-2">
-          {/* Image upload button */}
+          {/* Image upload */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -427,6 +475,20 @@ export function AgentChat() {
             onChange={handleFileChange}
             className="hidden"
           />
+
+          {/* Sticker button */}
+          <button
+            type="button"
+            onClick={() => setShowStickers(!showStickers)}
+            disabled={loading}
+            className={cn(
+              "h-9 w-9 rounded-xl border text-[var(--text-muted)] flex items-center justify-center hover:bg-[var(--bg-subtle)] hover:text-[var(--text-secondary)] disabled:opacity-40 transition-colors flex-shrink-0",
+              showStickers ? "border-blue-300 bg-blue-50 text-blue-500" : "border-[var(--border-base)]"
+            )}
+            title="Stickers"
+          >
+            <Smile size={15} strokeWidth={1.5} />
+          </button>
 
           <textarea
             ref={inputRef}
@@ -451,8 +513,8 @@ export function AgentChat() {
             <Send size={16} strokeWidth={1.5} />
           </button>
         </div>
-        <p className="text-[10px] text-[var(--text-muted)] mt-1.5 pl-11">
-          <ImageIcon size={9} className="inline mr-0.5" /> Podés adjuntar capturas de campaña, métricas o creativos para análisis
+        <p className="text-[10px] text-[var(--text-muted)] mt-1.5 pl-[4.5rem]">
+          <ImageIcon size={9} className="inline mr-0.5" /> Adjuntá capturas de campaña, métricas o creativos
         </p>
       </div>
     </div>
