@@ -74,6 +74,7 @@ const adminItems: NavItem[] = [
   { href: '/settings', label: 'Workspace', icon: Building2 },
   { href: '/settings/team', label: 'Equipo', icon: Users },
   { href: '/settings/roles', label: 'Roles', icon: Shield },
+  { href: '/settings/ai', label: 'Agente de IA', icon: Zap },
   { href: '/settings/billing', label: 'Facturacion', icon: CreditCard },
 ]
 
