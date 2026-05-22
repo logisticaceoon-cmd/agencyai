@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Loader2, Settings, ArrowRight } from 'lucide-react'
+import { Send, Loader2, Settings, ArrowRight, Paperclip, X as XIcon, Image as ImageIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import Link from 'next/link'
@@ -11,15 +11,23 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   time: string
+  imagePreview?: string // base64 data URL for display
+}
+
+interface ImageAttachment {
+  dataUrl: string       // for preview
+  base64: string        // raw base64
+  mimeType: string
+  name: string
 }
 
 const QUICK_CHIPS = [
-  'Que tareas tengo hoy?',
-  'Analisis completo',
+  'Qué tareas tengo hoy?',
+  'Análisis completo',
   'Crear tarea',
   'Ver proyectos en riesgo',
   'Generar reporte',
-  'Como estoy este mes?',
+  'Cómo estoy este mes?',
 ]
 
 function generateId() {
@@ -41,12 +49,14 @@ export function AgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [agentName, setAgentName] = useState('Asistente AgencyAI')
+  const [agentName, setAgentName] = useState('Ceonyx')
   const [agentAvatar, setAgentAvatar] = useState('🤖')
   const [hasAI, setHasAI] = useState<boolean | null>(null)
   const [greeted, setGreeted] = useState(false)
+  const [attachment, setAttachment] = useState<ImageAttachment | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Auto-scroll
   useEffect(() => {
@@ -61,35 +71,48 @@ export function AgentChat() {
       .then(r => r.json())
       .then(d => {
         if (d.data) {
-          setAgentName(d.data.agent_name || 'Asistente AgencyAI')
+          setAgentName(d.data.agent_name || 'Ceonyx')
           setAgentAvatar(d.data.agent_avatar || '🤖')
         }
       })
       .catch(() => {})
   }, [])
 
-  // Auto-greeting on mount
+  // Auto-greeting on mount (once per day)
   useEffect(() => {
     if (!user || greeted) return
-
     const today = new Date().toDateString()
     const key = `greeting_${org?.id || 'default'}`
-    const last = localStorage.getItem(key)
-
-    if (last === today) {
-      setGreeted(true)
-      return
-    }
-
+    const last = typeof window !== 'undefined' ? localStorage.getItem(key) : null
+    if (last === today) { setGreeted(true); return }
     setGreeted(true)
-    localStorage.setItem(key, today)
-
-    // Send system greeting
+    if (typeof window !== 'undefined') localStorage.setItem(key, today)
     sendToApi('[SISTEMA: Saludo inicial del dia. El usuario acaba de abrir el dashboard.]', true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, greeted])
 
-  const sendToApi = useCallback(async (text: string, isSystem = false) => {
+  // Handle image file selection
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) return
+    if (file.size > 5 * 1024 * 1024) {
+      alert('La imagen es muy grande. Máximo 5MB.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string
+      // Extract pure base64 without the data:image/xxx;base64, prefix
+      const base64 = dataUrl.split(',')[1]
+      setAttachment({ dataUrl, base64, mimeType: file.type, name: file.name })
+    }
+    reader.readAsDataURL(file)
+    // Reset input so same file can be re-selected
+    e.target.value = ''
+  }
+
+  const sendToApi = useCallback(async (text: string, isSystem = false, img?: ImageAttachment | null) => {
     if (loading) return
 
     const userMsg: ChatMessage | null = isSystem ? null : {
@@ -97,26 +120,36 @@ export function AgentChat() {
       role: 'user',
       content: text,
       time: getTimeStr(),
+      imagePreview: img?.dataUrl,
     }
 
     const updatedMessages = userMsg ? [...messages, userMsg] : [...messages]
     if (userMsg) setMessages(updatedMessages)
     setLoading(true)
+    setAttachment(null)
 
     try {
       const apiMessages = isSystem
         ? [{ role: 'user' as const, content: text }]
         : updatedMessages.map(m => ({ role: m.role, content: m.content }))
 
+      const body: Record<string, unknown> = {
+        messages: apiMessages,
+        message: text,
+        module: 'dashboard',
+        context: {},
+      }
+
+      // Attach image if present
+      if (img) {
+        body.imageBase64 = img.base64
+        body.imageMimeType = img.mimeType
+      }
+
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: apiMessages,
-          message: text,
-          module: 'dashboard',
-          context: {},
-        }),
+        body: JSON.stringify(body),
       })
 
       const data = await res.json()
@@ -130,7 +163,6 @@ export function AgentChat() {
       }
       setMessages(prev => [...prev, assistantMsg])
 
-      // Execute action if present
       if (data.action) {
         await executeAction(data.action)
       }
@@ -138,7 +170,7 @@ export function AgentChat() {
       setMessages(prev => [...prev, {
         id: generateId(),
         role: 'assistant',
-        content: 'Error de conexion. Intenta de nuevo.',
+        content: 'Error de conexión. Intentá de nuevo.',
         time: getTimeStr(),
       }])
     } finally {
@@ -147,7 +179,7 @@ export function AgentChat() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, loading])
 
-  async function executeAction(action: { type: string; data: any }) {
+  async function executeAction(action: { type: string; data: Record<string, unknown> }) {
     try {
       if (action.type === 'create_task') {
         const res = await fetch('/api/tasks', {
@@ -165,7 +197,7 @@ export function AgentChat() {
         if (res.ok) {
           setMessages(prev => [...prev, {
             id: generateId(), role: 'assistant',
-            content: `Tarea "${action.data.title}" creada en tu tablero.`,
+            content: `✓ Tarea "${action.data.title}" creada en tu tablero.`,
             time: getTimeStr(),
           }])
         }
@@ -177,7 +209,7 @@ export function AgentChat() {
         })
         setMessages(prev => [...prev, {
           id: generateId(), role: 'assistant',
-          content: 'Tarea marcada como completada.',
+          content: '✓ Tarea marcada como completada.',
           time: getTimeStr(),
         }])
       } else if (action.type === 'create_report') {
@@ -193,21 +225,22 @@ export function AgentChat() {
         if (res.ok) {
           setMessages(prev => [...prev, {
             id: generateId(), role: 'assistant',
-            content: 'Reporte creado. Podes verlo en la seccion Reportes.',
+            content: '✓ Reporte creado. Podés verlo en la sección Reportes.',
             time: getTimeStr(),
           }])
         }
       }
     } catch {
-      // silently fail action execution
+      // silently fail action
     }
   }
 
   function handleSend() {
-    if (!input.trim() || loading) return
-    sendToApi(input.trim())
+    if ((!input.trim() && !attachment) || loading) return
+    const text = input.trim() || (attachment ? 'Analizá esta imagen.' : '')
+    const img = attachment
+    sendToApi(text, false, img)
     setInput('')
-    // Reset textarea height
     if (inputRef.current) inputRef.current.style.height = 'auto'
   }
 
@@ -216,10 +249,6 @@ export function AgentChat() {
       e.preventDefault()
       handleSend()
     }
-  }
-
-  function handleChip(text: string) {
-    sendToApi(text)
   }
 
   const showChips = messages.length === 0 || (messages.length <= 1 && messages[0]?.role === 'assistant')
@@ -239,11 +268,15 @@ export function AgentChat() {
               hasAI === false ? 'bg-slate-400' : 'bg-emerald-500'
             )} />
             <span className="text-[10px] text-[var(--text-muted)]">
-              {hasAI === false ? 'Sin IA' : 'En linea'}
+              {hasAI === false ? 'Sin IA' : 'En línea'}
             </span>
           </div>
         </div>
-        <Link href="/alerts" className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] transition-colors" title="Configurar agente">
+        <Link
+          href="/settings/ai"
+          className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] transition-colors"
+          title="Configurar agente IA"
+        >
           <Settings size={14} strokeWidth={1.5} />
         </Link>
       </div>
@@ -261,8 +294,10 @@ export function AgentChat() {
         {hasAI === false && messages.length <= 1 && (
           <div className="mx-2 rounded-xl border border-amber-200 bg-amber-50 p-3.5">
             <p className="text-xs font-semibold text-amber-800 mb-1">IA no configurada</p>
-            <p className="text-[11px] text-amber-700 mb-2">Configura tu API key para activar las respuestas inteligentes</p>
-            <Link href="/alerts" className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 hover:text-amber-900 transition-colors">
+            <p className="text-[11px] text-amber-700 mb-2">
+              El owner del workspace debe configurar la API key para activar las respuestas inteligentes para todo el equipo.
+            </p>
+            <Link href="/settings/ai" className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 hover:text-amber-900 transition-colors">
               Ir a configurar <ArrowRight size={11} />
             </Link>
           </div>
@@ -287,6 +322,16 @@ export function AgentChat() {
               )}
 
               <div className={cn('max-w-[80%]')}>
+                {/* Image preview if user sent an image */}
+                {msg.imagePreview && (
+                  <div className={cn('mb-1', isUser ? 'flex justify-end' : '')}>
+                    <img
+                      src={msg.imagePreview}
+                      alt="Imagen adjunta"
+                      className="max-w-[220px] max-h-[160px] rounded-xl object-cover border border-white/30 shadow-sm"
+                    />
+                  </div>
+                )}
                 <div
                   className={cn(
                     'px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap',
@@ -331,7 +376,7 @@ export function AgentChat() {
           {QUICK_CHIPS.map((chip) => (
             <button
               key={chip}
-              onClick={() => handleChip(chip)}
+              onClick={() => sendToApi(chip)}
               className="flex-shrink-0 px-3 py-1.5 rounded-full border border-blue-200 bg-blue-50 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition-colors whitespace-nowrap"
             >
               {chip}
@@ -340,20 +385,59 @@ export function AgentChat() {
         </div>
       )}
 
+      {/* Image preview strip */}
+      {attachment && (
+        <div className="px-3 pt-2 border-t border-[var(--border-base)] bg-white flex-shrink-0">
+          <div className="relative inline-block">
+            <img
+              src={attachment.dataUrl}
+              alt={attachment.name}
+              className="h-16 w-16 rounded-lg object-cover border border-slate-200"
+            />
+            <button
+              onClick={() => setAttachment(null)}
+              className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-slate-900 transition-colors"
+            >
+              <XIcon size={10} />
+            </button>
+            <div className="absolute bottom-0 left-0 right-0 bg-black/40 rounded-b-lg px-1 py-0.5">
+              <p className="text-[9px] text-white truncate">{attachment.name}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Input area */}
       <div className="border-t border-[var(--border-base)] bg-white p-3 flex-shrink-0">
         <div className="flex items-end gap-2">
+          {/* Image upload button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            className="h-9 w-9 rounded-xl border border-[var(--border-base)] text-[var(--text-muted)] flex items-center justify-center hover:bg-[var(--bg-subtle)] hover:text-[var(--text-secondary)] disabled:opacity-40 transition-colors flex-shrink-0"
+            title="Adjuntar imagen"
+          >
+            <Paperclip size={15} strokeWidth={1.5} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+
           <textarea
             ref={inputRef}
             value={input}
             onChange={(e) => {
               setInput(e.target.value)
-              // Auto-resize
               e.target.style.height = 'auto'
               e.target.style.height = Math.min(e.target.scrollHeight, 100) + 'px'
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Escribi un mensaje..."
+            placeholder={attachment ? 'Preguntá algo sobre la imagen...' : 'Escribí un mensaje...'}
             rows={1}
             className="flex-1 bg-[var(--bg-subtle)] border border-[var(--border-base)] rounded-xl px-3.5 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--blue)] focus:shadow-[var(--shadow-focus)] resize-none transition-all"
             disabled={loading}
@@ -361,12 +445,15 @@ export function AgentChat() {
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || loading}
+            disabled={(!input.trim() && !attachment) || loading}
             className="h-9 w-9 rounded-xl bg-[var(--blue)] text-white flex items-center justify-center hover:bg-[#1d4ed8] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
           >
             <Send size={16} strokeWidth={1.5} />
           </button>
         </div>
+        <p className="text-[10px] text-[var(--text-muted)] mt-1.5 pl-11">
+          <ImageIcon size={9} className="inline mr-0.5" /> Podés adjuntar capturas de campaña, métricas o creativos para análisis
+        </p>
       </div>
     </div>
   )
@@ -376,7 +463,6 @@ export function AgentChat() {
 export function AgentChatMobile() {
   const [open, setOpen] = useState(false)
 
-  // Listen for open event
   useEffect(() => {
     function handleOpen() { setOpen(true) }
     window.addEventListener('open-agent-widget', handleOpen)
@@ -385,7 +471,6 @@ export function AgentChatMobile() {
 
   return (
     <>
-      {/* Floating button - mobile only */}
       <button
         onClick={() => setOpen(true)}
         className="md:hidden fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-[var(--blue)] text-white shadow-lg hover:bg-[#1d4ed8] transition-all flex items-center justify-center"
@@ -394,17 +479,11 @@ export function AgentChatMobile() {
         <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-white" />
       </button>
 
-      {/* Fullscreen modal - mobile */}
       {open && (
         <div className="md:hidden fixed inset-0 z-50 bg-white flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-base)]">
             <span className="text-sm font-semibold text-[var(--text-primary)]">Agente IA</span>
-            <button
-              onClick={() => setOpen(false)}
-              className="text-sm font-medium text-[var(--blue)]"
-            >
-              Cerrar
-            </button>
+            <button onClick={() => setOpen(false)} className="text-sm font-medium text-[var(--blue)]">Cerrar</button>
           </div>
           <div className="flex-1 overflow-hidden">
             <AgentChat />
