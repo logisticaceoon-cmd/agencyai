@@ -33,7 +33,7 @@ export default function AISettingsPage() {
       .catch(() => setLoading(false))
   }, [])
 
-  const isOwner = org?.owner_id === user?.id
+  const isOwner = user?.role === 'owner'
   const hasAnyKey = hasAnthropicKey || hasOpenaiKey
 
   async function handleSave() {
