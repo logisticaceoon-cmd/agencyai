@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { MarketResearchTab } from '@/components/market-research/MarketResearchTab'
 import Link from 'next/link'
 import * as Tabs from '@radix-ui/react-tabs'
 import {
   ArrowLeft,
   Globe,
   Mail,
+  TrendingUp,
   Phone,
   DollarSign,
   Building2,
@@ -231,6 +233,7 @@ export default function ClientDetailPage() {
             { value: 'reportes', label: 'Reportes', icon: FileText },
             { value: 'notas', label: 'Notas', icon: StickyNote },
             { value: 'documentos', label: 'Documentos', icon: BookOpen },
+            { value: 'investigacion', label: 'Investigación', icon: TrendingUp },
           ].map((tab) => (
             <Tabs.Trigger
               key={tab.value}
@@ -534,6 +537,11 @@ export default function ClientDetailPage() {
         {/* Documentos tab */}
         <Tabs.Content value="documentos" className="pt-6">
           <ClientBookmarks clientId={client.id} clientName={client.name} />
+        </Tabs.Content>
+
+        {/* Investigación tab */}
+        <Tabs.Content value="investigacion" className="pt-6">
+          <MarketResearchTab clientId={client.id} clientName={client.name} />
         </Tabs.Content>
       </Tabs.Root>
     </div>
