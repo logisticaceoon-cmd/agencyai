@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { validateApiKey, isApiAuthError } from '@/lib/api-auth'
 
 // ─── Helper: auto-log performance when task is completed ─────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function logPerformance(
-  supabase: ReturnType<typeof import('@supabase/supabase-js').createClient>,
+  supabase: any,
   organizationId: string,
   task: Record<string, unknown>
 ) {
@@ -39,7 +40,8 @@ async function logPerformance(
       },
     }))
 
-    await supabase.from('activity_log').insert(inserts)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).from('activity_log').insert(inserts)
   } catch (e) {
     console.warn('logPerformance error (non-blocking):', e)
   }
@@ -161,7 +163,8 @@ export async function DELETE(
 
     // If completed and not yet logged → save performance data before deleting
     if (task.status === 'completed') {
-      const { data: existingLog } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existingLog } = await (supabase as any)
         .from('activity_log')
         .select('id')
         .eq('taskId', id)
