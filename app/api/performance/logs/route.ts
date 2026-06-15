@@ -1,36 +1,45 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
-// Usamos activity_log (tabla existente) con actionType 'performance_task_completed'
-// Los datos de rendimiento se guardan en el campo JSON 'changes'
+// ─── Lee de tasks directamente (activity_log tiene FK incompatible con workspaces) ───
 
-type ActivityLogRow = {
+type TaskRow = {
   id: string
-  userId: string
-  organizationId: string
-  taskId?: string | null
-  actionType: string
-  description?: string | null
-  changes?: Record<string, unknown> | null
-  createdAt: string
+  title: string
+  deadline?: string | null
+  clientId?: string | null
+  createdById?: string | null
+  assignedTo?: string[]
+  updatedAt: string
 }
 
-function mapToPerformanceLog(row: ActivityLogRow) {
-  const c = (row.changes || {}) as Record<string, unknown>
+function isUserTask(task: TaskRow, userId: string): boolean {
+  if (task.createdById === userId) return true
+  if (Array.isArray(task.assignedTo) && task.assignedTo.includes(userId)) return true
+  return false
+}
+
+function taskToLog(task: TaskRow, workspaceId: string, userId: string) {
+  const deadline = task.deadline ? new Date(task.deadline) : null
+  const completedAt = new Date(task.updatedAt)
+  const wasOnTime = !deadline || completedAt <= deadline
+  const delayHours = wasOnTime || !deadline
+    ? null
+    : Math.round((completedAt.getTime() - deadline.getTime()) / (1000 * 60 * 60))
   return {
-    id: row.id,
-    workspace_id: row.organizationId,
-    user_id: row.userId,
-    task_id: row.taskId || null,
-    client_id: (c.clientId as string) || null,
+    id: task.id,
+    workspace_id: workspaceId,
+    user_id: userId,
+    task_id: task.id,
+    client_id: task.clientId || null,
     action_type: 'task_completed',
-    title: (c.title as string) || row.description || 'Tarea completada',
-    was_on_time: c.wasOnTime !== false,
-    delay_hours: (c.delayHours as number) || null,
-    hours_spent: (c.hoursSpent as number) || null,
-    month: (c.month as number) || new Date(row.createdAt).getMonth() + 1,
-    year: (c.year as number) || new Date(row.createdAt).getFullYear(),
-    created_at: row.createdAt,
+    title: task.title,
+    was_on_time: wasOnTime,
+    delay_hours: delayHours,
+    hours_spent: null,
+    month: completedAt.getMonth() + 1,
+    year: completedAt.getFullYear(),
+    created_at: task.updatedAt,
   }
 }
 
@@ -46,28 +55,42 @@ export async function GET(request: Request) {
     const year = searchParams.get('year')
 
     let query = supabase
-      .from('activity_log')
-      .select('*')
-      .eq('organizationId', workspaceId)
-      .eq('actionType', 'performance_task_completed')
-      .order('createdAt', { ascending: false })
-      .limit(200)
+      .from('tasks')
+      .select('id, title, deadline, clientId, createdById, assignedTo, updatedAt')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'completed')
+      .is('deleted_at', null)
+      .order('updatedAt', { ascending: false })
+      .limit(500)
 
-    if (userId) query = query.eq('userId', userId)
+    // If month+year specified, filter by date range
+    if (month && year) {
+      const targetMonth = parseInt(month)
+      const targetYear = parseInt(year)
+      const monthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01T00:00:00`
+      const nextMonthYear = targetMonth === 12 ? targetYear + 1 : targetYear
+      const nextMonthNum = targetMonth === 12 ? 1 : targetMonth + 1
+      const monthEnd = `${nextMonthYear}-${String(nextMonthNum).padStart(2, '0')}-01T00:00:00`
+      query = query.gte('updatedAt', monthStart).lt('updatedAt', monthEnd)
+    }
 
     const { data, error } = await query
 
     if (error) {
-      console.warn('Error fetching activity_log for performance:', error)
+      console.warn('Error fetching tasks for performance logs:', error)
       return NextResponse.json({ data: [] })
     }
 
-    let rows = ((data || []) as ActivityLogRow[]).map(mapToPerformanceLog)
+    let rows = (data || []) as TaskRow[]
 
-    if (month) rows = rows.filter(r => r.month === parseInt(month))
-    if (year) rows = rows.filter(r => r.year === parseInt(year))
+    // Filter by user
+    if (userId) {
+      rows = rows.filter(t => isUserTask(t, userId))
+    }
 
-    return NextResponse.json({ data: rows })
+    const logs = rows.map(t => taskToLog(t, workspaceId, userId || t.createdById || ''))
+
+    return NextResponse.json({ data: logs })
   } catch (err) {
     console.error('Error in GET /api/performance/logs:', err)
     return NextResponse.json({ data: [] })
@@ -75,45 +98,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  try {
-    const auth = await getAuthContext()
-    if (isAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
-
-    const body = await request.json()
-    const now = new Date()
-
-    const { data, error } = await supabase
-      .from('activity_log')
-      .insert({
-        organizationId: workspaceId,
-        userId: body.user_id,
-        taskId: body.task_id || null,
-        actionType: 'performance_task_completed',
-        entityType: 'task',
-        entityId: body.task_id || null,
-        description: body.title,
-        changes: {
-          wasOnTime: body.was_on_time !== false,
-          delayHours: body.delay_hours || null,
-          hoursSpent: body.hours_spent || null,
-          clientId: body.client_id || null,
-          month: body.month || (now.getMonth() + 1),
-          year: body.year || now.getFullYear(),
-          title: body.title,
-        },
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Error creating performance log in activity_log:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ data: mapToPerformanceLog(data as ActivityLogRow) }, { status: 201 })
-  } catch (err) {
-    console.error('Error in POST /api/performance/logs:', err)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
-  }
+  // POST a logs ya no es necesario — los logs se leen directo de tasks
+  // Mantener endpoint por compatibilidad pero retornar success sin escribir nada
+  return NextResponse.json({ data: { message: 'Logs are now computed from tasks table' } }, { status: 201 })
 }
