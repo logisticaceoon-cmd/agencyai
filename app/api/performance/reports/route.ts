@@ -1,15 +1,39 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
-// Reports se calculan en tiempo real desde activity_log (no se persisten en tabla separada)
+// ─── Lee de tasks directamente (activity_log tiene FK incompatible con workspaces) ───
+// Fuente de verdad: tasks.status = 'completed' + tasks.updatedAt para filtro de mes
 
-type ActivityLogRow = {
+type TaskRow = {
   id: string
-  userId: string
-  organizationId: string
-  taskId?: string | null
-  changes?: Record<string, unknown> | null
-  createdAt: string
+  title: string
+  deadline?: string | null
+  clientId?: string | null
+  createdById?: string | null
+  assignedTo?: string[]
+  updatedAt: string
+  workspace_id: string
+}
+
+function computeWasOnTime(task: TaskRow): boolean {
+  if (!task.deadline) return true
+  const deadline = new Date(task.deadline)
+  const completedAt = new Date(task.updatedAt)
+  return completedAt <= deadline
+}
+
+function delayHours(task: TaskRow): number | null {
+  if (!task.deadline) return null
+  const deadline = new Date(task.deadline)
+  const completedAt = new Date(task.updatedAt)
+  if (completedAt <= deadline) return null
+  return Math.round((completedAt.getTime() - deadline.getTime()) / (1000 * 60 * 60))
+}
+
+function isUserTask(task: TaskRow, userId: string): boolean {
+  if (task.createdById === userId) return true
+  if (Array.isArray(task.assignedTo) && task.assignedTo.includes(userId)) return true
+  return false
 }
 
 export async function GET(request: Request) {
@@ -27,39 +51,48 @@ export async function GET(request: Request) {
       return NextResponse.json({ data: [] })
     }
 
-    // Fetch logs from activity_log
-    const { data: logs } = await supabase
-      .from('activity_log')
-      .select('*')
-      .eq('organizationId', workspaceId)
-      .eq('userId', userId)
-      .eq('actionType', 'performance_task_completed')
+    const targetMonth = parseInt(month)
+    const targetYear = parseInt(year)
 
-    const allLogs = ((logs || []) as ActivityLogRow[]).filter(row => {
-      const c = row.changes || {}
-      return (c as Record<string, unknown>).month === parseInt(month) &&
-             (c as Record<string, unknown>).year === parseInt(year)
-    })
+    // Date range for the month
+    const monthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01T00:00:00`
+    const nextMonthYear = targetMonth === 12 ? targetYear + 1 : targetYear
+    const nextMonth = targetMonth === 12 ? 1 : targetMonth + 1
+    const monthEnd = `${nextMonthYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00`
 
-    const delayed = allLogs.filter(r => (r.changes as Record<string, unknown>)?.wasOnTime === false)
-    const onTimeRate = allLogs.length > 0
-      ? Math.round(((allLogs.length - delayed.length) / allLogs.length) * 100)
+    // Read completed tasks in the workspace for the period
+    const { data: tasks, error } = await supabase
+      .from('tasks')
+      .select('id, title, deadline, clientId, createdById, assignedTo, updatedAt, workspace_id')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'completed')
+      .is('deleted_at', null)
+      .gte('updatedAt', monthStart)
+      .lt('updatedAt', monthEnd)
+      .order('updatedAt', { ascending: false })
+      .limit(500)
+
+    if (error) {
+      console.warn('Error fetching tasks for performance reports:', error)
+      return NextResponse.json({ data: [] })
+    }
+
+    const userTasks = ((tasks || []) as TaskRow[]).filter(t => isUserTask(t, userId))
+    const delayed = userTasks.filter(t => !computeWasOnTime(t))
+    const onTimeRate = userTasks.length > 0
+      ? Math.round(((userTasks.length - delayed.length) / userTasks.length) * 100)
       : 0
 
-    const withHours = allLogs.filter(r => (r.changes as Record<string, unknown>)?.hoursSpent)
-    const avgHours = withHours.length > 0
-      ? withHours.reduce((sum, r) => sum + Number((r.changes as Record<string, unknown>).hoursSpent || 0), 0) / withHours.length
-      : null
-
+    // Pending tasks (workspace-wide for this user)
     const { data: pending } = await supabase
       .from('tasks')
       .select('id')
       .eq('workspace_id', workspaceId)
-      .contains('assignedTo', [userId])
       .in('status', ['pending', 'in_progress'])
+      .is('deleted_at', null)
 
-    const targetMonth = parseInt(month)
-    const targetYear = parseInt(year)
+    const pendingForUser = ((pending || []) as { id: string }[]).length
+
     const report = {
       id: `computed-${userId}-${targetMonth}-${targetYear}`,
       workspace_id: workspaceId,
@@ -69,12 +102,12 @@ export async function GET(request: Request) {
       period_end: `${targetYear}-${String(targetMonth).padStart(2, '0')}-30`,
       month: targetMonth,
       year: targetYear,
-      tasks_completed: allLogs.length,
+      tasks_completed: userTasks.length,
       tasks_delayed: delayed.length,
-      tasks_pending: pending?.length || 0,
+      tasks_pending: pendingForUser,
       on_time_rate: onTimeRate,
-      avg_hours_per_task: avgHours,
-      summary: `Resumen ${targetMonth}/${targetYear}: ${allLogs.length} tareas completadas, ${onTimeRate}% a tiempo`,
+      avg_hours_per_task: null,
+      summary: `Resumen ${targetMonth}/${targetYear}: ${userTasks.length} tareas completadas, ${onTimeRate}% a tiempo`,
     }
 
     return NextResponse.json({ data: [report] })
@@ -96,35 +129,33 @@ export async function POST(request: Request) {
     const targetYear = body.year || now.getFullYear()
     const userId = body.user_id
 
-    // Calculate from activity_log
-    const { data: logs } = await supabase
-      .from('activity_log')
-      .select('*')
-      .eq('organizationId', workspaceId)
-      .eq('userId', userId)
-      .eq('actionType', 'performance_task_completed')
+    const monthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01T00:00:00`
+    const nextMonthYear = targetMonth === 12 ? targetYear + 1 : targetYear
+    const nextMonth = targetMonth === 12 ? 1 : targetMonth + 1
+    const monthEnd = `${nextMonthYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00`
 
-    const periodLogs = ((logs || []) as ActivityLogRow[]).filter(row => {
-      const c = (row.changes || {}) as Record<string, unknown>
-      return c.month === targetMonth && c.year === targetYear
-    })
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id, title, deadline, clientId, createdById, assignedTo, updatedAt')
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'completed')
+      .is('deleted_at', null)
+      .gte('updatedAt', monthStart)
+      .lt('updatedAt', monthEnd)
+      .limit(500)
 
-    const delayed = periodLogs.filter(r => (r.changes as Record<string, unknown>)?.wasOnTime === false)
-    const onTimeRate = periodLogs.length > 0
-      ? Math.round(((periodLogs.length - delayed.length) / periodLogs.length) * 100)
+    const userTasks = ((tasks || []) as TaskRow[]).filter(t => isUserTask(t, userId))
+    const delayed = userTasks.filter(t => !computeWasOnTime(t))
+    const onTimeRate = userTasks.length > 0
+      ? Math.round(((userTasks.length - delayed.length) / userTasks.length) * 100)
       : 0
-
-    const withHours = periodLogs.filter(r => (r.changes as Record<string, unknown>)?.hoursSpent)
-    const avgHours = withHours.length > 0
-      ? withHours.reduce((sum, r) => sum + Number((r.changes as Record<string, unknown>).hoursSpent || 0), 0) / withHours.length
-      : null
 
     const { data: pending } = await supabase
       .from('tasks')
       .select('id')
       .eq('workspace_id', workspaceId)
-      .contains('assignedTo', [userId])
       .in('status', ['pending', 'in_progress'])
+      .is('deleted_at', null)
 
     const report = {
       id: `computed-${userId}-${targetMonth}-${targetYear}`,
@@ -135,12 +166,12 @@ export async function POST(request: Request) {
       period_end: `${targetYear}-${String(targetMonth).padStart(2, '0')}-30`,
       month: targetMonth,
       year: targetYear,
-      tasks_completed: periodLogs.length,
+      tasks_completed: userTasks.length,
       tasks_delayed: delayed.length,
-      tasks_pending: pending?.length || 0,
+      tasks_pending: (pending || []).length,
       on_time_rate: onTimeRate,
-      avg_hours_per_task: avgHours,
-      summary: body.summary || `${periodLogs.length} tareas completadas en ${targetMonth}/${targetYear}, ${onTimeRate}% a tiempo`,
+      avg_hours_per_task: null,
+      summary: body.summary || `${userTasks.length} tareas completadas en ${targetMonth}/${targetYear}, ${onTimeRate}% a tiempo`,
       strengths: body.strengths || null,
       improvement_areas: body.improvement_areas || null,
     }
