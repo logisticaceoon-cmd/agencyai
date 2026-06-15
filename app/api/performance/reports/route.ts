@@ -83,15 +83,16 @@ export async function GET(request: Request) {
       ? Math.round(((userTasks.length - delayed.length) / userTasks.length) * 100)
       : 0
 
-    // Pending tasks (workspace-wide for this user)
-    const { data: pending } = await supabase
+    // Pending tasks for this user (filter by createdById or assignedTo)
+    const { data: pendingAll } = await supabase
       .from('tasks')
-      .select('id')
+      .select('id, createdById, assignedTo')
       .eq('workspace_id', workspaceId)
       .in('status', ['pending', 'in_progress'])
       .is('deleted_at', null)
+      .limit(500)
 
-    const pendingForUser = ((pending || []) as { id: string }[]).length
+    const pendingForUser = ((pendingAll || []) as TaskRow[]).filter(t => isUserTask(t, userId)).length
 
     const report = {
       id: `computed-${userId}-${targetMonth}-${targetYear}`,
@@ -150,12 +151,13 @@ export async function POST(request: Request) {
       ? Math.round(((userTasks.length - delayed.length) / userTasks.length) * 100)
       : 0
 
-    const { data: pending } = await supabase
+    const { data: pendingAll } = await supabase
       .from('tasks')
-      .select('id')
+      .select('id, createdById, assignedTo')
       .eq('workspace_id', workspaceId)
       .in('status', ['pending', 'in_progress'])
       .is('deleted_at', null)
+      .limit(500)
 
     const report = {
       id: `computed-${userId}-${targetMonth}-${targetYear}`,
@@ -168,7 +170,7 @@ export async function POST(request: Request) {
       year: targetYear,
       tasks_completed: userTasks.length,
       tasks_delayed: delayed.length,
-      tasks_pending: (pending || []).length,
+      tasks_pending: ((pendingAll || []) as TaskRow[]).filter(t => isUserTask(t, userId)).length,
       on_time_rate: onTimeRate,
       avg_hours_per_task: null,
       summary: body.summary || `${userTasks.length} tareas completadas en ${targetMonth}/${targetYear}, ${onTimeRate}% a tiempo`,
