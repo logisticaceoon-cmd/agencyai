@@ -155,14 +155,15 @@ export default function TasksPage() {
   const [detailTask, setDetailTask] = useState<Task | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [members, setMembers] = useState<Member[]>([])
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('all')
   const [defaultStatus, setDefaultStatus] = useState<string>('pending')
 
   const isCEO = user?.role === 'CEO' || user?.role === 'Manager'
 
   // ─── Data fetching ───────────────────────────────────────────────────────────
 
-  const loadTasks = useCallback(async () => {
-    setLoading(true)
+  const loadTasks = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const params = new URLSearchParams()
       if (statusFilter) params.set('status', statusFilter)
@@ -173,7 +174,7 @@ export default function TasksPage() {
         setTasks(data.data || [])
       }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [statusFilter, priorityFilter])
 
@@ -206,14 +207,26 @@ export default function TasksPage() {
     loadMembers()
   }, [loadProjects, loadMembers])
 
+  // Auto-refresh silencioso cada 30s (monitoreo en vivo)
+  useEffect(() => {
+    const timer = setInterval(() => loadTasks(true), 30000)
+    return () => clearInterval(timer)
+  }, [loadTasks])
+
   // ─── Filtered tasks ──────────────────────────────────────────────────────────
 
   const filtered = useMemo(
     () =>
-      tasks.filter(
-        (t) => !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase())
-      ),
-    [tasks, searchQuery]
+      tasks.filter((t) => {
+        if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
+        if (selectedMemberId !== 'all') {
+          const isCreator = t.createdBy?.id === selectedMemberId
+          const isAssigned = Array.isArray(t.assignedTo) && t.assignedTo.includes(selectedMemberId)
+          if (!isCreator && !isAssigned) return false
+        }
+        return true
+      }),
+    [tasks, searchQuery, selectedMemberId]
   )
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -407,6 +420,48 @@ export default function TasksPage() {
           ))}
         </select>
       </div>
+
+      {/* Filtro por miembro (solo CEO/Manager) */}
+      {isCEO && members.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500 font-medium shrink-0">Ver tareas de:</span>
+          <button
+            onClick={() => setSelectedMemberId('all')}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              selectedMemberId === 'all'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Todos
+          </button>
+          {members.map((m) => (
+            <button
+              key={m.userId}
+              onClick={() => setSelectedMemberId(selectedMemberId === m.userId ? 'all' : m.userId)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                selectedMemberId === m.userId
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {m.user.avatarUrl ? (
+                <img src={m.user.avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
+              ) : (
+                <span className="w-4 h-4 rounded-full bg-slate-400 text-white text-[9px] flex items-center justify-center font-bold shrink-0">
+                  {m.user.fullName.charAt(0).toUpperCase()}
+                </span>
+              )}
+              {m.user.fullName.split(' ')[0]}
+            </button>
+          ))}
+          {selectedMemberId !== 'all' && (
+            <span className="text-xs text-slate-400">
+              ({filtered.length} tarea{filtered.length !== 1 ? 's' : ''})
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Content */}
       {loading ? (
