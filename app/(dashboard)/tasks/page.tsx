@@ -220,7 +220,11 @@ export default function TasksPage() {
       tasks.filter((t) => {
         if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
         if (selectedMemberId !== 'all') {
-          const isCreator = t.createdBy?.id === selectedMemberId
+          // API returns flat createdById, not nested createdBy object
+          const taskAny = t as unknown as Record<string, unknown>
+          const isCreator =
+            t.createdBy?.id === selectedMemberId ||
+            taskAny.createdById === selectedMemberId
           const isAssigned = Array.isArray(t.assignedTo) && t.assignedTo.includes(selectedMemberId)
           if (!isCreator && !isAssigned) return false
         }
