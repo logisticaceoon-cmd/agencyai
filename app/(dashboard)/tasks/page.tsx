@@ -158,7 +158,7 @@ export default function TasksPage() {
   const [selectedMemberId, setSelectedMemberId] = useState<string>('all')
   const [defaultStatus, setDefaultStatus] = useState<string>('pending')
 
-  const isCEO = user?.role === 'CEO' || user?.role === 'Manager'
+  const isCEO = user?.role === 'CEO' || user?.role === 'Manager' || user?.role === 'owner' || user?.role === 'admin'
 
   // ─── Data fetching ───────────────────────────────────────────────────────────
 
