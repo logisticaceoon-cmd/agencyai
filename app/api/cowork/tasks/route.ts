@@ -62,6 +62,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 })
     }
 
+    // Resolver createdById: acepta snake_case y camelCase; fallback al owner del workspace
+    let createdById = body.created_by || body.createdById || null
+
+    if (!createdById) {
+      const { data: ownerData } = await supabase
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', organizationId)
+        .eq('role', 'owner')
+        .single()
+      createdById = ownerData?.user_id || null
+    }
+
     const { data, error } = await supabase
       .from('tasks')
       .insert({
@@ -73,8 +86,8 @@ export async function POST(request: Request) {
         assignedTo: body.assigned_to || [],
         deadline: body.deadline || null,
         priority: body.priority || 'medium',
-        status: 'pending',
-        createdById: body.created_by || null,
+        status: body.status || 'pending',
+        createdById,
       })
       .select()
       .single()
@@ -94,3 +107,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
