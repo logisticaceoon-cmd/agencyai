@@ -33,26 +33,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
-    const { url, filename, folderId, mimeType = 'application/pdf' } = await request.json() as {
-      url: string; filename: string; folderId?: string; mimeType?: string
+    const { url, filename, folderId, existingFileId, mimeType = 'application/pdf' } = await request.json() as {
+      url: string; filename: string; folderId?: string; existingFileId?: string; mimeType?: string
     }
     const fileRes = await fetch(url)
     if (!fileRes.ok) throw new Error(`Download failed: ${fileRes.status}`)
     const fileBuffer = await fileRes.arrayBuffer()
     const accessToken = await getGoogleAccessToken()
+
+    if (existingFileId) {
+      // UPDATE existing file (no quota needed)
+      const updateRes = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=media`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': mimeType,
+          },
+          body: fileBuffer,
+        }
+      )
+      const updateData = await updateRes.json() as { id?: string; error?: unknown }
+      if (!updateRes.ok) throw new Error(`Drive update failed: ${JSON.stringify(updateData)}`)
+      return NextResponse.json({
+        success: true,
+        fileId: updateData.id || existingFileId,
+        filename,
+        viewUrl: `https://drive.google.com/file/d/${updateData.id || existingFileId}/view`,
+      })
+    }
+
+    // CREATE new file (requires SA to have storage - use for shared drives only)
     const metadata = JSON.stringify({ name: filename, parents: folderId ? [folderId] : [] })
-    const boundary = 'ceonyx_boundary_' + Math.random().toString(36).substring(2)
-    const metaBytes = Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`)
-    const filePartHeader = Buffer.from(`--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`)
-    const fileBytes = Buffer.from(fileBuffer)
-    const closeBytes = Buffer.from(`\r\n--${boundary}--`)
-    const body = Buffer.concat([metaBytes, filePartHeader, fileBytes, closeBytes])
+    const boundary = 'ceonyx_' + Math.random().toString(36).substring(2)
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`),
+      Buffer.from(`--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`),
+      Buffer.from(fileBuffer),
+      Buffer.from(`\r\n--${boundary}--`),
+    ])
     const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': `multipart/related; boundary=${boundary}`,
-      },
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
       body,
     })
     const uploadData = await uploadRes.json() as { id?: string; error?: unknown }
@@ -64,7 +87,6 @@ export async function POST(request: Request) {
       viewUrl: `https://drive.google.com/file/d/${uploadData.id}/view`,
     })
   } catch (error) {
-    console.error('Drive upload error:', error)
     return NextResponse.json({ error: String(error) }, { status: 500 })
   }
 }
