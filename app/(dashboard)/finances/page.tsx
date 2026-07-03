@@ -735,7 +735,7 @@ export default function FinancesPage() {
                                         </a>
                                       )}
                                     </td>
-                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{Number(c.contract_cost).toLocaleString()}</td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{(() => { const rec = getMonthlyRecord(c.id); const fee = rec && Number(rec.billed_amount) > 0 ? Number(rec.billed_amount) : Number(c.contract_cost); return <>{sym}{fee.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</>; })()}</td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                       {Number(c.commission_percent) > 0 ? (
                                         <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span>
@@ -771,7 +771,7 @@ export default function FinancesPage() {
                                     <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>
                                       {(() => {
                                         const rec = getMonthlyRecord(c.id)
-                                        const rowTotal = Number(c.contract_cost) + (rec ? Number(rec.commission_amount) : 0)
+                                        const rowTotal = (rec && Number(rec.billed_amount) > 0 ? Number(rec.billed_amount) : Number(c.contract_cost)) + (rec ? Number(rec.commission_amount) : 0)
                                         return <>{sym}{rowTotal.toLocaleString()}</>
                                       })()}
                                     </td>
