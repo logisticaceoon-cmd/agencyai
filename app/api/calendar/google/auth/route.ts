@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { createHmac } from 'crypto'
 
 export async function GET() {
   try {
@@ -21,7 +22,10 @@ export async function GET() {
       'https://www.googleapis.com/auth/calendar.readonly',
     ].join(' ')
 
-    const state = JSON.stringify({ workspaceId, userId })
+    const stateData = JSON.stringify({ workspaceId, userId })
+    const hmacSecret = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+    const sig = createHmac('sha256', hmacSecret).update(stateData).digest('hex')
+    const state = Buffer.from(JSON.stringify({ data: stateData, sig })).toString('base64url')
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -30,7 +34,7 @@ export async function GET() {
       scope: scopes,
       access_type: 'offline',
       prompt: 'consent',
-      state: Buffer.from(state).toString('base64'),
+      state,
     })
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`

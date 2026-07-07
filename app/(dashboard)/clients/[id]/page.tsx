@@ -28,19 +28,14 @@ import {
   Pencil,
   Link2,
   Trash2,
+  MessageCircle,
+  Users,
+  Clock,
 } from 'lucide-react'
 import { BookmarkCard, type Bookmark } from '@/components/bookmarks/BookmarkCard'
+import { getInitials } from '@/lib/utils'
 
 // -- Helpers ------------------------------------------------------------------
-
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-}
 
 function getColor(name: string) {
   const colors = [
@@ -233,6 +228,7 @@ export default function ClientDetailPage() {
             { value: 'reportes', label: 'Reportes', icon: FileText },
             { value: 'notas', label: 'Notas', icon: StickyNote },
             { value: 'documentos', label: 'Documentos', icon: BookOpen },
+            { value: 'historial', label: 'Historial', icon: MessageCircle },
             { value: 'investigacion', label: 'Investigación', icon: TrendingUp },
           ].map((tab) => (
             <Tabs.Trigger
@@ -539,6 +535,11 @@ export default function ClientDetailPage() {
           <ClientBookmarks clientId={client.id} clientName={client.name} />
         </Tabs.Content>
 
+        {/* Historial tab */}
+        <Tabs.Content value="historial" className="pt-6">
+          <ClientInteractions clientId={client.id} />
+        </Tabs.Content>
+
         {/* Investigación tab */}
         <Tabs.Content value="investigacion" className="pt-6">
           <MarketResearchTab clientId={client.id} clientName={client.name} />
@@ -553,6 +554,7 @@ export default function ClientDetailPage() {
 function ClientBookmarks({ clientId, clientName }: { clientId: string; clientName: string }) {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [loading, setLoading] = useState(true)
+  const [confirmDeleteBookmarkId, setConfirmDeleteBookmarkId] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/bookmarks')
@@ -566,7 +568,10 @@ function ClientBookmarks({ clientId, clientName }: { clientId: string; clientNam
   }, [clientId])
 
   async function handleDelete(id: string) {
-    if (!confirm('Eliminar este marcador?')) return
+    setConfirmDeleteBookmarkId(id)
+  }
+
+  async function executeDeleteBookmark(id: string) {
     await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' })
     setBookmarks(prev => prev.filter(b => b.id !== id))
   }
@@ -610,16 +615,285 @@ function ClientBookmarks({ clientId, clientName }: { clientId: string; clientNam
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {bookmarks.map(b => (
-        <BookmarkCard
-          key={b.id}
-          bookmark={b}
-          onEdit={() => {}}
-          onDelete={handleDelete}
-          onTogglePin={handleTogglePin}
-        />
-      ))}
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {bookmarks.map(b => (
+          <BookmarkCard
+            key={b.id}
+            bookmark={b}
+            onEdit={() => {}}
+            onDelete={handleDelete}
+            onTogglePin={handleTogglePin}
+          />
+        ))}
+      </div>
+
+      {/* Confirm delete bookmark modal */}
+      {confirmDeleteBookmarkId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2">Confirmar eliminación</h3>
+            <p className="text-gray-600 mb-4">¿Eliminar este marcador? Esta acción no se puede deshacer.</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setConfirmDeleteBookmarkId(null)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={() => { executeDeleteBookmark(confirmDeleteBookmarkId); setConfirmDeleteBookmarkId(null) }} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ── Client Interactions Sub-component ──────────────────────────────────────────
+
+interface Interaction {
+  id: string
+  type: string
+  date: string
+  duration_minutes: number | null
+  summary: string
+  outcome: string | null
+  next_action: string | null
+  created_at: string
+}
+
+const INTERACTION_TYPES = [
+  { value: 'email', label: 'Email', icon: Mail, color: 'bg-blue-100 text-blue-600' },
+  { value: 'call', label: 'Llamada', icon: Phone, color: 'bg-green-100 text-green-600' },
+  { value: 'meeting', label: 'Reunion', icon: Users, color: 'bg-purple-100 text-purple-600' },
+  { value: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, color: 'bg-emerald-100 text-emerald-600' },
+  { value: 'note', label: 'Nota', icon: FileText, color: 'bg-amber-100 text-amber-600' },
+  { value: 'other', label: 'Otro', icon: ClipboardList, color: 'bg-slate-100 text-slate-600' },
+]
+
+function getInteractionMeta(type: string) {
+  return INTERACTION_TYPES.find((t) => t.value === type) || INTERACTION_TYPES[5]
+}
+
+function relativeDate(d: string) {
+  const now = new Date()
+  const date = new Date(d)
+  const diffMs = now.getTime() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  if (diffMin < 1) return 'Ahora'
+  if (diffMin < 60) return `hace ${diffMin}m`
+  const diffH = Math.floor(diffMin / 60)
+  if (diffH < 24) return `hace ${diffH}h`
+  const diffD = Math.floor(diffH / 24)
+  if (diffD < 7) return `hace ${diffD}d`
+  return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function ClientInteractions({ clientId }: { clientId: string }) {
+  const [interactions, setInteractions] = useState<Interaction[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ type: 'note', date: '', duration_minutes: '', summary: '', outcome: '', next_action: '' })
+
+  useEffect(() => {
+    fetch(`/api/clients/${clientId}/interactions`)
+      .then((r) => r.json())
+      .then((d) => setInteractions(d.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [clientId])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!form.summary.trim()) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/clients/${clientId}/interactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: form.type,
+          date: form.date || undefined,
+          duration_minutes: form.duration_minutes ? parseInt(form.duration_minutes) : undefined,
+          summary: form.summary,
+          outcome: form.outcome || undefined,
+          next_action: form.next_action || undefined,
+        }),
+      })
+      if (res.ok) {
+        const d = await res.json()
+        setInteractions((prev) => [d.data, ...prev])
+        setForm({ type: 'note', date: '', duration_minutes: '', summary: '', outcome: '', next_action: '' })
+        setShowForm(false)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+            <div className="h-4 w-1/3 rounded bg-slate-200" />
+            <div className="h-3 w-2/3 rounded bg-slate-100" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+          Historial de comunicaciones ({interactions.length})
+        </h2>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          Agregar interaccion
+        </button>
+      </div>
+
+      {/* Form */}
+      {showForm && (
+        <form onSubmit={handleSubmit} className="rounded-xl border border-blue-200 bg-blue-50/50 p-4 space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
+              <select
+                value={form.type}
+                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+              >
+                {INTERACTION_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
+              <input
+                type="datetime-local"
+                value={form.date}
+                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+            {(form.type === 'call' || form.type === 'meeting') && (
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Duracion (min)</label>
+                <input
+                  type="number"
+                  value={form.duration_minutes}
+                  onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                  placeholder="30"
+                  min={1}
+                />
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Resumen *</label>
+            <textarea
+              value={form.summary}
+              onChange={(e) => setForm((f) => ({ ...f, summary: e.target.value }))}
+              rows={2}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none resize-none"
+              placeholder="Describe la interaccion..."
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Resultado</label>
+              <input
+                value={form.outcome}
+                onChange={(e) => setForm((f) => ({ ...f, outcome: e.target.value }))}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                placeholder="Resultado de la interaccion"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Proxima accion</label>
+              <input
+                value={form.next_action}
+                onChange={(e) => setForm((f) => ({ ...f, next_action: e.target.value }))}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                placeholder="Siguiente paso"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setShowForm(false)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50">
+              Cancelar
+            </button>
+            <button type="submit" disabled={saving} className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+              {saving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Timeline */}
+      {interactions.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center rounded-xl border border-slate-200 bg-white">
+          <MessageCircle className="h-10 w-10 text-slate-300 mb-3" />
+          <p className="text-sm text-slate-500">No hay interacciones registradas</p>
+          <p className="text-xs text-slate-400 mt-1">Registra llamadas, emails, reuniones y mas</p>
+        </div>
+      ) : (
+        <div className="space-y-0">
+          {interactions.map((item, idx) => {
+            const meta = getInteractionMeta(item.type)
+            const Icon = meta.icon
+            return (
+              <div key={item.id} className="flex gap-3">
+                {/* Timeline line + icon */}
+                <div className="flex flex-col items-center">
+                  <div className={`flex items-center justify-center h-8 w-8 rounded-full ${meta.color}`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  {idx < interactions.length - 1 && <div className="w-px flex-1 bg-slate-200 my-1" />}
+                </div>
+                {/* Content */}
+                <div className="flex-1 pb-4">
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${meta.color}`}>
+                          {meta.label}
+                        </span>
+                        {item.duration_minutes && (
+                          <span className="flex items-center gap-1 text-xs text-slate-400">
+                            <Clock className="h-3 w-3" />
+                            {item.duration_minutes} min
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-400">{relativeDate(item.date)}</span>
+                    </div>
+                    <p className="text-sm text-slate-700">{item.summary}</p>
+                    {item.outcome && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        <span className="font-medium">Resultado:</span> {item.outcome}
+                      </p>
+                    )}
+                    {item.next_action && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        <span className="font-medium">Proxima accion:</span> {item.next_action}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

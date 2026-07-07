@@ -9,14 +9,16 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
+    const clientId = searchParams.get('client_id')
 
     let query = supabase
       .from('invoices')
-      .select('*')
+      .select('*, clients(id, name, email)')
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false })
 
     if (status) query = query.eq('status', status)
+    if (clientId) query = query.eq('client_id', clientId)
 
     const { data, error } = await query
 
@@ -71,7 +73,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error creating invoice:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     return NextResponse.json({ data }, { status: 201 })

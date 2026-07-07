@@ -2,18 +2,37 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import nodemailer from 'nodemailer'
 
-const STEPHANY_EMAIL = 'stephany.acp@gmail.com'
-const RAFAEL_EMAIL = 'logisticaceoon@gmail.com'
-const STEPHANY_USER_ID = '079cb567-1bb8-4726-b6ae-deaaf83ecbda'
+const STEPHANY_EMAIL = process.env.STEPHANY_EMAIL || ''
+const RAFAEL_EMAIL = process.env.RAFAEL_EMAIL || ''
+const FROM_ADDRESS =
+  process.env.EMAIL_FROM || 'AgencyAI <noreply@agencyai.app>'
 
-function createTransporter() {
+function getTransporter() {
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.GMAIL_USER || 'logisticaceoon@gmail.com',
+      user: process.env.GMAIL_USER || '',
       pass: process.env.GMAIL_APP_PASSWORD,
     },
   })
+}
+
+const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+const MONTHS = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
+// Clients managed by Stephany
+const STEPHANY_CLIENT_NAMES = ['RMONIA SPA', 'YASMIN.TENDENCIA', 'AMURASPA.CL', 'BENDITASHOP.CL', 'DANGER PINK']
+
+function trunc(s: string, n = 68) {
+  return s.length > n ? s.substring(0, n) + '…' : s
+}
+
+function formatDeadline(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
 }
 
 export async function GET(request: Request) {
@@ -24,141 +43,177 @@ export async function GET(request: Request) {
 
   try {
     const supabase = createAdminClient()
-    const now = new Date()
-    const todayStart = new Date(now)
-    todayStart.setHours(0, 0, 0, 0)
-    const todayEnd = new Date(now)
-    todayEnd.setHours(23, 59, 59, 999)
+    const nowUTC = new Date()
 
-    // Get Stephany's pending/in_progress tasks
-    const { data: activeTasks } = await supabase
-      .from('tasks')
-      .select('id, title, status, priority, deadline, description')
-      .eq('createdById', STEPHANY_USER_ID)
-      .in('status', ['pending', 'in_progress'])
-      .is('deleted_at', null)
-      .order('priority', { ascending: false })
-      .order('deadline', { ascending: true })
-      .limit(20)
+    // Argentina = UTC-3
+    const argOffset = -3 * 60 * 60 * 1000
+    const argNow = new Date(nowUTC.getTime() + argOffset)
+    const dayOfWeek = argNow.getUTCDay()
 
-    // Get overdue tasks
-    const overdueTasks = (activeTasks || []).filter(
-      t => t.deadline && new Date(t.deadline) < todayStart
-    )
-
-    // Get tasks due today
-    const todayTasks = (activeTasks || []).filter(
-      t =>
-        t.deadline &&
-        new Date(t.deadline) >= todayStart &&
-        new Date(t.deadline) <= todayEnd
-    )
-
-    // Other active tasks (no deadline or future)
-    const otherTasks = (activeTasks || []).filter(
-      t =>
-        !t.deadline ||
-        new Date(t.deadline) > todayEnd
-    )
-
-    const dayName = now.toLocaleDateString('es-AR', { weekday: 'long', timeZone: 'America/Argentina/Buenos_Aires' })
-    const dateStr = now.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Argentina/Buenos_Aires' })
-
-    const priorityBadge = (p: string) => {
-      if (p === 'high' || p === 'urgent') return '🔴'
-      if (p === 'medium') return '🟡'
-      return '🟢'
+    // Skip weekends
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      return NextResponse.json({ success: true, skipped: 'weekend' })
     }
 
-    const taskRow = (t: { title: string; status: string; priority: string; deadline?: string | null }) =>
-      `<tr style="border-bottom:1px solid #f0f0f0;">
-        <td style="padding:8px 12px;">${priorityBadge(t.priority)} ${t.title}</td>
-        <td style="padding:8px 12px;color:#666;font-size:13px;">${t.status === 'in_progress' ? '⚡ En progreso' : '⏳ Pendiente'}</td>
-        <td style="padding:8px 12px;color:#999;font-size:12px;">${t.deadline ? new Date(t.deadline).toLocaleDateString('es-AR') : '—'}</td>
-      </tr>`
+    const todayStart = new Date(Date.UTC(
+      argNow.getUTCFullYear(), argNow.getUTCMonth(), argNow.getUTCDate(), 3, 0, 0, 0
+    ))
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000 - 1)
 
-    const html = `
-<!DOCTYPE html>
+    // Stephany's user ID and workspace — configured via env vars
+    const WORKSPACE_ID = process.env.DEFAULT_WORKSPACE_ID
+    const STEPHANY_USER_ID = process.env.STEPHANY_USER_ID
+    if (!WORKSPACE_ID || !STEPHANY_USER_ID) {
+      return NextResponse.json({ error: 'Missing DEFAULT_WORKSPACE_ID or STEPHANY_USER_ID' }, { status: 500 })
+    }
+
+    // Get ONLY tasks assigned to Stephany in this workspace
+    const { data: allTasks } = await supabase
+      .from('tasks')
+      .select('id, title, priority, deadline, status, clientId')
+      .eq('workspace_id', WORKSPACE_ID)
+      .contains('assignedTo', [STEPHANY_USER_ID])
+      .in('status', ['pending', 'in_progress'])
+      .is('deleted_at', null)
+      .order('deadline', { ascending: true })
+      .limit(50)
+
+    const tasks = allTasks || []
+
+    const overdue = tasks.filter(t => t.deadline && new Date(t.deadline) < todayStart)
+    const dueToday = tasks.filter(t => {
+      if (!t.deadline) return false
+      const d = new Date(t.deadline)
+      return d >= todayStart && d <= todayEnd
+    })
+    const inProgress = tasks.filter(t => t.status === 'in_progress')
+    const upcoming = tasks.filter(t => t.deadline && new Date(t.deadline) > todayEnd).slice(0, 3)
+
+    const dayName = DAYS[argNow.getUTCDay()]
+    const dateStr = `${argNow.getUTCDate()} de ${MONTHS[argNow.getUTCMonth()]}`
+    const monthShort = MONTHS[argNow.getUTCMonth()].substring(0, 3)
+
+    // ── Tono humano — como Rafael le habla a Tefy ───────────────────
+    const greetings = [
+      `¿Cómo arrancás? Acá te mando el resumen del día.`,
+      `Empezamos otro día, arriba los ánimos.`,
+      `Lunes ya, vamos con todo Tefy.`,
+      `Acá el resumen. Revisalo y avisame si hay algo trabado.`,
+      `Revisaste las campañas? Acá te dejo lo que hay que atacar hoy.`,
+    ]
+    const dayGreeting = greetings[argNow.getUTCDay() % greetings.length]
+
+    const urgentBlock = overdue.length > 0
+      ? `<div style="background:#fee2e2;border-left:4px solid #dc2626;padding:14px 18px;margin-bottom:16px;border-radius:6px;">
+          <p style="margin:0 0 8px;font-weight:700;color:#b91c1c;font-size:14px;">🔴 Esto está vencido — resolverlo hoy</p>
+          <ul style="margin:0;padding-left:20px;color:#1f2937;font-size:13px;line-height:1.8;">
+            ${overdue.slice(0, 4).map(t =>
+              `<li>${trunc(t.title)}${t.priority === 'high' ? ' <span style="background:#dc2626;color:white;font-size:10px;padding:1px 5px;border-radius:3px;">URGENTE</span>' : ''}</li>`
+            ).join('')}
+            ${overdue.length > 4 ? `<li><em style="color:#9ca3af;">+${overdue.length - 4} más...</em></li>` : ''}
+          </ul>
+        </div>` : ''
+
+    const todayBlock = dueToday.length > 0
+      ? `<div style="background:#fef9c3;border-left:4px solid #ca8a04;padding:14px 18px;margin-bottom:16px;border-radius:6px;">
+          <p style="margin:0 0 8px;font-weight:700;color:#854d0e;font-size:14px;">🟡 Para cerrar hoy</p>
+          <ul style="margin:0;padding-left:20px;color:#1f2937;font-size:13px;line-height:1.8;">
+            ${dueToday.slice(0, 4).map(t => `<li>${trunc(t.title)}</li>`).join('')}
+            ${dueToday.length > 4 ? `<li><em style="color:#9ca3af;">+${dueToday.length - 4} más para hoy</em></li>` : ''}
+          </ul>
+        </div>` : ''
+
+    const inProgressBlock = inProgress.length > 0
+      ? `<div style="background:#eff6ff;border-left:4px solid #3b82f6;padding:14px 18px;margin-bottom:16px;border-radius:6px;">
+          <p style="margin:0 0 8px;font-weight:700;color:#1d4ed8;font-size:14px;">🔄 En progreso</p>
+          <ul style="margin:0;padding-left:20px;color:#1f2937;font-size:13px;line-height:1.8;">
+            ${inProgress.slice(0, 3).map(t => `<li>${trunc(t.title)}</li>`).join('')}
+            ${inProgress.length > 3 ? `<li><em style="color:#9ca3af;">+${inProgress.length - 3} más...</em></li>` : ''}
+          </ul>
+        </div>` : ''
+
+    const noTasksBlock = (overdue.length === 0 && dueToday.length === 0 && inProgress.length === 0)
+      ? `<div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:14px 18px;margin-bottom:16px;border-radius:6px;">
+          <p style="margin:0;color:#15803d;font-size:14px;">✅ Todo limpio por ahora. Aprovechá para revisar métricas de los clientes y optimizar campañas.</p>
+        </div>` : ''
+
+    const closingLine = overdue.length > 0
+      ? `<p style="font-size:13px;color:#6b7280;margin:16px 0 0;">Si encontrás algo urgente de un cliente, avisame por WhatsApp directo. Gracias Tefy 🙌</p>`
+      : `<p style="font-size:13px;color:#6b7280;margin:16px 0 0;">Cualquier duda o problema con algún cliente, avisame. Vamos con todo hoy 💪</p>`
+
+    const html = `<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f9fa;margin:0;padding:20px;">
-  <div style="max-width:600px;margin:0 auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-    
-    <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);padding:24px 28px;">
-      <p style="color:#a0aec0;margin:0 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:1px;">Briefing matutino</p>
-      <h1 style="color:white;margin:0;font-size:22px;font-weight:600;">${dayName.charAt(0).toUpperCase() + dayName.slice(1)}, ${dateStr}</h1>
-      <p style="color:#718096;margin:8px 0 0;font-size:14px;">Buenos días Tefy — acá están tus tareas para hoy</p>
-    </div>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <div style="max-width:560px;margin:20px auto;padding:0 12px;">
+    <div style="background:white;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
 
-    <div style="padding:24px 28px;">
-
-      ${overdueTasks.length > 0 ? `
-      <div style="background:#fff5f5;border-left:4px solid #fc8181;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:20px;">
-        <p style="margin:0;font-weight:600;color:#c53030;">⚠️ ${overdueTasks.length} tarea${overdueTasks.length > 1 ? 's' : ''} vencida${overdueTasks.length > 1 ? 's' : ''}</p>
-        <p style="margin:4px 0 0;font-size:13px;color:#742a2a;">Necesitan atención urgente.</p>
+      <div style="background:#111827;padding:20px 24px;">
+        <h1 style="margin:0;font-size:17px;color:white;font-weight:700;">Buenos días Tefy 👋</h1>
+        <p style="margin:4px 0 0;color:#9ca3af;font-size:13px;">${dayName} ${dateStr} — Logística CEOON</p>
       </div>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
-        <thead><tr style="background:#fff5f5;"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#c53030;text-transform:uppercase;">Tarea vencida</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#c53030;">Estado</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#c53030;">Venció</th></tr></thead>
-        <tbody>${overdueTasks.map(taskRow).join('')}</tbody>
-      </table>` : ''}
 
-      ${todayTasks.length > 0 ? `
-      <h2 style="font-size:15px;font-weight:600;color:#2d3748;margin:0 0 12px;">📅 Para hoy</h2>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
-        <thead><tr style="background:#f7fafc;"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#718096;text-transform:uppercase;">Tarea</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#718096;">Estado</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#718096;">Fecha</th></tr></thead>
-        <tbody>${todayTasks.map(taskRow).join('')}</tbody>
-      </table>` : ''}
+      <div style="padding:20px 24px;">
+        <p style="margin:0 0 18px;color:#374151;font-size:14px;line-height:1.6;">${dayGreeting}</p>
 
-      ${otherTasks.length > 0 ? `
-      <h2 style="font-size:15px;font-weight:600;color:#2d3748;margin:0 0 12px;">📋 Otras tareas activas</h2>
-      <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
-        <thead><tr style="background:#f7fafc;"><th style="padding:8px 12px;text-align:left;font-size:12px;color:#718096;text-transform:uppercase;">Tarea</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#718096;">Estado</th><th style="padding:8px 12px;text-align:left;font-size:12px;color:#718096;">Deadline</th></tr></thead>
-        <tbody>${otherTasks.slice(0, 8).map(taskRow).join('')}</tbody>
-      </table>` : ''}
+        ${urgentBlock}
+        ${todayBlock}
+        ${inProgressBlock}
+        ${noTasksBlock}
 
-      ${activeTasks?.length === 0 ? `
-      <div style="text-align:center;padding:32px;color:#a0aec0;">
-        <p style="font-size:32px;margin:0;">✅</p>
-        <p style="margin:8px 0 0;font-size:15px;">Sin tareas pendientes. ¡Buen trabajo!</p>
-      </div>` : ''}
+        <div style="background:#f9fafb;border-radius:6px;padding:12px 16px;margin-top:16px;">
+          <p style="margin:0;font-size:13px;color:#374151;font-weight:600;">Recordatorio diario:</p>
+          <ul style="margin:6px 0 0;padding-left:18px;font-size:13px;color:#6b7280;line-height:1.8;">
+            <li>Revisar métricas de todas las campañas activas</li>
+            <li>Optimizar cualquier conjunto que esté underperforming</li>
+            <li>Al cierre del día mandá reporte de resultados</li>
+          </ul>
+        </div>
 
-      <div style="background:#f7fafc;border-radius:8px;padding:16px;margin-top:8px;">
-        <p style="margin:0;font-size:13px;color:#718096;">
-          📊 <strong>${activeTasks?.length || 0}</strong> tareas activas · 
-          <strong style="color:#c53030;">${overdueTasks.length}</strong> vencidas · 
-          <strong style="color:#d69e2e;">${todayTasks.length}</strong> vencen hoy
+        <div style="text-align:center;margin-top:20px;">
+          <a href="https://agencyai-iota.vercel.app/tasks"
+             style="display:inline-block;background:#111827;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">
+            Ver tareas en AgencyAi →
+          </a>
+        </div>
+
+        ${closingLine}
+      </div>
+
+      <div style="background:#f9fafb;padding:12px 24px;border-top:1px solid #f3f4f6;text-align:center;">
+        <p style="margin:0;font-size:11px;color:#9ca3af;">
+          Rafael · Logística CEOON — Enviado automáticamente a las 10:00 AM
         </p>
       </div>
-    </div>
 
-    <div style="padding:16px 28px;background:#f7fafc;border-top:1px solid #e2e8f0;">
-      <p style="margin:0;font-size:12px;color:#a0aec0;">
-        Ceonyx · Agente IA — Logística CEOON<br>
-        Enviado automáticamente a las 10:00 AM (hora Argentina)
-      </p>
     </div>
   </div>
 </body>
 </html>`
 
-    const transporter = createTransporter()
-    await transporter.sendMail({
-      from: `"Ceonyx · CEOON" <${process.env.GMAIL_USER || 'logisticaceoon@gmail.com'}>`,
-      to: STEPHANY_EMAIL,
-      cc: RAFAEL_EMAIL,
-      subject: `📋 Briefing del día — ${dayName.charAt(0).toUpperCase() + dayName.slice(1)} ${dateStr}`,
-      html,
-    })
+    const subjectAlert = overdue.length > 0
+      ? ` — 🔴 ${overdue.length} vencida${overdue.length > 1 ? 's' : ''}`
+      : dueToday.length > 0 ? ` — ${dueToday.length} para hoy` : ''
+    const subject = `Buenos días Tefy — ${dayName} ${argNow.getUTCDate()} ${monthShort}${subjectAlert}`
+
+    if (process.env.GMAIL_APP_PASSWORD) {
+      const transporter = getTransporter()
+      await transporter.sendMail({
+        from: FROM_ADDRESS,
+        to: STEPHANY_EMAIL,
+        cc: RAFAEL_EMAIL,
+        subject,
+        html,
+      })
+    }
 
     return NextResponse.json({
       success: true,
-      activeTasks: activeTasks?.length || 0,
-      overdueTasks: overdueTasks.length,
-      todayTasks: todayTasks.length,
-      emailSentTo: STEPHANY_EMAIL,
+      emailSent: !!process.env.GMAIL_APP_PASSWORD,
+      summary: { overdue: overdue.length, dueToday: dueToday.length, inProgress: inProgress.length },
     })
   } catch (error) {
-    console.error('Stephany morning briefing error:', error)
-    return NextResponse.json({ error: 'Failed to send morning briefing' }, { status: 500 })
+    console.error('Stephany morning cron error:', error)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

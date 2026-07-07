@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase'
 import { toast } from '@/hooks/use-toast'
-import { Eye, EyeOff, Zap, Mail } from 'lucide-react'
+import { Eye, EyeOff, Zap, Mail, ArrowLeft, RefreshCw } from 'lucide-react'
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -15,18 +16,46 @@ const loginSchema = z.object({
 })
 
 type LoginForm = z.infer<typeof loginSchema>
+type View = 'login' | 'forgot' | 'forgot-sent'
 
-export default function SignInPage() {
+function SignInInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const inviteToken = searchParams.get('invite')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [inviteInfo, setInviteInfo] = useState<{ workspaceName: string; role: string } | null>(null)
+
+  // Si hay token de invitación, cargar info del workspace
+  useEffect(() => {
+    if (!inviteToken) return
+    fetch(`/api/invitations/${inviteToken}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.data) {
+          setInviteInfo({
+            workspaceName: d.data.workspaces?.name || 'un workspace',
+            role: d.data.role || 'member',
+          })
+        }
+      })
+      .catch(() => {})
+  }, [inviteToken])
+
+  // Forgot password state
+  const [view, setView] = useState<View>('login')
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotError, setForgotError] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(false)
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   })
 
@@ -42,7 +71,8 @@ export default function SignInPage() {
         toast({ title: 'Error al iniciar sesión', description: error.message, variant: 'destructive' })
         return
       }
-      router.push('/dashboard')
+      // Si vino con invitación, volver a aceptarla; si no, al dashboard
+      router.push(inviteToken ? `/invite/${inviteToken}` : '/dashboard')
       router.refresh()
     } catch {
       toast({ title: 'Error inesperado', variant: 'destructive' })
@@ -71,6 +101,155 @@ export default function SignInPage() {
     }
   }
 
+  async function handleForgotPassword(email?: string) {
+    const targetEmail = email ?? forgotEmail
+    if (!targetEmail) {
+      setForgotError('Ingresá tu email')
+      return
+    }
+    setForgotLoading(true)
+    setForgotError('')
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) {
+        setForgotError(error.message)
+        return
+      }
+      setView('forgot-sent')
+    } catch {
+      setForgotError('Error inesperado. Intentá de nuevo.')
+    } finally {
+      setForgotLoading(false)
+    }
+  }
+
+  async function handleResendEmail() {
+    if (resendCooldown) return
+    setResendCooldown(true)
+    await handleForgotPassword(forgotEmail)
+    // Reset cooldown after 30 seconds
+    setTimeout(() => setResendCooldown(false), 30000)
+  }
+
+  // ── FORGOT-SENT VIEW ─────────────────────────────────────────────
+  if (view === 'forgot-sent') {
+    return (
+      <div className="min-h-screen bg-[var(--bg-subtle)] flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* Logo */}
+          <div className="flex items-center justify-center gap-2.5 mb-8">
+            <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center">
+              <Zap className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-2xl font-bold text-slate-900">AgencyAI</span>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm text-center">
+            <div className="flex items-center justify-center mb-4">
+              <div className="h-16 w-16 rounded-full bg-blue-50 flex items-center justify-center">
+                <Mail className="h-8 w-8 text-blue-600" />
+              </div>
+            </div>
+
+            <h2 className="text-xl font-semibold text-slate-900 mb-2">¡Email enviado!</h2>
+            <p className="text-sm text-slate-500 mb-1">
+              Revisá tu bandeja de entrada en
+            </p>
+            <p className="text-sm font-semibold text-slate-800 mb-2">{forgotEmail}</p>
+            <p className="text-sm text-slate-500 mb-6">
+              y hacé click en el link para restablecer tu contraseña.
+            </p>
+            <p className="text-xs text-slate-400 mb-8">¿No lo ves? Revisá la carpeta de spam.</p>
+
+            {/* Reenviar email */}
+            <button
+              type="button"
+              onClick={handleResendEmail}
+              disabled={resendCooldown || forgotLoading}
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-3"
+            >
+              <RefreshCw className={`h-4 w-4 ${forgotLoading ? 'animate-spin' : ''}`} />
+              {resendCooldown && !forgotLoading ? 'Reenviado ✓' : forgotLoading ? 'Reenviando...' : 'Reenviar email'}
+            </button>
+
+            {/* Iniciar sesión */}
+            <button
+              type="button"
+              onClick={() => setView('login')}
+              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+            >
+              Iniciar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── FORGOT VIEW ──────────────────────────────────────────────────
+  if (view === 'forgot') {
+    return (
+      <div className="min-h-screen bg-[var(--bg-subtle)] flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* Logo */}
+          <div className="flex items-center justify-center gap-2.5 mb-8">
+            <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center">
+              <Zap className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-2xl font-bold text-slate-900">AgencyAI</span>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <button
+              type="button"
+              onClick={() => { setView('login'); setForgotError('') }}
+              className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Volver al login
+            </button>
+
+            <h2 className="text-xl font-semibold text-slate-900 mb-1">Recuperar contraseña</h2>
+            <p className="text-sm text-slate-500 mb-6">
+              Ingresá tu email y te enviamos un link para crear una nueva contraseña.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleForgotPassword()}
+                    placeholder="tu@agencia.com"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-colors"
+                  />
+                </div>
+                {forgotError && <p className="mt-1 text-xs text-red-500">{forgotError}</p>}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleForgotPassword()}
+                disabled={forgotLoading}
+                className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {forgotLoading ? 'Enviando...' : 'Enviar link de recuperación'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── LOGIN VIEW (default) ─────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[var(--bg-subtle)] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -84,6 +263,14 @@ export default function SignInPage() {
 
         {/* Card */}
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          {inviteInfo ? (
+            <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 mb-5">
+              <p className="text-sm font-semibold text-blue-900">Tenés una invitación pendiente</p>
+              <p className="text-sm text-blue-700 mt-0.5">
+                Iniciá sesión para unirte a <strong>{inviteInfo.workspaceName}</strong> como <strong>{inviteInfo.role}</strong>
+              </p>
+            </div>
+          ) : null}
           <h2 className="text-xl font-semibold text-slate-900 mb-1">Iniciar sesión</h2>
           <p className="text-sm text-slate-500 mb-6">Ingresá a tu cuenta para continuar</p>
 
@@ -132,6 +319,13 @@ export default function SignInPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-sm font-medium text-slate-700">Contraseña</label>
+                <button
+                  type="button"
+                  onClick={() => { setView('forgot'); setForgotError('') }}
+                  className="text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
               </div>
               <div className="relative">
                 <input
@@ -162,12 +356,27 @@ export default function SignInPage() {
 
           <p className="mt-5 text-center text-sm text-slate-500">
             ¿No tienes cuenta?{' '}
-            <Link href="/sign-up" className="font-medium text-blue-600 hover:text-blue-700 transition-colors">
+            <Link
+              href={inviteToken ? `/sign-up?invite=${inviteToken}` : '/sign-up'}
+              className="font-medium text-blue-600 hover:text-blue-700 transition-colors"
+            >
               Crear cuenta gratis
             </Link>
           </p>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[var(--bg-subtle)] flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+      </div>
+    }>
+      <SignInInner />
+    </Suspense>
   )
 }

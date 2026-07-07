@@ -23,12 +23,14 @@ export async function PUT(
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
@@ -52,7 +54,8 @@ export async function DELETE(
       .limit(1)
 
     if (checkError) {
-      return NextResponse.json({ error: checkError.message }, { status: 500 })
+      console.error(checkError)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     if (clients && clients.length > 0) {
@@ -69,11 +72,13 @@ export async function DELETE(
       .eq('workspace_id', workspaceId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

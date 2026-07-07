@@ -10,15 +10,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const body = await request.json()
 
+    const allowedFields = ['title', 'description', 'quarter', 'year', 'status', 'notes', 'client_id', 'progress']
+    const sanitizedBody: Record<string, unknown> = {}
+    for (const field of allowedFields) {
+      if (field in body) sanitizedBody[field] = body[field]
+    }
+
     const { data, error } = await supabase
       .from('objectives')
-      .update(body)
+      .update(sanitizedBody)
       .eq('id', id)
       .eq('workspace_id', workspaceId)
       .select('*, clients(id, name), key_results(*)')
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    }
     return NextResponse.json({ data })
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
@@ -32,6 +41,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const { id } = await params
 
   const { error } = await supabase.from('objectives').delete().eq('id', id).eq('workspace_id', workspaceId)
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error(error)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
   return NextResponse.json({ success: true })
 }

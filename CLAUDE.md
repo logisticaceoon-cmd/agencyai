@@ -10,15 +10,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev          # Start dev server (Next.js 16)
 npm run build        # Production build
 npm run lint         # ESLint
-npm run db:generate  # Regenerate Prisma client
-npm run db:migrate   # Run Prisma migrations (dev)
-npm run db:push      # Push schema to DB without migration
-npm run db:seed      # Seed database
 ```
 
 ## Architecture
 
-**AgencyAI** is a multi-tenant SaaS platform for agencies/freelancers built with Next.js 16 App Router, Supabase Auth, Prisma ORM, and shadcn/ui.
+**AgencyAI** is a multi-tenant SaaS platform for agencies/freelancers built with Next.js 16 App Router, Supabase Auth, and shadcn/ui.
 
 ### Multi-tenancy model
 
@@ -72,7 +68,7 @@ Helper: `isAuthError(auth)` type guard distinguishes auth errors from valid cont
 
 ### Database
 
-Prisma schema in `prisma/schema.prisma`. Supabase PostgreSQL. Key tables: `organizations`, `organization_members`, `clients`, `projects`, `tasks`, `reports`, `finances`, `kpis`, `objectives`, `meetings`, `recordings`, `documentation`, `notifications`.
+Supabase PostgreSQL. Key tables: `organizations`, `organization_members`, `clients`, `projects`, `tasks`, `reports`, `finances`, `kpis`, `objectives`, `meetings`, `recordings`, `documentation`, `notifications`. Migrations in `supabase/migrations/`.
 
 Supabase clients in `lib/supabase/`: `server.ts` (createClient for SSR, createAdminClient for service role), `client.ts` (browser).
 
@@ -104,14 +100,47 @@ API REST en `app/api/cowork/` para que herramientas externas (Cowork desktop) se
 | Endpoint | Metodo | Descripcion |
 |----------|--------|-------------|
 | `/api/cowork/health` | GET | Health check (sin auth) |
+| `/api/cowork/me` | GET | Info del usuario/workspace autenticado por API key |
 | `/api/cowork/tasks` | GET | Listar tareas (filtros: date, status, client_id, project_id, assigned_to) |
 | `/api/cowork/tasks` | POST | Crear tarea |
 | `/api/cowork/tasks/[id]` | GET | Detalle de tarea |
 | `/api/cowork/tasks/[id]` | PATCH | Actualizar tarea |
 | `/api/cowork/tasks/[id]` | POST | Completar tarea (`{ action: "complete" }`) |
 | `/api/cowork/clients` | GET | Listar clientes |
+| `/api/cowork/clients` | POST | Crear cliente |
+| `/api/cowork/clients/[id]` | GET | Detalle de cliente |
+| `/api/cowork/clients/[id]` | PATCH | Editar cliente |
+| `/api/cowork/clients/[id]` | DELETE | Eliminar cliente (soft delete) |
 | `/api/cowork/projects` | GET | Listar proyectos |
+| `/api/cowork/projects` | POST | Crear proyecto |
+| `/api/cowork/projects/[id]` | GET | Detalle de proyecto |
+| `/api/cowork/projects/[id]` | PATCH | Editar proyecto |
+| `/api/cowork/projects/[id]` | DELETE | Eliminar proyecto |
 | `/api/cowork/team` | GET | Listar miembros del equipo |
+| `/api/cowork/team` | POST | Agregar miembro |
+| `/api/cowork/team/[id]` | GET | Detalle de miembro |
+| `/api/cowork/team/[id]` | PATCH | Editar miembro |
+| `/api/cowork/team/[id]` | DELETE | Desactivar miembro |
+| `/api/cowork/finance` | GET | Transacciones + payroll (filtros: type, period, client_id, category) |
+| `/api/cowork/finance` | POST | Registrar transaccion (income/expense) |
+| `/api/cowork/finance/[id]` | GET | Detalle de transaccion |
+| `/api/cowork/finance/[id]` | PATCH | Editar transaccion |
+| `/api/cowork/finance/[id]` | DELETE | Eliminar transaccion |
+| `/api/cowork/minutas` | GET | Listar minutas (filtros: client_id, project_id, status) |
+| `/api/cowork/minutas` | POST | Crear minuta |
+| `/api/cowork/minutas/[id]` | GET | Detalle de minuta |
+| `/api/cowork/minutas/[id]` | PATCH | Editar minuta |
+| `/api/cowork/minutas/[id]` | DELETE | Eliminar minuta |
+| `/api/cowork/kpis` | GET | Listar KPIs con registros (filtros: client_id, category) |
+| `/api/cowork/kpis` | POST | Crear KPI |
+| `/api/cowork/kpis/[id]` | GET | Detalle de KPI con registros |
+| `/api/cowork/kpis/[id]` | PATCH | Editar KPI o agregar registro (`record_value`) |
+| `/api/cowork/kpis/[id]` | DELETE | Eliminar KPI |
+| `/api/cowork/reports` | GET | Listar reportes (filtros: client_id, status, type) |
+| `/api/cowork/reports` | POST | Crear reporte |
+| `/api/cowork/reports/[id]` | GET | Detalle de reporte |
+| `/api/cowork/reports/[id]` | PATCH | Editar reporte |
+| `/api/cowork/reports/[id]` | DELETE | Eliminar reporte |
 
 ## Fases completadas
 

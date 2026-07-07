@@ -90,7 +90,8 @@ export async function PUT(
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
@@ -117,7 +118,8 @@ export async function DELETE(
       .eq('workspace_id', workspaceId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

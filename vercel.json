@@ -21,16 +21,8 @@
       "schedule": "0 21 * * 1-5"
     },
     {
-      "path": "/api/cron/task-alerts",
-      "schedule": "0 20 * * *"
-    },
-    {
       "path": "/api/cron/monthly-finance",
       "schedule": "0 12 5 * *"
-    },
-    {
-      "path": "/api/cron/team-performance",
-      "schedule": "0 12 * * 1"
     },
     {
       "path": "/api/cron/cleanup-accounts",

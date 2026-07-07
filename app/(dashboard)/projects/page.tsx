@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { toast } from '@/hooks/use-toast'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -15,7 +16,11 @@ import {
   Loader2,
   Calendar,
   Users,
+  Trash2,
+  MoreVertical,
+  Download,
 } from 'lucide-react'
+import { downloadCSV } from '@/lib/export'
 import { InfoBanner } from '@/components/shared/InfoBanner'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -98,7 +103,11 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null)
+  const [projectMenuOpen, setProjectMenuOpen] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
   const [checklist, setChecklist] = useState<{ text: string; done: boolean }[]>([])
   const [newCheckItem, setNewCheckItem] = useState('')
 
@@ -171,7 +180,7 @@ export default function ProjectsPage() {
           )
         }
       } catch {
-        // silently fail
+        toast({ title: 'Error al cargar datos', variant: 'destructive' })
       }
     }
     loadAux()
@@ -258,6 +267,66 @@ export default function ProjectsPage() {
     }
   }
 
+  async function handleDeleteProject(project: Project) {
+    const res = await fetch(`/api/projects/${project.id}`, { method: 'DELETE' })
+    if (res.ok) { setDeletingProject(null); loadProjects() }
+  }
+
+  // ── Bulk actions ──────────────────────────────────────────────────────
+
+  const allSelected = projects.length > 0 && selectedIds.size === projects.length
+  const someSelected = selectedIds.size > 0 && selectedIds.size < projects.length
+
+  function toggleProject(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(projects.map((p) => p.id)))
+    }
+  }
+
+  async function bulkStatusChange(newStatus: string) {
+    setBulkLoading(true)
+    try {
+      const promises = Array.from(selectedIds).map((id) =>
+        fetch(`/api/projects/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        })
+      )
+      await Promise.all(promises)
+      setSelectedIds(new Set())
+      loadProjects()
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`Eliminar ${selectedIds.size} proyectos seleccionados?`)) return
+    setBulkLoading(true)
+    try {
+      const promises = Array.from(selectedIds).map((id) =>
+        fetch(`/api/projects/${id}`, { method: 'DELETE' })
+      )
+      await Promise.all(promises)
+      setSelectedIds(new Set())
+      loadProjects()
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
@@ -306,6 +375,27 @@ export default function ProjectsPage() {
           <option value="paused">Pausado</option>
           <option value="completed">Completado</option>
         </select>
+        <button
+          onClick={() => downloadCSV(projects.map(p => ({
+            name: p.name,
+            client: p.client?.name || '',
+            status: statusLabel[p.status] || p.status,
+            budget: '',
+            progress: `${p.progressPercent}%`,
+            deadline: p.endDate || '',
+          })), 'proyectos', [
+            { key: 'name', label: 'Nombre' },
+            { key: 'client', label: 'Cliente' },
+            { key: 'status', label: 'Estado' },
+            { key: 'budget', label: 'Presupuesto' },
+            { key: 'progress', label: 'Progreso' },
+            { key: 'deadline', label: 'Vencimiento' },
+          ])}
+          className="px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-2"
+        >
+          <Download className="w-4 h-4" />
+          Exportar
+        </button>
       </div>
 
       {/* Content */}
@@ -339,37 +429,80 @@ export default function ProjectsPage() {
           </p>
         </div>
       ) : (
+        <>
+        {/* Select all */}
+        <div className="flex items-center gap-3 px-2 mb-2">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            ref={(el) => { if (el) el.indeterminate = someSelected }}
+            onChange={toggleAll}
+            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+          />
+          <span className="text-sm text-slate-500">Seleccionar todos</span>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map((project) => (
-            <Link
+            <div
               key={project.id}
-              href={`/projects/${project.id}`}
-              className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-slate-300 transition-all"
+              className={cn(
+                "group relative rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-slate-300 transition-all",
+                selectedIds.has(project.id) && "bg-blue-50 border-blue-200 hover:bg-blue-50"
+              )}
             >
-              {/* Project name & edit */}
+              {/* Checkbox */}
+              <div className="absolute top-3 left-3 z-10">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(project.id)}
+                  onChange={() => toggleProject(project.id)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            <Link
+              href={`/projects/${project.id}`}
+              className="block p-5 pl-10"
+            >
+              {/* Project name & actions */}
               <div className="flex items-start justify-between mb-2">
                 <h3 className="text-sm font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
                   {project.name}
                 </h3>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    openEditDialog(project)
-                  }}
-                  className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <svg
-                    className="h-3.5 w-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setProjectMenuOpen(projectMenuOpen === project.id ? null : project.id)
+                    }}
+                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors opacity-0 group-hover:opacity-100"
                   >
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
-                </button>
+                    <MoreVertical className="h-3.5 w-3.5" />
+                  </button>
+                  {projectMenuOpen === project.id && (
+                    <div className="absolute right-0 top-7 z-20 w-36 rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openEditDialog(project); setProjectMenuOpen(null) }}
+                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                        Editar
+                      </button>
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeletingProject(project); setProjectMenuOpen(null) }}
+                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Eliminar
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Client badge */}
@@ -430,7 +563,21 @@ export default function ProjectsPage() {
                 </div>
               )}
             </Link>
+            </div>
           ))}
+        </div>
+        </>
+      )}
+
+      {/* Bulk Actions Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-4 z-40">
+          <span className="text-sm">{selectedIds.size} seleccionados</span>
+          <button onClick={() => bulkStatusChange('active')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-green-600 rounded-full hover:bg-green-700 disabled:opacity-50">Activar</button>
+          <button onClick={() => bulkStatusChange('completed')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-emerald-600 rounded-full hover:bg-emerald-700 disabled:opacity-50">Completar</button>
+          <button onClick={() => bulkStatusChange('paused')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-amber-600 rounded-full hover:bg-amber-700 disabled:opacity-50">Pausar</button>
+          <button onClick={bulkDelete} disabled={bulkLoading} className="text-sm px-3 py-1 bg-red-600 rounded-full hover:bg-red-700 disabled:opacity-50">Eliminar</button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-slate-400 hover:text-white">Cancelar</button>
         </div>
       )}
 
@@ -673,6 +820,33 @@ export default function ProjectsPage() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      {/* Delete confirmation modal */}
+      {deletingProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeletingProject(null)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
+                <Trash2 className="h-5 w-5 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Eliminar proyecto?</h3>
+                <p className="text-xs text-slate-500">{deletingProject.name}</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">
+              Se eliminara el proyecto y todas sus tareas asociadas. Esta accion no se puede deshacer.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setDeletingProject(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+              <button onClick={() => handleDeleteProject(deletingProject)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Close dropdown on outside click */}
+      {projectMenuOpen && <div className="fixed inset-0 z-10" onClick={() => setProjectMenuOpen(null)} />}
     </div>
   )
 }

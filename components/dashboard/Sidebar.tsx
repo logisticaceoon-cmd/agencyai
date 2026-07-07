@@ -8,9 +8,11 @@ import { useProfessionalType } from '@/hooks/useProfessionalType'
 import { Avatar } from '@/components/shared/Avatar'
 import { toast } from '@/hooks/use-toast'
 import { normalizeRole, canAccessSection, ROLE_LABELS, type AppRole } from '@/lib/roles'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   LayoutDashboard,
   CheckSquare,
+  CheckCircle,
   FileText,
   Search,
   Users,
@@ -25,6 +27,7 @@ import {
   Video,
   Calendar,
   FolderKanban,
+  Clock,
   Building2,
   User,
   CreditCard,
@@ -32,6 +35,12 @@ import {
   ChevronDown,
   TrendingUp,
   Lock,
+  Shield,
+  X,
+  Megaphone,
+  Receipt,
+  MessageCircle,
+  ImageIcon,
 } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
@@ -65,11 +74,14 @@ type NavItem = {
   label: string
   icon: React.ElementType
   minPlan?: OrgPlan
+  proRequired?: boolean   // nuevo: se bloquea en free, visible con badge PRO
 }
 
 const adminItems: NavItem[] = [
   { href: '/settings', label: 'Workspace', icon: Building2 },
   { href: '/settings/team', label: 'Equipo', icon: Users },
+  { href: '/settings/roles', label: 'Roles', icon: Shield },
+  { href: '/settings/ai', label: 'Agente de IA', icon: Zap },
   { href: '/settings/billing', label: 'Facturacion', icon: CreditCard },
 ]
 
@@ -78,7 +90,7 @@ function isUnlocked(itemMinPlan: OrgPlan | undefined, orgPlan: OrgPlan): boolean
   return PLAN_RANK[orgPlan] >= PLAN_RANK[itemMinPlan]
 }
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, org } = useCurrentUser()
@@ -88,6 +100,7 @@ export function Sidebar() {
   const role: AppRole = normalizeRole(user?.role)
   const isOwner = role === 'owner'
   const canAdmin = role === 'owner' || role === 'admin'
+  const { isPro } = usePlanLimits()
 
   const navGroups: { label: string | null; items: NavItem[] }[] = [
     {
@@ -102,27 +115,33 @@ export function Sidebar() {
         { href: '/clients',   label: config.terminology.clients,  icon: Users },
         { href: '/projects',  label: config.terminology.projects, icon: FolderKanban },
         { href: '/tasks',     label: config.terminology.tasks,    icon: CheckSquare },
-        { href: '/minutes',   label: 'Minutas',                   icon: MessageSquare },
+        { href: '/minutes',   label: 'Minutas',                   icon: MessageSquare, proRequired: !isPro },
         { href: '/calendar',  label: 'Calendario',                icon: Calendar },
+        { href: '/time',            label: 'Tiempo',                    icon: Clock },
+        { href: '/approvals',       label: 'Aprobaciones',              icon: CheckCircle },
+        { href: '/communications',  label: 'Comunicaciones',            icon: MessageCircle },
+        { href: '/assets',          label: 'Archivos',                  icon: ImageIcon },
       ],
     },
     {
       label: 'Reportes',
       items: [
         { href: '/reports',    label: config.terminology.reports, icon: FileText },
-        { href: '/kpis',       label: 'KPIs y Metricas',          icon: BarChart2 },
-        { href: '/objectives', label: 'Objetivos',                icon: Target },
+        { href: '/kpis',       label: 'KPIs y Metricas',          icon: BarChart2,  proRequired: !isPro },
+        { href: '/objectives', label: 'Objetivos',                icon: Target,     proRequired: !isPro },
       ],
     },
     {
       label: 'Gestion',
       items: [
-        { href: '/audits',      label: 'Auditorias',       icon: Search },
-        { href: '/performance', label: 'Rendimiento',      icon: TrendingUp },
-        { href: '/docs',        label: 'Documentos',       icon: BookOpen },
-        { href: '/finances',    label: 'Finanzas',         icon: DollarSign },
-        { href: '/recordings',  label: 'Grabaciones',      icon: Video },
-        { href: '/alerts',      label: 'IA & Alertas',     icon: Zap },
+        { href: '/audits',      label: 'Auditorias',   icon: Search,    proRequired: !isPro },
+        { href: '/performance', label: 'Rendimiento',  icon: TrendingUp, proRequired: !isPro },
+        { href: '/docs',        label: 'Documentos',   icon: BookOpen,  proRequired: !isPro },
+        { href: '/finances',    label: 'Finanzas',     icon: DollarSign },
+        { href: '/invoices',    label: 'Facturas',     icon: Receipt },
+        { href: '/ad-spend',    label: 'Inversion Ads', icon: Megaphone },
+        { href: '/recordings',  label: 'Grabaciones',  icon: Video,     proRequired: !isPro },
+        { href: '/alerts',      label: 'IA & Alertas', icon: Zap,       proRequired: !isPro },
       ],
     },
   ]
@@ -144,7 +163,11 @@ export function Sidebar() {
   const displayEmail = user?.email || ''
 
   return (
-    <aside className="flex h-full w-64 flex-col bg-[var(--bg-subtle)] border-r border-[var(--border-base)] flex-shrink-0">
+    <aside className="flex h-full w-64 flex-col bg-[var(--bg-subtle)] border-r border-[var(--border-base)] flex-shrink-0 relative">
+      {/* Mobile close button */}
+      <button onClick={onClose} className="lg:hidden absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-lg z-10" aria-label="Cerrar menú">
+        <X className="w-5 h-5" />
+      </button>
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 h-14 border-b border-[var(--border-base)]">
         <div className="h-[36px] w-[36px] rounded-[var(--radius-md)] bg-[var(--blue)] flex items-center justify-center flex-shrink-0">
@@ -162,7 +185,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+      <nav aria-label="Navegación principal" className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         {navGroups.map((group) => {
           // Filtrar items accesibles para este rol
           const visibleItems = group.items.filter((item) =>
@@ -180,12 +203,32 @@ export function Sidebar() {
               {visibleItems.map((item) => {
                 const unlocked = isUnlocked(item.minPlan, orgPlan)
                 const active = isActive(item.href)
+                // Item bloqueado por plan Pro
+                const isProLocked = item.proRequired === true
+
+                if (isProLocked) {
+                  return (
+                    <Link
+                      key={item.href}
+                      href="/settings/billing"
+                      title="Función Pro — Activar por $30/mes"
+                      className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-secondary)] transition-all group"
+                    >
+                      <item.icon size={16} strokeWidth={1.5} className="flex-shrink-0 opacity-50" />
+                      <span className="flex-1 opacity-50">{item.label}</span>
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 text-indigo-500 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide flex-shrink-0">
+                        <Lock size={7} />
+                        Pro
+                      </span>
+                    </Link>
+                  )
+                }
 
                 if (!unlocked) {
                   return (
                     <Link
                       key={item.href}
-                      href="/settings"
+                      href="/settings/billing"
                       title={`Requiere plan ${PLAN_LABEL[item.minPlan!]} — Actualizar plan`}
                       className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-muted)] opacity-50 hover:opacity-70 transition-all"
                     >

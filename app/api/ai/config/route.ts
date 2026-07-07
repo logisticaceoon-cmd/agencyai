@@ -9,7 +9,7 @@ export async function GET() {
 
     const { data } = await supabase
       .from('workspace_ai_config')
-      .select('workspace_id, agent_name, agent_avatar, agent_personality, ai_provider, language, updated_at')
+      .select('workspace_id, agent_name, agent_avatar, agent_personality, ai_provider, language, alert_config, updated_at')
       .eq('workspace_id', workspaceId)
       .maybeSingle()
 
@@ -44,7 +44,19 @@ export async function POST(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId } = auth
+    const { supabase, workspaceId, userId } = auth
+
+    // Only owner and admin can configure AI settings
+    const { data: member } = await supabase
+      .from('workspace_members')
+      .select('role')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .single()
+
+    if (!member || !['owner', 'admin'].includes(member.role)) {
+      return NextResponse.json({ error: 'Solo administradores pueden configurar IA' }, { status: 403 })
+    }
 
     const body = await request.json()
 
@@ -60,6 +72,7 @@ export async function POST(request: Request) {
     if (body.anthropic_api_key !== undefined) updateData.anthropic_api_key = body.anthropic_api_key
     if (body.openai_api_key !== undefined) updateData.openai_api_key = body.openai_api_key
     if (body.language !== undefined) updateData.language = body.language
+    if (body.alert_config !== undefined) updateData.alert_config = body.alert_config
 
     const { data, error } = await supabase
       .from('workspace_ai_config')
@@ -68,7 +81,8 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     return NextResponse.json({ data })

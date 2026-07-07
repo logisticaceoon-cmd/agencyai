@@ -18,7 +18,10 @@ export async function GET(request: Request) {
       .eq('workspace_id', workspaceId)
       .order('priority')
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    }
     return NextResponse.json({ data: data || [] })
   } catch (err) {
     console.error('[competitors] GET error:', err)
@@ -51,7 +54,10 @@ export async function POST(request: Request) {
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    }
     return NextResponse.json({ data })
   } catch (err) {
     console.error('[competitors] POST error:', err)
@@ -75,7 +81,10 @@ export async function DELETE(request: Request) {
       .eq('id', id)
       .eq('workspace_id', workspaceId)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    }
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('[competitors] DELETE error:', err)

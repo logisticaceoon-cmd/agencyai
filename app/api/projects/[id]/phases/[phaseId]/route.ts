@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
-import type { Phase } from '../route'
+import { taskToPhase } from '@/lib/task-to-phase'
 
 export async function GET(
   request: Request,
@@ -12,28 +12,23 @@ export async function GET(
     const { supabase, workspaceId } = auth
     const { id: projectId, phaseId } = await params
 
-    // Get project phases
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('phases')
-      .eq('id', projectId)
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', phaseId)
+      .eq('projectId', projectId)
       .eq('workspace_id', workspaceId)
-      .maybeSingle()
+      .eq('taskType', 'phase')
+      .is('deleted_at', null)
+      .single()
 
-    if (projectError || !project) {
-      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
-    }
-
-    const phases = (project.phases as Phase[]) || []
-    const phase = phases.find(p => p.id === phaseId)
-
-    if (!phase) {
+    if (error || !data) {
       return NextResponse.json({ error: 'Fase no encontrada' }, { status: 404 })
     }
 
-    return NextResponse.json({ data: phase })
+    return NextResponse.json({ data: taskToPhase(data) })
   } catch (err) {
-    console.error('Error in GET /api/projects/[id]/phases/[phaseId]:', err)
+    console.error(err)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
@@ -49,77 +44,55 @@ export async function PATCH(
     const { id: projectId, phaseId } = await params
 
     const body = await request.json()
+    const updatePayload: any = { updatedAt: new Date().toISOString() }
 
-    // Get project phases
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('phases')
-      .eq('id', projectId)
+    if (body.title !== undefined) updatePayload.title = body.title
+    if (body.description !== undefined) updatePayload.description = body.description
+    if (body.deadline !== undefined) updatePayload.deadline = body.deadline
+    if (body.responsible_id !== undefined) {
+      updatePayload.assignedTo = body.responsible_id
+      updatePayload.assignee_id = body.responsible_id
+    }
+    if (body.status !== undefined) {
+      updatePayload.status = body.status === 'completed' ? 'completed' : body.status === 'in_progress' ? 'in_progress' : 'pending'
+    }
+    if (body.order !== undefined) updatePayload.position = body.order
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(updatePayload)
+      .eq('id', phaseId)
+      .eq('projectId', projectId)
       .eq('workspace_id', workspaceId)
-      .maybeSingle()
-
-    if (projectError || !project) {
-      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
-    }
-
-    const phases = (project.phases as Phase[]) || []
-    const phaseIndex = phases.findIndex(p => p.id === phaseId)
-
-    if (phaseIndex === -1) {
-      return NextResponse.json({ error: 'Fase no encontrada' }, { status: 404 })
-    }
-
-    // Update phase
-    const updatedPhase: Phase = {
-      ...phases[phaseIndex],
-      title: body.title ?? phases[phaseIndex].title,
-      description: body.description ?? phases[phaseIndex].description,
-      deadline: body.deadline ?? phases[phaseIndex].deadline,
-      responsible_id: body.responsible_id ?? phases[phaseIndex].responsible_id,
-      status: body.status ?? phases[phaseIndex].status,
-      order: body.order ?? phases[phaseIndex].order,
-      updated_at: new Date().toISOString(),
-    }
-
-    const updatedPhases = [...phases]
-    updatedPhases[phaseIndex] = updatedPhase
-
-    // Update project
-    const { data: updated, error: updateError } = await supabase
-      .from('projects')
-      .update({ phases: updatedPhases, updated_at: new Date().toISOString() })
-      .eq('id', projectId)
-      .eq('workspace_id', workspaceId)
+      .eq('taskType', 'phase')
       .select()
       .single()
 
-    if (updateError) {
-      console.error('Error updating phase:', updateError)
-      return NextResponse.json({ error: 'Error al actualizar la fase' }, { status: 500 })
+    if (error || !data) {
+      console.error(error)
+      return NextResponse.json({ error: 'Recurso no encontrado' }, { status: 404 })
     }
 
-    // Create notification if deadline changed and is within 3 days
-    if (body.deadline && updatedPhase.status !== 'completed') {
-      const deadlineDate = new Date(body.deadline)
-      const now = new Date()
-      const daysUntilDeadline = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-
-      if (daysUntilDeadline <= 3 && daysUntilDeadline > 0) {
-        const { error: notifError } = await supabase.from('notifications').insert({
-          workspace_id: workspaceId,
-          title: `Fase próxima a vencer: ${updatedPhase.title}`,
-          message: `La fase "${updatedPhase.title}" vence en ${daysUntilDeadline} días`,
-          type: 'warning',
-          read: false,
-          created_at: new Date().toISOString(),
-        })
-        if (notifError) console.error('Error creating notification:', notifError)
+    // Notify if deadline is within 3 days and not completed
+    if (body.deadline && data.status !== 'completed') {
+      const daysLeft = Math.ceil((new Date(body.deadline).getTime() - Date.now()) / 86400000)
+      if (daysLeft <= 3 && daysLeft > 0) {
+        try {
+          await supabase.from('notifications').insert({
+            workspace_id: workspaceId,
+            title: `Fase próxima a vencer: ${data.title}`,
+            message: `La fase "${data.title}" vence en ${daysLeft} día${daysLeft !== 1 ? 's' : ''}`,
+            type: 'warning',
+            read: false,
+          })
+        } catch (notifErr) {
+          console.error('Failed to insert phase notification:', notifErr)
+        }
       }
     }
 
-    return NextResponse.json({ data: updatedPhase })
-  } catch (err) {
-    console.error('Error in PATCH /api/projects/[id]/phases/[phaseId]:', err)
+    return NextResponse.json({ data: taskToPhase(data) })
+  } catch {
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
@@ -134,47 +107,22 @@ export async function DELETE(
     const { supabase, workspaceId } = auth
     const { id: projectId, phaseId } = await params
 
-    // Get project phases
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('phases')
-      .eq('id', projectId)
+    const { error } = await supabase
+      .from('tasks')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', phaseId)
+      .eq('projectId', projectId)
       .eq('workspace_id', workspaceId)
-      .maybeSingle()
+      .eq('taskType', 'phase')
 
-    if (projectError || !project) {
-      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
-    }
-
-    const phases = (project.phases as Phase[]) || []
-    const phaseIndex = phases.findIndex(p => p.id === phaseId)
-
-    if (phaseIndex === -1) {
-      return NextResponse.json({ error: 'Fase no encontrada' }, { status: 404 })
-    }
-
-    // Remove phase and reorder
-    const updatedPhases = phases
-      .filter((_, i) => i !== phaseIndex)
-      .map((p, i) => ({ ...p, order: i }))
-
-    // Update project
-    const { error: updateError } = await supabase
-      .from('projects')
-      .update({ phases: updatedPhases, updated_at: new Date().toISOString() })
-      .eq('id', projectId)
-      .eq('workspace_id', workspaceId)
-      .select()
-      .single()
-
-    if (updateError) {
-      console.error('Error deleting phase:', updateError)
-      return NextResponse.json({ error: 'Error al eliminar la fase' }, { status: 500 })
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('Error in DELETE /api/projects/[id]/phases/[phaseId]:', err)
+    console.error(err)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

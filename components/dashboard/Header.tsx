@@ -66,6 +66,7 @@ export function Header() {
           <button
             onClick={() => setOpen(!open)}
             className="relative p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors rounded-lg hover:bg-[var(--bg-muted)]"
+            aria-label="Notificaciones"
           >
             <Bell size={16} strokeWidth={1.5} />
             {unreadCount > 0 && (
@@ -118,7 +119,7 @@ export function Header() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-[var(--text-primary)]">{n.title}</p>
                             <p className="text-xs text-[var(--text-secondary)] truncate">{n.message}</p>
-                            <p className="text-xs text-[var(--text-muted)] mt-0.5">{timeAgo(n.createdAt)}</p>
+                            <p className="text-xs text-[var(--text-muted)] mt-0.5">{n.createdAt ? timeAgo(n.createdAt) : ''}</p>
                           </div>
                         </Link>
                       )
@@ -132,7 +133,7 @@ export function Header() {
 
         {/* User avatar */}
         {user && (
-          <Link href="/settings/account" className="flex-shrink-0">
+          <Link href="/settings/account" className="flex-shrink-0" aria-label="Mi cuenta">
             <Avatar name={user.fullName || 'U'} avatarUrl={user.avatarUrl} size="sm" />
           </Link>
         )}

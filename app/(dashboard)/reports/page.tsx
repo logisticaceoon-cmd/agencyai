@@ -17,8 +17,14 @@ import {
   AlertCircle,
   Calendar,
   User,
+  Download,
+  Share2,
+  Link2,
+  Copy,
 } from 'lucide-react'
 import { InfoBanner } from '@/components/shared/InfoBanner'
+import { downloadPDF, downloadReportPDF } from '@/lib/pdf'
+import { downloadCSV } from '@/lib/export'
 
 interface Report {
   id: string
@@ -120,6 +126,22 @@ export default function ReportsPage() {
     }
   }
 
+  async function shareReport(id: string) {
+    try {
+      const res = await fetch(`/api/reports/${id}/share`, { method: 'POST' })
+      if (res.ok) {
+        const { token } = await res.json()
+        const shareUrl = `${window.location.origin}/share/report/${token}`
+        await navigator.clipboard.writeText(shareUrl)
+        toast({ title: 'Enlace copiado al portapapeles' })
+      } else {
+        toast({ title: 'Error al generar enlace', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error al compartir', variant: 'destructive' })
+    }
+  }
+
   const filteredReports = reports.filter((r) => {
     if (!searchQuery) return true
     const q = searchQuery.toLowerCase()
@@ -129,6 +151,71 @@ export default function ReportsPage() {
       (r.client?.name || '').toLowerCase().includes(q)
     )
   })
+
+  function exportCSV() {
+    const columns = [
+      { key: 'title', label: 'Titulo' },
+      { key: 'client', label: 'Cliente' },
+      { key: 'type', label: 'Tipo' },
+      { key: 'status', label: 'Estado' },
+      { key: 'author', label: 'Autor' },
+      { key: 'date', label: 'Fecha' },
+    ]
+    const data = filteredReports.map((r) => ({
+      title: r.title,
+      client: r.client?.name || '',
+      type: typeLabel[r.reportType] || r.reportType,
+      status: statusLabel[r.status] || r.status,
+      author: r.submittedBy?.fullName || '',
+      date: new Date(r.createdAt).toLocaleDateString('es-ES'),
+    }))
+    downloadCSV(data, 'reportes', columns)
+  }
+
+  function exportPDF() {
+    const columns = [
+      { key: 'title', label: 'Titulo' },
+      { key: 'client', label: 'Cliente' },
+      { key: 'type', label: 'Tipo' },
+      { key: 'status', label: 'Estado' },
+      { key: 'author', label: 'Autor' },
+      { key: 'date', label: 'Fecha' },
+    ]
+    const data = filteredReports.map((r) => ({
+      title: r.title,
+      client: r.client?.name || '',
+      type: typeLabel[r.reportType] || r.reportType,
+      status: statusLabel[r.status] || r.status,
+      author: r.submittedBy?.fullName || '',
+      date: new Date(r.createdAt).toLocaleDateString('es-ES'),
+    }))
+    downloadPDF({
+      title: 'Reportes',
+      subtitle: `${data.length} reportes`,
+      filename: 'reportes',
+      columns,
+      data,
+      orientation: 'landscape',
+    })
+  }
+
+  async function exportSingleReportPDF(report: Report) {
+    try {
+      const res = await fetch(`/api/reports/${report.id}`)
+      if (!res.ok) throw new Error('No se pudo obtener el reporte')
+      const { data } = await res.json()
+      downloadReportPDF({
+        title: data.title || report.title,
+        client_name: report.client?.name,
+        type: typeLabel[report.reportType] || report.reportType,
+        period: data.period || undefined,
+        content: data.description || data.content || report.description || '',
+        created_at: new Date(report.createdAt).toLocaleDateString('es-ES'),
+      })
+    } catch {
+      toast({ title: 'Error al generar PDF', variant: 'destructive' })
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -141,13 +228,31 @@ export default function ReportsPage() {
             {isCEO ? 'Gestion y validacion de reportes del equipo' : 'Mis reportes enviados'}
           </p>
         </div>
-        <Link
-          href="/reports/new"
-          className="flex items-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo reporte
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCSV}
+            disabled={filteredReports.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="h-3.5 w-3.5" />
+            CSV
+          </button>
+          <button
+            onClick={exportPDF}
+            disabled={filteredReports.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="h-3.5 w-3.5" />
+            PDF
+          </button>
+          <Link
+            href="/reports/new"
+            className="flex items-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo reporte
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -219,7 +324,7 @@ export default function ReportsPage() {
                 <th className="px-4 py-3 text-left font-medium text-slate-600">Estado</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">Autor</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-600">Fecha</th>
-                {isCEO && <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>}
+                <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -262,10 +367,24 @@ export default function ReportsPage() {
                       <span>{timeAgo(report.createdAt)}</span>
                     </div>
                   </td>
-                  {isCEO && (
-                    <td className="px-4 py-3 text-right">
-                      {report.status === 'pending' && (
-                        <div className="flex justify-end gap-1.5">
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex justify-end gap-1.5">
+                      <button
+                        onClick={() => exportSingleReportPDF(report)}
+                        title="Descargar PDF"
+                        className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                      >
+                        <Download className="h-3.5 w-3.5" /> PDF
+                      </button>
+                      <button
+                        onClick={() => shareReport(report.id)}
+                        title="Compartir enlace"
+                        className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                      >
+                        <Share2 className="h-3.5 w-3.5" /> Compartir
+                      </button>
+                      {isCEO && report.status === 'pending' && (
+                        <>
                           <button
                             onClick={() => validateReport(report.id, 'validated')}
                             className="flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors"
@@ -284,10 +403,10 @@ export default function ReportsPage() {
                           >
                             <XCircle className="h-3.5 w-3.5" /> Rechazar
                           </button>
-                        </div>
+                        </>
                       )}
-                    </td>
-                  )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

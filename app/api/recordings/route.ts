@@ -11,7 +11,7 @@ export async function GET() {
       .from('recordings')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (error) {
       console.error('Error fetching recordings:', error)
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error creating recording:', error)
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return NextResponse.json({ error: 'Error en la solicitud' }, { status: 400 })
     }
 
     return NextResponse.json({ data })

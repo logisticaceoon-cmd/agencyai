@@ -4,8 +4,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 // Ejecuta el día 1 de cada mes a las 7 AM UTC
 // Genera reportes de investigación para todos los clientes activos con competidores configurados
 export async function GET(request: Request) {
-  const cronSecret = request.headers.get('authorization')
-  if (cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret || request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

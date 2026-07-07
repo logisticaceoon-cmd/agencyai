@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { randomBytes, createHash } from 'crypto'
 
 function generateApiKey(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  let result = ''
-  for (let i = 0; i < 32; i++) {
-    result += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return `sk_agencyai_${result}`
+  return `sk_agencyai_${randomBytes(24).toString('hex')}`
+}
+
+function hashApiKey(key: string): string {
+  return createHash('sha256').update(key).digest('hex')
 }
 
 export async function GET() {
@@ -21,16 +21,14 @@ export async function GET() {
       .select('id, name, description, status, last_used_at, created_at')
       .eq('organization_id', workspaceId)
       .eq('status', 'active')
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (error) {
-      console.error('Error fetching API keys:', error)
       return NextResponse.json({ data: [] })
     }
 
     return NextResponse.json({ data: data || [] })
-  } catch (err) {
-    console.error('Error in GET /api/cowork/api-keys:', err)
+  } catch {
     return NextResponse.json({ data: [] })
   }
 }
@@ -48,6 +46,7 @@ export async function POST(request: Request) {
     }
 
     const key = generateApiKey()
+    const keyHash = hashApiKey(key)
 
     const { data, error } = await supabase
       .from('api_keys')
@@ -55,18 +54,18 @@ export async function POST(request: Request) {
         organization_id: workspaceId,
         name: body.name.trim(),
         description: body.description || null,
-        key,
+        key: keyHash,
         status: 'active',
       })
-      .select('id, name, key, created_at')
+      .select('id, name, created_at')
       .single()
 
     if (error) {
-      console.error('Error creating API key:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al crear API key' }, { status: 500 })
     }
 
-    return NextResponse.json({ data }, { status: 201 })
+    // Return the plaintext key only once — it won't be retrievable again
+    return NextResponse.json({ data: { ...data, key } }, { status: 201 })
   } catch (err) {
     console.error('Error in POST /api/cowork/api-keys:', err)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
@@ -93,13 +92,11 @@ export async function DELETE(request: Request) {
       .eq('organization_id', workspaceId)
 
     if (error) {
-      console.error('Error revoking API key:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al revocar API key' }, { status: 500 })
     }
 
     return NextResponse.json({ data: { message: 'API key revocada' } })
-  } catch (err) {
-    console.error('Error in DELETE /api/cowork/api-keys:', err)
+  } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

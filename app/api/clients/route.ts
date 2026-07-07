@@ -1,6 +1,24 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 import { normalizeRole, getDataScope } from '@/lib/roles'
+import { FOUNDER_WORKSPACE_IDS, PLAN_MAP } from '@/lib/plans'
+import { sanitizeError } from '@/lib/sanitize-error'
+
+const createClientSchema = z.object({
+  name: z.string().min(1, 'El nombre es obligatorio'),
+  brand: z.string().optional(),
+  email: z.string().email('Email inválido').optional().or(z.literal('')),
+  phone: z.string().optional(),
+  website: z.string().optional(),
+  status: z.enum(['active', 'inactive', 'lead', 'churned']).optional(),
+  industry: z.string().optional(),
+  notes: z.string().optional(),
+  monthlyFee: z.number().min(0, 'La tarifa mensual debe ser positiva').optional().nullable(),
+  currency: z.string().optional(),
+  pays_percentage: z.boolean().optional(),
+  percentage_value: z.number().min(0).max(100).optional().nullable(),
+})
 
 export async function GET(request: Request) {
   try {
@@ -9,16 +27,26 @@ export async function GET(request: Request) {
     const { supabase, workspaceId, userId, role } = auth
 
     const { searchParams } = new URL(request.url)
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')))
+    const offset = (page - 1) * pageSize
     const status = searchParams.get('status')
     const search = searchParams.get('search')
 
     const appRole = normalizeRole(role)
     const scope = getDataScope('clients', appRole)
 
-    // Para trafficker/viewer: solo los clientes donde tienen proyectos o tareas asignadas
+    // Para trafficker/viewer: solo los clientes asignados directamente
     let clientIds: string[] | null = null
     if (scope === 'assigned') {
-      // Obtener IDs de proyectos asignados
+      // 1. Asignaciones directas (member_client_assignments — fuente principal)
+      const { data: directAssignments } = await supabase
+        .from('member_client_assignments')
+        .select('client_id')
+        .eq('workspace_id', workspaceId)
+        .eq('member_user_id', userId)
+
+      // 2. Proyectos donde son owner (respaldo / proyectos creados por ellos)
       const { data: myProjects } = await supabase
         .from('projects')
         .select('clientId')
@@ -26,7 +54,7 @@ export async function GET(request: Request) {
         .eq('owner_id', userId)
         .not('clientId', 'is', null)
 
-      // Obtener IDs de clientes de tareas asignadas
+      // 3. Tareas asignadas con clientId
       const { data: myTasks } = await supabase
         .from('tasks')
         .select('clientId')
@@ -34,9 +62,10 @@ export async function GET(request: Request) {
         .contains('assignedTo', [userId])
         .not('clientId', 'is', null)
 
+      const fromDirect = (directAssignments || []).map((a: { client_id: string }) => a.client_id).filter(Boolean)
       const fromProjects = (myProjects || []).map((p: { clientId: string }) => p.clientId).filter(Boolean)
       const fromTasks = (myTasks || []).map((t: { clientId: string }) => t.clientId).filter(Boolean)
-      clientIds = [...new Set([...fromProjects, ...fromTasks])]
+      clientIds = [...new Set([...fromDirect, ...fromProjects, ...fromTasks])]
     }
 
     let query = supabase
@@ -44,8 +73,8 @@ export async function GET(request: Request) {
       .select('*')
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
-      .limit(200)
       .order('createdAt', { ascending: false })
+      .range(offset, offset + pageSize - 1)
 
     if (clientIds !== null) {
       if (clientIds.length === 0) return NextResponse.json({ data: [] })
@@ -53,19 +82,22 @@ export async function GET(request: Request) {
     }
 
     if (status) query = query.eq('status', status)
-    if (search) query = query.or(`name.ilike.%${search}%,brand.ilike.%${search}%,email.ilike.%${search}%`)
+    if (search) {
+      const s = search.replace(/[%_\\,()]/g, '\\$&')
+      query = query.or(`name.ilike.%${s}%,brand.ilike.%${s}%,email.ilike.%${s}%`)
+    }
 
     const { data, error } = await query
 
     if (error) {
-      console.error('Error fetching clients:', error)
-      return NextResponse.json({ data: [] })
+      return NextResponse.json({ data: [], page, pageSize, hasMore: false })
     }
 
-    return NextResponse.json({ data: data || [] })
+    const results = data || []
+    return NextResponse.json({ data: results, page, pageSize, hasMore: results.length === pageSize })
   } catch (err) {
     console.error('Error in GET /api/clients:', err)
-    return NextResponse.json({ data: [] })
+    return NextResponse.json({ data: [], page: 1, pageSize: 50, hasMore: false })
   }
 }
 
@@ -80,31 +112,70 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Sin permisos para crear clientes' }, { status: 403 })
     }
 
+    // ─── Verificar límite de clientes según el plan ──────────────────────────
+    if (!FOUNDER_WORKSPACE_IDS.has(workspaceId)) {
+      const { data: ws } = await supabase
+        .from('workspaces')
+        .select('plan')
+        .eq('id', workspaceId)
+        .single()
+
+      const plan = ws?.plan || 'free'
+      const planDef = PLAN_MAP[plan as keyof typeof PLAN_MAP] ?? PLAN_MAP.free
+      const maxClients = planDef.maxClients
+
+      if (maxClients !== Infinity) {
+        const { count } = await supabase
+          .from('clients')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .is('deleted_at', null)
+
+        if ((count ?? 0) >= maxClients) {
+          const planNames: Record<string, string> = {
+            free: 'Free (3 clientes)',
+            pro: 'Pro (8 clientes)',
+            agency: 'Agency (20 clientes)',
+          }
+          return NextResponse.json({
+            error: `Límite de clientes alcanzado. Tu plan ${planNames[plan] || plan} permite máximo ${maxClients} clientes. Actualizá tu plan para agregar más.`,
+            limitReached: true,
+            maxClients,
+          }, { status: 403 })
+        }
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     const body = await request.json()
+    const result = createClientSchema.safeParse(body)
+    if (!result.success) {
+      return NextResponse.json({ error: 'Datos inválidos', details: result.error.flatten().fieldErrors }, { status: 400 })
+    }
+    const parsed = result.data
 
     const { data, error } = await supabase
       .from('clients')
       .insert({
         workspace_id: workspaceId,
-        name: body.name,
-        brand: body.brand || null,
-        email: body.email || null,
-        phone: body.phone || null,
-        website: body.website || null,
-        status: body.status || 'active',
-        industry: body.industry || null,
-        notes: body.notes || null,
-        monthlyFee: body.monthlyFee || null,
-        currency: body.currency || 'USD',
-        pays_percentage: body.pays_percentage ?? false,
-        percentage_value: body.percentage_value || null,
+        name: parsed.name,
+        brand: parsed.brand || null,
+        email: parsed.email || null,
+        phone: parsed.phone || null,
+        website: parsed.website || null,
+        status: parsed.status || 'active',
+        industry: parsed.industry || null,
+        notes: parsed.notes || null,
+        monthlyFee: parsed.monthlyFee || null,
+        currency: parsed.currency || 'USD',
+        pays_percentage: parsed.pays_percentage ?? false,
+        percentage_value: parsed.percentage_value || null,
       })
       .select()
       .single()
 
     if (error) {
-      console.error('Error creating client:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: sanitizeError(error, 'POST /api/clients') }, { status: 500 })
     }
 
     // Sync to finance_clients (upsert by client_name + workspace_id)

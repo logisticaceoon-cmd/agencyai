@@ -32,6 +32,7 @@ export function NotificationCenter() {
       <button
         onClick={() => setOpen(!open)}
         className="relative p-2 text-slate-400 hover:text-slate-600 transition-colors rounded-lg hover:bg-slate-100"
+        aria-label="Centro de notificaciones"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
@@ -90,7 +91,7 @@ export function NotificationCenter() {
                           )}
                         </div>
                         <p className="text-xs text-slate-500 truncate">{n.message}</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(n.createdAt)}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{n.createdAt ? timeAgo(n.createdAt) : ''}</p>
                       </div>
                     </Link>
                   )

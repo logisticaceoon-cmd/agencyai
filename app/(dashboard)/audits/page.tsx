@@ -107,6 +107,7 @@ export default function AuditsPage() {
   const [form, setForm] = useState({ ...emptyForm })
   const [submitting, setSubmitting] = useState(false)
   const [newFinding, setNewFinding] = useState<Finding>({ titulo: '', detalle: '', severidad: 'medio' })
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   async function loadAudits() {
     setLoading(true)
@@ -161,7 +162,10 @@ export default function AuditsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Eliminar esta auditoria?')) return
+    setConfirmDeleteId(id)
+  }
+
+  async function executeDelete(id: string) {
     const res = await fetch(`/api/audits/${id}`, { method: 'DELETE' })
     if (res.ok) {
       toast({ title: 'Auditoria eliminada' })
@@ -445,6 +449,20 @@ export default function AuditsPage() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      {/* Confirm delete modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2">Confirmar eliminación</h3>
+            <p className="text-gray-600 mb-4">¿Eliminar esta auditoria? Esta acción no se puede deshacer.</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={() => { executeDelete(confirmDeleteId); setConfirmDeleteId(null) }} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

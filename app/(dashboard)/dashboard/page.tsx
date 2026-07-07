@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
-import { cn, formatDate } from '@/lib/utils'
+import { cn, formatDate, getInitials } from '@/lib/utils'
 import { AgentChat, AgentChatMobile } from '@/components/ai/AgentChat'
 import {
   Users,
@@ -17,6 +18,23 @@ import {
   TrendingUp,
   Activity,
 } from 'lucide-react'
+
+const ActivityChart = dynamic(() => import('recharts').then(mod => {
+  const { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } = mod
+  return function Chart({ data }: { data: { date: string; tasks: number; projects: number }[] }) {
+    return (
+      <ResponsiveContainer width="100%" height={200}>
+        <AreaChart data={data}>
+          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+          <YAxis tick={{ fontSize: 12 }} />
+          <Tooltip />
+          <Area type="monotone" dataKey="tasks" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} name="Tareas" />
+          <Area type="monotone" dataKey="projects" stroke="#10b981" fill="#10b981" fillOpacity={0.1} name="Proyectos" />
+        </AreaChart>
+      </ResponsiveContainer>
+    )
+  }
+}), { ssr: false, loading: () => <div className="h-[200px] animate-pulse bg-slate-100 rounded-lg" /> })
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,9 +90,6 @@ function getDaysRemainingBadge(deadline: string) {
   return { label: `${days}d`, color: 'bg-[var(--green-light)] text-[var(--green)]' }
 }
 
-function getInitials(name: string) {
-  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-}
 
 function getAvatarColor(name: string) {
   const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-purple-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500']
@@ -95,6 +110,7 @@ export default function DashboardPage() {
   const { user } = useCurrentUser()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activityData, setActivityData] = useState<{ date: string; tasks: number; projects: number }[]>([])
   const [greeting, setGreeting] = useState('')
   const [dateString, setDateString] = useState('')
 
@@ -106,8 +122,52 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/dashboard/stats')
-        if (res.ok) setStats(await res.json())
+        const [statsRes, tasksRes, projectsRes] = await Promise.all([
+          fetch('/api/dashboard/stats'),
+          fetch('/api/tasks?status=completed&limit=500'),
+          fetch('/api/projects?limit=500'),
+        ])
+        if (statsRes.ok) setStats(await statsRes.json())
+
+        // Build activity data for last 30 days
+        const now = new Date()
+        const days: Record<string, { tasks: number; projects: number }> = {}
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date(now)
+          d.setDate(d.getDate() - i)
+          const key = d.toISOString().slice(0, 10)
+          days[key] = { tasks: 0, projects: 0 }
+        }
+
+        if (tasksRes.ok) {
+          const tasksJson = await tasksRes.json()
+          const tasks = Array.isArray(tasksJson) ? tasksJson : tasksJson.data || tasksJson.tasks || []
+          for (const task of tasks) {
+            const dateStr = (task.completed_at || task.updated_at || task.created_at || '').slice(0, 10)
+            if (days[dateStr]) {
+              days[dateStr].tasks += 1
+            }
+          }
+        }
+
+        if (projectsRes.ok) {
+          const projectsJson = await projectsRes.json()
+          const projects = Array.isArray(projectsJson) ? projectsJson : projectsJson.data || projectsJson.projects || []
+          for (const project of projects) {
+            const dateStr = (project.updated_at || project.created_at || '').slice(0, 10)
+            if (days[dateStr]) {
+              days[dateStr].projects += 1
+            }
+          }
+        }
+
+        setActivityData(
+          Object.entries(days).map(([date, vals]) => ({
+            date: `${date.slice(8, 10)}/${date.slice(5, 7)}`,
+            tasks: vals.tasks,
+            projects: vals.projects,
+          }))
+        )
       } finally {
         setLoading(false)
       }
@@ -191,13 +251,16 @@ export default function DashboardPage() {
                 Actividad del mes
               </h2>
             </div>
-            <div className="h-40 flex items-center justify-center rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-base)]">
-              <div className="text-center">
-                <BarChart2 size={28} strokeWidth={1} className="text-[var(--text-muted)] mx-auto mb-2" />
-                <p className="text-sm text-[var(--text-muted)]">Grafico de actividad</p>
-                {stats && <p className="text-xs text-[var(--text-muted)] mt-1">{stats.tasksCompletedThisWeek} tareas completadas esta semana</p>}
+            {activityData.length > 0 ? (
+              <ActivityChart data={activityData} />
+            ) : (
+              <div className="h-[200px] flex items-center justify-center rounded-lg bg-[var(--bg-subtle)] border border-[var(--border-base)]">
+                <div className="text-center">
+                  <BarChart2 size={28} strokeWidth={1} className="text-[var(--text-muted)] mx-auto mb-2" />
+                  <p className="text-sm text-[var(--text-muted)]">Sin datos de actividad</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="xl:col-span-2 rounded-[var(--radius-lg)] border border-[var(--border-base)] bg-white p-5">

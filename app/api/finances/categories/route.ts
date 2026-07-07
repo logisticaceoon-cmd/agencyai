@@ -15,12 +15,14 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: true })
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
@@ -55,11 +57,13 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     return NextResponse.json({ data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

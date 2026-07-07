@@ -49,7 +49,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error en la solicitud' }, { status: 400 })
     }
 
     return NextResponse.json({ data })

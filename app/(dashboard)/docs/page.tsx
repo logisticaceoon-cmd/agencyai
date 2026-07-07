@@ -289,10 +289,12 @@ export default function DocsPage() {
     finally { setSaving(false) }
   }
 
+  const [deleteDocId, setDeleteDocId] = useState<string | null>(null)
+
   async function handleDelete(id: string) {
-    if (!confirm('Eliminar este item?')) return
     await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' })
     setBookmarks(prev => prev.filter(b => b.id !== id))
+    setDeleteDocId(null)
   }
 
   async function handleTogglePin(id: string, pinned: boolean) {

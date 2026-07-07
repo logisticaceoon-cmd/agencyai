@@ -32,7 +32,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    }
 
     // Update current_value on the KPI
     await supabase.from('kpis').update({ current_value: body.value }).eq('id', id)

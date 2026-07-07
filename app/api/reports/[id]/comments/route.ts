@@ -25,7 +25,8 @@ export async function POST(
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error en la solicitud' }, { status: 400 })
     }
 
     return NextResponse.json({ data }, { status: 201 })

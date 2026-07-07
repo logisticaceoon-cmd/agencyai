@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { validateApiKey, isApiAuthError } from '@/lib/api-auth'
+import { sanitizeError } from '@/lib/sanitize-error'
 
 export async function GET(request: Request) {
   try {
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Cowork tasks GET error:', error)
-      return NextResponse.json({ error: `Error fetching tasks: ${error.message}` }, { status: 500 })
+      return NextResponse.json({ error: sanitizeError(error, 'GET /api/cowork/tasks') }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
   try {
     const auth = await validateApiKey(request)
     if (isApiAuthError(auth)) return auth
-    const { supabase, organizationId } = auth
+    const { supabase, organizationId, userId } = auth
 
     const body = await request.json()
 
@@ -62,8 +63,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 })
     }
 
-    // Resolver createdById: acepta snake_case y camelCase; fallback al owner del workspace
-    let createdById = body.created_by || body.createdById || null
+    // Resolver createdById: use authenticated userId, fallback to body or workspace owner
+    let createdById = userId || body.created_by || body.createdById || null
 
     if (!createdById) {
       const { data: ownerData } = await supabase
@@ -82,7 +83,8 @@ export async function POST(request: Request) {
         title: body.title,
         description: body.description || null,
         clientId: body.client_id || null,
-        projectId: body.project_id || null,
+        projectId: body.project_id || body.projectId || null,
+        parentTaskId: body.parent_task_id || body.parentTaskId || null,
         assignedTo: body.assigned_to || [],
         deadline: body.deadline || null,
         priority: body.priority || 'medium',
@@ -94,7 +96,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Cowork tasks POST error:', error)
-      return NextResponse.json({ error: `Error creating task: ${error.message}` }, { status: 500 })
+      return NextResponse.json({ error: sanitizeError(error, 'POST /api/cowork/tasks') }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -107,4 +109,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-

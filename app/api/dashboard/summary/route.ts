@@ -23,13 +23,13 @@ export async function GET() {
       supabase.from('clients').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).eq('status', 'active'),
       supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).neq('status', 'rejected'),
       supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).eq('status', 'completed'),
-      supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).in('status', ['pending', 'in_progress']).lt('due_date', now),
+      supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).is('deleted_at', null).in('status', ['pending', 'in_progress']).lt('deadline', now),
       supabase.from('reports').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId),
       supabase.from('reports').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).in('status', ['validated', 'rejected']),
       supabase.from('reports').select('id', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('status', 'pending'),
     ])
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       totalClients: clientsResult.count || 0,
       clientsOnTrack: activeClientsResult.count || 0,
       tasksTotal: tasksResult.count || 0,
@@ -42,6 +42,8 @@ export async function GET() {
       monthlyRevenue: 0,
       pendingPayments: 0,
     })
+    response.headers.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60')
+    return response
   } catch (err) {
     console.error('Error fetching dashboard summary:', err)
     return NextResponse.json({

@@ -19,7 +19,12 @@ import {
   Check,
   MoreVertical,
   ChevronDown,
+  Eye,
+  Download,
+  FileStack,
+  Loader2,
 } from 'lucide-react'
+import { downloadCSV } from '@/lib/export'
 import {
   DndContext,
   closestCorners,
@@ -155,15 +160,22 @@ export default function TasksPage() {
   const [detailTask, setDetailTask] = useState<Task | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [members, setMembers] = useState<Member[]>([])
-  const [selectedMemberId, setSelectedMemberId] = useState<string>('all')
   const [defaultStatus, setDefaultStatus] = useState<string>('pending')
+  const [templateModalOpen, setTemplateModalOpen] = useState(false)
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; description: string | null; subtasks: Array<{ title: string }>; category: string }>>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
+  const [tplClientId, setTplClientId] = useState('')
+  const [tplProjectId, setTplProjectId] = useState('')
+  const [generatingFromTemplate, setGeneratingFromTemplate] = useState(false)
+  const [clients, setClients] = useState<Array<{ id: string; name: string }>>([])
 
-  const isCEO = user?.role === 'CEO' || user?.role === 'Manager' || user?.role === 'owner' || user?.role === 'admin'
+  const isCEO = user?.role === 'CEO' || user?.role === 'Manager'
 
   // ─── Data fetching ───────────────────────────────────────────────────────────
 
-  const loadTasks = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true)
+  const loadTasks = useCallback(async () => {
+    setLoading(true)
     try {
       const params = new URLSearchParams()
       if (statusFilter) params.set('status', statusFilter)
@@ -174,7 +186,7 @@ export default function TasksPage() {
         setTasks(data.data || [])
       }
     } finally {
-      if (!silent) setLoading(false)
+      setLoading(false)
     }
   }, [statusFilter, priorityFilter])
 
@@ -205,32 +217,55 @@ export default function TasksPage() {
   useEffect(() => {
     loadProjects()
     loadMembers()
+    // Load clients for template generation
+    fetch('/api/clients?limit=200').then(r => r.json()).then(d => setClients(d.data || [])).catch(() => {})
   }, [loadProjects, loadMembers])
 
-  // Auto-refresh silencioso cada 30s (monitoreo en vivo)
-  useEffect(() => {
-    const timer = setInterval(() => loadTasks(true), 30000)
-    return () => clearInterval(timer)
-  }, [loadTasks])
+  async function openTemplateModal() {
+    setTemplateModalOpen(true)
+    setSelectedTemplate(null)
+    setTplClientId('')
+    setTplProjectId('')
+    if (templates.length === 0) {
+      setTemplatesLoading(true)
+      try {
+        const res = await fetch('/api/task-templates')
+        if (res.ok) {
+          const d = await res.json()
+          setTemplates(d.data || [])
+        }
+      } finally {
+        setTemplatesLoading(false)
+      }
+    }
+  }
+
+  async function generateFromTemplate() {
+    if (!selectedTemplate) return
+    setGeneratingFromTemplate(true)
+    try {
+      const res = await fetch(`/api/task-templates/${selectedTemplate}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: tplClientId || undefined, project_id: tplProjectId || undefined }),
+      })
+      if (res.ok) {
+        setTemplateModalOpen(false)
+        loadTasks()
+      }
+    } finally {
+      setGeneratingFromTemplate(false)
+    }
+  }
 
   // ─── Filtered tasks ──────────────────────────────────────────────────────────
 
   const filtered = useMemo(
     () =>
-      tasks.filter((t) => {
-        if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
-        if (selectedMemberId !== 'all') {
-          // API returns flat createdById, not nested createdBy object
-          const taskAny = t as unknown as Record<string, unknown>
-          const isCreator =
-            t.createdBy?.id === selectedMemberId ||
-            taskAny.createdById === selectedMemberId
-          const isAssigned = Array.isArray(t.assignedTo) && t.assignedTo.includes(selectedMemberId)
-          if (!isCreator && !isAssigned) return false
-        }
-        return true
-      }),
-    [tasks, searchQuery, selectedMemberId]
+      tasks.filter(
+        (t) => !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase())
+      ),
+    [tasks, searchQuery]
   )
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -309,20 +344,28 @@ export default function TasksPage() {
     }
   }
 
-  async function handleDeleteTask(taskId: string) {
-    if (!confirm('Seguro que deseas eliminar esta tarea?')) return
-    const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
+
+  async function confirmDeleteTask() {
+    if (!deleteTaskId) return
+    const res = await fetch(`/api/tasks/${deleteTaskId}`, { method: 'DELETE' })
     if (res.ok) {
-      setTasks((prev) => prev.filter((t) => t.id !== taskId))
-      if (detailTask?.id === taskId) setDetailTask(null)
+      setTasks((prev) => prev.filter((t) => t.id !== deleteTaskId))
+      if (detailTask?.id === deleteTaskId) setDetailTask(null)
     }
+    setDeleteTaskId(null)
+  }
+
+  function handleDeleteTask(taskId: string) {
+    setDeleteTaskId(taskId)
   }
 
   async function loadTaskDetail(taskId: string) {
     const res = await fetch(`/api/tasks/${taskId}`)
     if (res.ok) {
       const data = await res.json()
-      setDetailTask(data.data)
+      // API returns task directly at top level (not wrapped in { data: ... })
+      setDetailTask(data.data ?? data)
     }
   }
 
@@ -378,6 +421,13 @@ export default function TasksPage() {
             </button>
           </div>
           <button
+            onClick={openTemplateModal}
+            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            <FileStack className="h-4 w-4" />
+            Plantillas
+          </button>
+          <button
             onClick={() => openCreateModal()}
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
           >
@@ -423,49 +473,30 @@ export default function TasksPage() {
             </option>
           ))}
         </select>
+        <button
+          onClick={() => downloadCSV(filtered.map(t => ({
+            title: t.title,
+            status: STATUS_LABELS[t.status] || t.status,
+            priority: PRIORITY_LABELS[t.priority] || t.priority,
+            client: t.client?.name || '',
+            project: t.project?.name || '',
+            deadline: t.deadline || '',
+            assignee: t.assignedTo.length > 0 ? getMemberName(t.assignedTo[0]) : '',
+          })), 'tareas', [
+            { key: 'title', label: 'Titulo' },
+            { key: 'status', label: 'Estado' },
+            { key: 'priority', label: 'Prioridad' },
+            { key: 'client', label: 'Cliente' },
+            { key: 'project', label: 'Proyecto' },
+            { key: 'deadline', label: 'Vencimiento' },
+            { key: 'assignee', label: 'Asignado' },
+          ])}
+          className="px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-2"
+        >
+          <Download className="w-4 h-4" />
+          Exportar
+        </button>
       </div>
-
-      {/* Filtro por miembro (solo CEO/Manager) */}
-      {isCEO && members.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-500 font-medium shrink-0">Ver tareas de:</span>
-          <button
-            onClick={() => setSelectedMemberId('all')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              selectedMemberId === 'all'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            Todos
-          </button>
-          {members.map((m) => (
-            <button
-              key={m.userId}
-              onClick={() => setSelectedMemberId(selectedMemberId === m.userId ? 'all' : m.userId)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                selectedMemberId === m.userId
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {m.user.avatarUrl ? (
-                <img src={m.user.avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
-              ) : (
-                <span className="w-4 h-4 rounded-full bg-slate-400 text-white text-[9px] flex items-center justify-center font-bold shrink-0">
-                  {m.user.fullName.charAt(0).toUpperCase()}
-                </span>
-              )}
-              {m.user.fullName.split(' ')[0]}
-            </button>
-          ))}
-          {selectedMemberId !== 'all' && (
-            <span className="text-xs text-slate-400">
-              ({filtered.length} tarea{filtered.length !== 1 ? 's' : ''})
-            </span>
-          )}
-        </div>
-      )}
 
       {/* Content */}
       {loading ? (
@@ -491,6 +522,8 @@ export default function TasksPage() {
           onRowClick={(task) => loadTaskDetail(task.id)}
           onEdit={openEditModal}
           onDelete={handleDeleteTask}
+          onStatusChange={handleStatusChange}
+          onReload={loadTasks}
         />
       ) : (
         <KanbanView
@@ -502,6 +535,7 @@ export default function TasksPage() {
           onAddToColumn={openCreateModal}
           onEdit={openEditModal}
           onDelete={handleDeleteTask}
+          onPreview={(task) => loadTaskDetail(task.id)}
         />
       )}
 
@@ -516,6 +550,96 @@ export default function TasksPage() {
         onSubmit={handleSaveTask}
       />
 
+      {/* Template Modal */}
+      {templateModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Crear desde plantilla</h3>
+              <button onClick={() => setTemplateModalOpen(false)} className="rounded-md p-1 text-slate-400 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {templatesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="text-center py-8">
+                <FileStack className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+                <p className="text-sm text-slate-500">No hay plantillas creadas</p>
+                <p className="text-xs text-slate-400 mt-1">Crea plantillas desde la API para reutilizar flujos de tareas</p>
+              </div>
+            ) : !selectedTemplate ? (
+              <div className="space-y-2">
+                {templates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    onClick={() => setSelectedTemplate(tpl.id)}
+                    className="w-full text-left rounded-lg border border-slate-200 p-3 hover:border-blue-300 hover:bg-blue-50/50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-slate-900">{tpl.name}</span>
+                      <span className="text-xs text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">{tpl.category}</span>
+                    </div>
+                    {tpl.description && <p className="text-xs text-slate-500 mt-1">{tpl.description}</p>}
+                    {tpl.subtasks && tpl.subtasks.length > 0 && (
+                      <p className="text-xs text-slate-400 mt-1">{tpl.subtasks.length} subtarea(s)</p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-600">
+                  Plantilla: <span className="font-medium">{templates.find((t) => t.id === selectedTemplate)?.name}</span>
+                </p>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Cliente (opcional)</label>
+                  <select
+                    value={tplClientId}
+                    onChange={(e) => setTplClientId(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">Sin cliente</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Proyecto (opcional)</label>
+                  <select
+                    value={tplProjectId}
+                    onChange={(e) => setTplProjectId(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">Sin proyecto</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button onClick={() => setSelectedTemplate(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50">
+                    Atras
+                  </button>
+                  <button
+                    onClick={generateFromTemplate}
+                    disabled={generatingFromTemplate}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {generatingFromTemplate && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {generatingFromTemplate ? 'Generando...' : 'Generar tareas'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Detail Slide-in Panel */}
       <TaskDetailPanel
         task={detailTask}
@@ -526,6 +650,20 @@ export default function TasksPage() {
         onStatusChange={handleStatusChange}
         onReload={() => detailTask && loadTaskDetail(detailTask.id)}
       />
+
+      {/* Delete Confirmation Modal */}
+      {deleteTaskId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2">Confirmar eliminación</h3>
+            <p className="text-gray-600 mb-4">¿Estás seguro de que deseas eliminar esta tarea?</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setDeleteTaskId(null)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={confirmDeleteTask} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -538,90 +676,186 @@ function ListView({
   onRowClick,
   onEdit,
   onDelete,
+  onStatusChange,
+  onReload,
 }: {
   tasks: Task[]
   getMemberName: (id: string) => string
   onRowClick: (task: Task) => void
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
+  onStatusChange: (taskId: string, status: string) => void
+  onReload: () => void
 }) {
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+
+  const allSelected = tasks.length > 0 && selectedTasks.size === tasks.length
+  const someSelected = selectedTasks.size > 0 && selectedTasks.size < tasks.length
+
+  function toggleTask(taskId: string) {
+    setSelectedTasks((prev) => {
+      const next = new Set(prev)
+      if (next.has(taskId)) next.delete(taskId)
+      else next.add(taskId)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelectedTasks(new Set())
+    } else {
+      setSelectedTasks(new Set(tasks.map((t) => t.id)))
+    }
+  }
+
+  async function bulkStatusChange(newStatus: string) {
+    setBulkLoading(true)
+    try {
+      const promises = Array.from(selectedTasks).map((taskId) =>
+        fetch(`/api/tasks/${taskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: newStatus,
+            ...(newStatus === 'completed' ? { progressPercent: 100 } : {}),
+          }),
+        })
+      )
+      await Promise.all(promises)
+      setSelectedTasks(new Set())
+      onReload()
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`¿Eliminar ${selectedTasks.size} tareas seleccionadas?`)) return
+    setBulkLoading(true)
+    try {
+      const promises = Array.from(selectedTasks).map((taskId) =>
+        fetch(`/api/tasks/${taskId}`, { method: 'DELETE' })
+      )
+      await Promise.all(promises)
+      setSelectedTasks(new Set())
+      onReload()
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 bg-slate-50">
-            <th className="px-4 py-3 text-left font-semibold text-slate-600">Titulo</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-600">Proyecto</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-600">Estado</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-600">Prioridad</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-600">Asignado</th>
-            <th className="px-4 py-3 text-left font-semibold text-slate-600">Vencimiento</th>
-            <th className="px-4 py-3 text-right font-semibold text-slate-600">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.map((task) => (
-            <tr
-              key={task.id}
-              className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
-              onClick={() => onRowClick(task)}
-            >
-              <td className="px-4 py-3 font-medium text-slate-900 max-w-[240px] truncate">
-                {task.title}
-              </td>
-              <td className="px-4 py-3 text-slate-600">
-                {task.project?.name || '-'}
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={cn(
-                    'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-                    STATUS_BADGE[task.status] || STATUS_BADGE.pending
-                  )}
-                >
-                  {STATUS_LABELS[task.status] || task.status}
-                </span>
-              </td>
-              <td className="px-4 py-3">
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
-                    PRIORITY_BADGE[task.priority] || PRIORITY_BADGE.medium
-                  )}
-                >
-                  <span className={cn('h-1.5 w-1.5 rounded-full', PRIORITY_DOT[task.priority])} />
-                  {PRIORITY_LABELS[task.priority] || task.priority}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-slate-600">
-                {task.assignedTo.length > 0 ? getMemberName(task.assignedTo[0]) : 'Sin asignar'}
-              </td>
-              <td className="px-4 py-3 text-slate-600">
-                {task.deadline ? formatDate(task.deadline) : '-'}
-              </td>
-              <td className="px-4 py-3 text-right">
-                <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => onEdit(task)}
-                    className="rounded-md p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                    title="Editar"
-                  >
-                    <Edit3 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => onDelete(task.id)}
-                    className="rounded-md p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                    title="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </td>
+    <>
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50">
+              <th className="px-3 py-3 text-left w-10">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = someSelected }}
+                  onChange={toggleAll}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+              </th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-600">Titulo</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-600">Proyecto</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-600">Estado</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-600">Prioridad</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-600">Asignado</th>
+              <th className="px-4 py-3 text-left font-semibold text-slate-600">Vencimiento</th>
+              <th className="px-4 py-3 text-right font-semibold text-slate-600">Acciones</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {tasks.map((task) => (
+              <tr
+                key={task.id}
+                className={cn(
+                  'border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors',
+                  selectedTasks.has(task.id) && 'bg-blue-50 hover:bg-blue-50'
+                )}
+                onClick={() => onRowClick(task)}
+              >
+                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedTasks.has(task.id)}
+                    onChange={() => toggleTask(task.id)}
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </td>
+                <td className="px-4 py-3 font-medium text-slate-900 max-w-[240px] truncate">
+                  {task.title}
+                </td>
+                <td className="px-4 py-3 text-slate-600">
+                  {task.project?.name || '-'}
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                      STATUS_BADGE[task.status] || STATUS_BADGE.pending
+                    )}
+                  >
+                    {STATUS_LABELS[task.status] || task.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
+                      PRIORITY_BADGE[task.priority] || PRIORITY_BADGE.medium
+                    )}
+                  >
+                    <span className={cn('h-1.5 w-1.5 rounded-full', PRIORITY_DOT[task.priority])} />
+                    {PRIORITY_LABELS[task.priority] || task.priority}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-slate-600">
+                  {task.assignedTo.length > 0 ? getMemberName(task.assignedTo[0]) : 'Sin asignar'}
+                </td>
+                <td className="px-4 py-3 text-slate-600">
+                  {task.deadline ? formatDate(task.deadline) : '-'}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => onEdit(task)}
+                      className="rounded-md p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      title="Editar"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => onDelete(task.id)}
+                      className="rounded-md p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Bulk Actions Toolbar */}
+      {selectedTasks.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-4 z-40">
+          <span className="text-sm">{selectedTasks.size} seleccionadas</span>
+          <button onClick={() => bulkStatusChange('completed')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-green-600 rounded-full hover:bg-green-700 disabled:opacity-50">Completar</button>
+          <button onClick={() => bulkStatusChange('in_progress')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-blue-600 rounded-full hover:bg-blue-700 disabled:opacity-50">En progreso</button>
+          <button onClick={bulkDelete} disabled={bulkLoading} className="text-sm px-3 py-1 bg-red-600 rounded-full hover:bg-red-700 disabled:opacity-50">Eliminar</button>
+          <button onClick={() => setSelectedTasks(new Set())} className="text-sm text-slate-400 hover:text-white">Cancelar</button>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -636,6 +870,7 @@ function KanbanView({
   onAddToColumn,
   onEdit,
   onDelete,
+  onPreview,
 }: {
   tasks: Task[]
   getMemberName: (id: string) => string
@@ -645,6 +880,7 @@ function KanbanView({
   onAddToColumn: (status: string) => void
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
+  onPreview: (task: Task) => void
 }) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
 
@@ -703,7 +939,7 @@ function KanbanView({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-4 gap-4 min-h-[60vh]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-h-[60vh]">
         {KANBAN_COLUMNS.map((col) => (
           <KanbanColumn
             key={col.key}
@@ -717,6 +953,7 @@ function KanbanView({
             onStatusChange={onStatusChange}
             onEdit={onEdit}
             onDelete={onDelete}
+            onPreview={onPreview}
           />
         ))}
       </div>
@@ -744,6 +981,7 @@ function KanbanColumn({
   onStatusChange,
   onEdit,
   onDelete,
+  onPreview,
 }: {
   id: string
   label: string
@@ -755,6 +993,7 @@ function KanbanColumn({
   onStatusChange: (taskId: string, status: string) => void
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
+  onPreview: (task: Task) => void
 }) {
   const { setNodeRef } = useDroppable({ id })
 
@@ -797,6 +1036,7 @@ function KanbanColumn({
               onStatusChange={onStatusChange}
               onEdit={onEdit}
               onDelete={onDelete}
+              onPreview={onPreview}
             />
           ))}
         </SortableContext>
@@ -818,6 +1058,7 @@ function KanbanCard({
   onStatusChange,
   onEdit,
   onDelete,
+  onPreview,
 }: {
   task: Task
   getMemberName: (id: string) => string
@@ -826,6 +1067,7 @@ function KanbanCard({
   onStatusChange: (taskId: string, status: string) => void
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
+  onPreview: (task: Task) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -891,6 +1133,12 @@ function KanbanCard({
                     </button>
                   ))}
                   <div className="border-t border-slate-100 my-1" />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onPreview(task); setMenuOpen(false) }}
+                    className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <Eye className="h-3 w-3" /> Vista previa
+                  </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); onEdit(task); setMenuOpen(false) }}
                     className="flex items-center gap-2 w-full px-3 py-1.5 text-left text-slate-600 hover:bg-slate-50 transition-colors"
@@ -1046,7 +1294,7 @@ function TaskFormModal({
           projectId: task.projectId || '',
           status: task.status as TaskFormData['status'],
           priority: task.priority as TaskFormData['priority'],
-          assignedTo: task.assignedTo[0] || '',
+          assignedTo: task.assignedTo?.[0] || '',
           deadline: task.deadline ? task.deadline.slice(0, 10) : '',
           estimatedHours: task.estimatedHours || undefined,
           tags: '',

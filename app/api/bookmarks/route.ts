@@ -12,7 +12,7 @@ export async function GET() {
       .select('*, clients(id, name), projects(id, name)')
       .eq('workspace_id', workspaceId)
       .order('pinned', { ascending: false })
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (error) {
       const { data: fallback } = await supabase
@@ -20,7 +20,7 @@ export async function GET() {
         .select('*')
         .eq('workspace_id', workspaceId)
         .order('pinned', { ascending: false })
-        .order('created_at', { ascending: false })
+        .order('createdAt', { ascending: false })
       return NextResponse.json({ data: fallback || [] })
     }
 
@@ -57,7 +57,8 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
     return NextResponse.json({ data })
   } catch {

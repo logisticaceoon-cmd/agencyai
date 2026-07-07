@@ -20,7 +20,8 @@ export async function GET(
       .maybeSingle()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     if (!data) {
@@ -28,8 +29,9 @@ export async function GET(
     }
 
     return NextResponse.json({ data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
@@ -90,7 +92,8 @@ export async function PUT(
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     // Sync name/status to clients table
@@ -107,8 +110,9 @@ export async function PUT(
     }
 
     return NextResponse.json({ data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
@@ -130,7 +134,8 @@ export async function DELETE(
       .eq('workspace_id', workspaceId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     // Sync soft-delete to clients table
@@ -149,7 +154,8 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

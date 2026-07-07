@@ -17,7 +17,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       .select('*')
       .eq('workspace_id', id)
       .eq('status', 'active')
-      .order('created_at', { ascending: true })
+      .order('createdAt', { ascending: true })
 
     return NextResponse.json({ data: data || [] })
   } catch {
@@ -45,7 +45,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
       .eq('workspace_id', id)
       .eq('user_id', userId)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ error: 'Error en la solicitud' }, { status: 400 })
+    }
 
     return NextResponse.json({ message: 'Member removed' })
   } catch {

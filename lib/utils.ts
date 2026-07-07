@@ -65,8 +65,7 @@ export function getInitials(name: string): string {
 }
 
 export function calculateWorkload(
-  assignedTasks: number,
-  completedTasks: number
+  assignedTasks: number
 ): { percentage: number; status: 'on_track' | 'monitor' | 'overloaded' } {
   const percentage = assignedTasks > 0 ? Math.round((assignedTasks / 10) * 100) : 0
   let status: 'on_track' | 'monitor' | 'overloaded' = 'on_track'

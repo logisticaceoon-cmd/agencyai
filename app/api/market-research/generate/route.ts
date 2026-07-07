@@ -173,7 +173,10 @@ export async function POST(request: Request) {
       .select()
       .single()
 
-    if (upsertErr) return NextResponse.json({ error: upsertErr.message }, { status: 500 })
+    if (upsertErr) {
+      console.error(upsertErr)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    }
 
     const anthropicKey = process.env.ANTHROPIC_API_KEY
     if (!anthropicKey || !anthropicKey.startsWith('sk-ant-')) {
@@ -185,26 +188,43 @@ export async function POST(request: Request) {
 
     const startTime = Date.now()
 
-    // Llamar a Claude con web search
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'web-search-2025-03-05',
-      },
-      body: JSON.stringify({
+    // Llamar a Claude — primero con web search, fallback sin web search
+    const makeApiCall = async (withWebSearch: boolean) => {
+      const body: Record<string, unknown> = {
         model: 'claude-sonnet-4-6',
         max_tokens: 16000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 15 }],
         system: systemPrompt(),
         messages: [{
           role: 'user',
           content: userPrompt(client as Record<string, string>, (competitors || []) as Array<Record<string, string>>, reportMonth),
         }],
-      }),
-    })
+      }
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+      }
+      if (withWebSearch) {
+        headers['anthropic-beta'] = 'web-search-2025-03-05'
+        body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 15 }]
+      }
+      return fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      })
+    }
+
+    let res = await makeApiCall(true)
+
+    // Si falla con web search (ej: beta no habilitada), reintentar sin ella
+    if (!res.ok) {
+      const errBody = await res.text()
+      if (res.status === 400 || res.status === 403) {
+        console.log('[market-research] web search no disponible, reintentando sin ella:', errBody)
+        res = await makeApiCall(false)
+      }
+    }
 
     if (!res.ok) {
       const errText = await res.text()

@@ -211,7 +211,7 @@ export default function ProjectDetailPage() {
       const res = await fetch(`/api/projects/${projectId}`)
       if (res.ok) {
         const json = await res.json()
-        setProject(json.data)
+        setProject(json)
       } else {
         router.push('/projects')
       }

@@ -28,7 +28,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ error: 'Error en la solicitud' }, { status: 400 })
+    }
 
     return NextResponse.json({ data }, { status: 201 })
   } catch {
@@ -52,7 +55,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       .select('*')
       .eq('workspace_id', id)
       .is('accepted_at', null)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     return NextResponse.json({ data: data || [] })
   } catch {

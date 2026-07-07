@@ -31,7 +31,8 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
 
     if (clientsError) {
-      return NextResponse.json({ error: clientsError.message }, { status: 500 })
+      console.error(clientsError)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     const clientIds = (clients || []).map((c: any) => c.id)
@@ -45,14 +46,16 @@ export async function GET(request: Request) {
         .eq('year', year)
 
       if (monthlyError) {
-        return NextResponse.json({ error: monthlyError.message }, { status: 500 })
+        console.error(monthlyError)
+        return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
       }
       records = monthly || []
     }
 
     return NextResponse.json({ data: clients, monthlyRecords: records })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }
 
@@ -107,7 +110,8 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     // Sync to clients table (upsert by name + workspace)
@@ -125,7 +129,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
 }

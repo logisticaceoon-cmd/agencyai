@@ -9,8 +9,10 @@ import {
   Calendar,
   Users,
   Filter,
+  X,
+  Check,
 } from 'lucide-react'
-import { cn, formatDate } from '@/lib/utils'
+import { cn, formatDate, getInitials } from '@/lib/utils'
 import * as Dialog from '@radix-ui/react-dialog'
 import Link from 'next/link'
 import { InfoBanner } from '@/components/shared/InfoBanner'
@@ -38,6 +40,14 @@ interface ProjectOption {
   name: string
 }
 
+interface TeamMember {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+}
+
 const MEETING_TYPES = [
   { value: 'kickoff', label: 'Kickoff' },
   { value: 'followup', label: 'Seguimiento' },
@@ -52,14 +62,6 @@ const STATUS_OPTIONS = [
   { value: 'final', label: 'Finalizada' },
 ]
 
-function getInitials(name: string): string {
-  return name
-    .split(/[\s@]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() || '')
-    .join('')
-}
 
 export default function MinutesPage() {
   const { org } = useCurrentUser()
@@ -70,6 +72,7 @@ export default function MinutesPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [clients, setClients] = useState<ClientOption[]>([])
   const [projects, setProjects] = useState<ProjectOption[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [saving, setSaving] = useState(false)
 
   // Form state
@@ -78,9 +81,10 @@ export default function MinutesPage() {
     client_id: '',
     project_id: '',
     meeting_date: '',
-    participants: '',
+    participants: [] as string[],
     meeting_type: 'followup',
   })
+  const [customParticipant, setCustomParticipant] = useState('')
 
   const fetchMinutes = useCallback(async () => {
     setLoading(true)
@@ -112,6 +116,10 @@ export default function MinutesPage() {
         .then((r) => r.json())
         .then((d) => setProjects(d.data || []))
         .catch(() => {})
+      fetch('/api/team')
+        .then((r) => r.json())
+        .then((d) => setTeamMembers((d.data || []).filter((m: TeamMember) => m.status === 'active')))
+        .catch(() => {})
     }
   }, [org])
 
@@ -124,10 +132,7 @@ export default function MinutesPage() {
         client_id: form.client_id || null,
         project_id: form.project_id || null,
         meeting_date: form.meeting_date || null,
-        participants: form.participants
-          .split(',')
-          .map((p) => p.trim())
-          .filter(Boolean),
+        participants: form.participants,
         meeting_type: form.meeting_type,
       }
       const res = await fetch('/api/minutes', {
@@ -142,9 +147,10 @@ export default function MinutesPage() {
           client_id: '',
           project_id: '',
           meeting_date: '',
-          participants: '',
+          participants: [],
           meeting_type: 'followup',
         })
+        setCustomParticipant('')
         fetchMinutes()
       }
     } catch {
@@ -260,21 +266,86 @@ export default function MinutesPage() {
 
                 {/* Participants */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Participantes (emails separados por coma)
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Participantes
                   </label>
-                  <input
-                    type="text"
-                    value={form.participants}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        participants: e.target.value,
-                      }))
-                    }
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900"
-                    placeholder="ana@email.com, pedro@email.com"
-                  />
+                  {/* Team member chips */}
+                  {teamMembers.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {teamMembers.map((tm) => {
+                        const label = tm.name || tm.email.split('@')[0]
+                        const selected = form.participants.includes(label)
+                        return (
+                          <button
+                            key={tm.id}
+                            type="button"
+                            onClick={() =>
+                              setForm((f) => ({
+                                ...f,
+                                participants: selected
+                                  ? f.participants.filter((p) => p !== label)
+                                  : [...f.participants, label],
+                              }))
+                            }
+                            className={cn(
+                              'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-all',
+                              selected
+                                ? 'bg-blue-100 text-blue-700 border-blue-300'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                            )}
+                          >
+                            {selected && <Check className="h-3 w-3" />}
+                            {label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {/* Custom participant input */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customParticipant}
+                      onChange={(e) => setCustomParticipant(e.target.value)}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ',') && customParticipant.trim()) {
+                          e.preventDefault()
+                          const val = customParticipant.trim().replace(/,$/, '')
+                          if (val && !form.participants.includes(val)) {
+                            setForm((f) => ({ ...f, participants: [...f.participants, val] }))
+                          }
+                          setCustomParticipant('')
+                        }
+                      }}
+                      placeholder="Agregar otro participante (Enter para confirmar)"
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900"
+                    />
+                  </div>
+                  {/* Selected participants tags */}
+                  {form.participants.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {form.participants.map((p) => (
+                        <span
+                          key={p}
+                          className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded-full"
+                        >
+                          {p}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setForm((f) => ({
+                                ...f,
+                                participants: f.participants.filter((x) => x !== p),
+                              }))
+                            }
+                            className="text-slate-400 hover:text-slate-600"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Meeting Type */}

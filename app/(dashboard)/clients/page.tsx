@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { toast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -22,19 +24,15 @@ import {
   Building2,
   Loader2,
   Percent,
+  Download,
 } from 'lucide-react'
+import { downloadCSV } from '@/lib/export'
 import { InfoBanner } from '@/components/shared/InfoBanner'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { getInitials } from '@/lib/utils'
+import { Zap } from 'lucide-react'
 
 // -- Helpers ------------------------------------------------------------------
-
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-}
 
 function getColor(name: string) {
   const colors = [
@@ -126,6 +124,7 @@ const industries = [
 
 export default function ClientsPage() {
   const { user } = useCurrentUser()
+  const { maxClients, isFounder } = usePlanLimits()
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
@@ -135,6 +134,9 @@ export default function ClientsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [deleteInput, setDeleteInput] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [upgradeModal, setUpgradeModal] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
 
   const canManage = !user ? false : ['CEO', 'Manager', 'owner', 'admin'].includes(user.role)
 
@@ -175,7 +177,7 @@ export default function ClientsPage() {
         setClients(Array.isArray(json) ? json : (json.data || []))
       }
     } catch {
-      // silently fail
+      toast({ title: 'Error al cargar clientes', variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -286,6 +288,12 @@ export default function ClientsPage() {
         if (res.ok) {
           setDialogOpen(false)
           loadClients()
+        } else {
+          const err = await res.json()
+          if (err.limitReached) {
+            setDialogOpen(false)
+            setUpgradeModal(true)
+          }
         }
       }
     } finally {
@@ -306,6 +314,61 @@ export default function ClientsPage() {
     }
   }
 
+  // -- Bulk actions -----------------------------------------------------------
+
+  const allSelected = clients.length > 0 && selectedIds.size === clients.length
+  const someSelected = selectedIds.size > 0 && selectedIds.size < clients.length
+
+  function toggleClient(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(clients.map((c) => c.id)))
+    }
+  }
+
+  async function bulkStatusChange(newStatus: string) {
+    setBulkLoading(true)
+    try {
+      const promises = Array.from(selectedIds).map((id) =>
+        fetch(`/api/clients/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        })
+      )
+      await Promise.all(promises)
+      setSelectedIds(new Set())
+      loadClients()
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  async function bulkDelete() {
+    if (!confirm(`Eliminar ${selectedIds.size} clientes seleccionados?`)) return
+    setBulkLoading(true)
+    try {
+      const promises = Array.from(selectedIds).map((id) =>
+        fetch(`/api/clients/${id}`, { method: 'DELETE' })
+      )
+      await Promise.all(promises)
+      setSelectedIds(new Set())
+      loadClients()
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   // -- Get client name for delete dialog --------------------------------------
 
   const deleteClientName = useMemo(() => {
@@ -320,8 +383,47 @@ export default function ClientsPage() {
 
   // -- Render -----------------------------------------------------------------
 
+  // Indicador de uso
+  const clientCount = clients.length
+  const atLimit = !isFounder && maxClients !== Infinity && clientCount >= maxClients
+  const usagePercent = maxClients !== Infinity ? Math.min((clientCount / maxClients) * 100, 100) : 0
+
   return (
     <div className="space-y-6">
+      {/* Modal upgrade */}
+      {upgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <Zap className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900">Límite de clientes alcanzado</h3>
+                <p className="text-sm text-slate-500">Tu plan actual permite máximo {maxClients} clientes</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 mb-6">
+              Para agregar más clientes, actualizá tu plan. Los planes Pro, Agency y Scale ofrecen más capacidad para hacer crecer tu agencia.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setUpgradeModal(false)}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <a
+                href="/settings/billing"
+                className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white text-center hover:bg-blue-700"
+              >
+                Ver planes →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       <InfoBanner id="clients" title="Gestion de Clientes" description="Aqui podes administrar todos los clientes de tu agencia. Crea, edita y organiza tu cartera de clientes por industria." />
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -331,15 +433,31 @@ export default function ClientsPage() {
             Gestion de clientes de la agencia
           </p>
         </div>
-        {canManage && (
-          <button
-            onClick={openCreateDialog}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo cliente
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {/* Indicador de uso */}
+          {!isFounder && maxClients !== Infinity && (
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium ${atLimit ? 'text-red-600' : 'text-slate-500'}`}>
+                {clientCount}/{maxClients} clientes
+              </span>
+              <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${atLimit ? 'bg-red-500' : usagePercent > 75 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                  style={{ width: `${usagePercent}%` }}
+                />
+              </div>
+            </div>
+          )}
+          {canManage && (
+            <button
+              onClick={atLimit ? () => setUpgradeModal(true) : openCreateDialog}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors ${atLimit ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+            >
+              {atLimit ? <Zap className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+              {atLimit ? 'Límite alcanzado' : 'Nuevo cliente'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -367,6 +485,21 @@ export default function ClientsPage() {
           <option value="risk">En riesgo</option>
           <option value="scaling">Escalando</option>
         </select>
+        <button
+          onClick={() => downloadCSV(clients as unknown as Record<string, unknown>[], 'clientes', [
+            { key: 'name', label: 'Nombre' },
+            { key: 'brand', label: 'Marca' },
+            { key: 'email', label: 'Email' },
+            { key: 'phone', label: 'Teléfono' },
+            { key: 'status', label: 'Estado' },
+            { key: 'industry', label: 'Industria' },
+            { key: 'monthlyFee', label: 'Fee Mensual' },
+          ])}
+          className="px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-2"
+        >
+          <Download className="w-4 h-4" />
+          Exportar
+        </button>
       </div>
 
       {/* Content */}
@@ -401,6 +534,18 @@ export default function ClientsPage() {
         </div>
       ) : (
         <div className="space-y-8">
+          {/* Select all */}
+          <div className="flex items-center gap-3 px-2">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={(el) => { if (el) el.indeterminate = someSelected }}
+              onChange={toggleAll}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+            <span className="text-sm text-slate-500">Seleccionar todos</span>
+          </div>
+
           {groupedClients.map((group) => (
             <div key={group.industry}>
               {/* Industry section header */}
@@ -419,8 +564,20 @@ export default function ClientsPage() {
                 {group.clients.map((client) => (
                   <div
                     key={client.id}
-                    className="group relative flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all"
+                    className={cn(
+                      "group relative flex items-center gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all",
+                      selectedIds.has(client.id) && "bg-blue-50 border-blue-200 hover:bg-blue-50"
+                    )}
                   >
+                    {/* Checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(client.id)}
+                      onChange={() => toggleClient(client.id)}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+
                     {/* Avatar */}
                     <Link href={`/clients/${client.id}`} className="shrink-0">
                       <div
@@ -530,6 +687,17 @@ export default function ClientsPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Bulk Actions Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-4 z-40">
+          <span className="text-sm">{selectedIds.size} seleccionados</span>
+          <button onClick={() => bulkStatusChange('active')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-green-600 rounded-full hover:bg-green-700 disabled:opacity-50">Activar</button>
+          <button onClick={() => bulkStatusChange('inactive')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-slate-600 rounded-full hover:bg-slate-700 disabled:opacity-50">Desactivar</button>
+          <button onClick={bulkDelete} disabled={bulkLoading} className="text-sm px-3 py-1 bg-red-600 rounded-full hover:bg-red-700 disabled:opacity-50">Eliminar</button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-slate-400 hover:text-white">Cancelar</button>
         </div>
       )}
 

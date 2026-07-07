@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function PATCH() {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId, userId } = auth
 
-    const admin = createAdminClient()
-    await admin
+    // Mark all notifications for this user in this workspace as read
+    // Using safe parameterized filter (user.id comes from auth, not user input)
+    await supabase
       .from('notifications')
-      .update({ isRead: true, readAt: new Date().toISOString() })
-      .or(`"userId".eq.${user.id},user_id.eq.${user.id}`)
+      .update({ isRead: true, read: true, readAt: new Date().toISOString() })
+      .eq('workspace_id', workspaceId)
+      .or(`"userId".eq.${userId},user_id.eq.${userId}`)
 
     return NextResponse.json({ success: true })
   } catch {

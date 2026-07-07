@@ -12,7 +12,7 @@ export async function GET() {
       .select('*')
       .eq('workspace_id', workspaceId)
       .limit(200)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (error) {
       console.error('Error fetching audits:', error)
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error creating audit:', error)
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      return NextResponse.json({ error: 'Error en la solicitud' }, { status: 400 })
     }
 
     return NextResponse.json({ data })

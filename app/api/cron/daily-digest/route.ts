@@ -9,6 +9,11 @@ export async function GET(request: Request) {
 
   try {
     const supabase = createAdminClient()
+    const workspaceId = process.env.DEFAULT_WORKSPACE_ID
+    if (!workspaceId) {
+      return NextResponse.json({ error: 'DEFAULT_WORKSPACE_ID not configured' }, { status: 500 })
+    }
+
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
 
@@ -16,16 +21,19 @@ export async function GET(request: Request) {
       supabase
         .from('tasks')
         .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
         .eq('status', 'completed')
         .gte('createdAt', yesterday),
       supabase
         .from('tasks')
         .select('id', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId)
         .in('status', ['pending', 'in_progress'])
         .is('deleted_at', null),
       supabase
         .from('tasks')
         .select('title, deadline')
+        .eq('workspace_id', workspaceId)
         .not('deadline', 'is', null)
         .lt('deadline', now.toISOString())
         .in('status', ['pending', 'in_progress'])
@@ -33,21 +41,13 @@ export async function GET(request: Request) {
         .limit(10),
     ])
 
-    // For now, just log the digest (Resend integration can be added later)
-    console.log('Daily digest:', {
-      completedTasks: completedResult.count || 0,
-      pendingTasks: pendingResult.count || 0,
-      overdueTasks: overdueResult.data?.length || 0,
-    })
-
     return NextResponse.json({
       success: true,
       completedTasks: completedResult.count || 0,
       pendingTasks: pendingResult.count || 0,
       overdueTasks: overdueResult.data?.length || 0,
     })
-  } catch (error) {
-    console.error('Daily digest error:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to generate digest' }, { status: 500 })
   }
 }

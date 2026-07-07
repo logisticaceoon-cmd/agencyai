@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 import { normalizeRole, getDataScope } from '@/lib/roles'
+
+const createProjectSchema = z.object({
+  name: z.string().min(1, 'El nombre es obligatorio'),
+  clientId: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  status: z.enum(['active', 'completed', 'paused', 'cancelled']).optional(),
+  color: z.string().optional(),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  budget: z.number().min(0, 'El presupuesto debe ser positivo').optional().nullable(),
+  ownerId: z.string().optional(),
+})
 
 export async function GET(request: Request) {
   try {
@@ -9,6 +22,9 @@ export async function GET(request: Request) {
     const { supabase, workspaceId, userId, role } = auth
 
     const { searchParams } = new URL(request.url)
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')))
+    const offset = (page - 1) * pageSize
     const clientId = searchParams.get('client_id')
     const status = searchParams.get('status')
 
@@ -20,8 +36,8 @@ export async function GET(request: Request) {
       .select('*')
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
-      .limit(200)
       .order('createdAt', { ascending: false })
+      .range(offset, offset + pageSize - 1)
 
     // Trafficker/viewer: solo proyectos donde son owner o tienen tareas asignadas
     if (scope === 'assigned') {
@@ -55,13 +71,14 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching projects:', error)
-      return NextResponse.json({ data: [] })
+      return NextResponse.json({ data: [], page, pageSize, hasMore: false })
     }
 
-    return NextResponse.json({ data: projects || [] })
+    const results = projects || []
+    return NextResponse.json({ data: results, page, pageSize, hasMore: results.length === pageSize })
   } catch (err) {
     console.error('Error in GET /api/projects:', err)
-    return NextResponse.json({ data: [] })
+    return NextResponse.json({ data: [], page: 1, pageSize: 50, hasMore: false })
   }
 }
 
@@ -69,7 +86,7 @@ export async function POST(request: Request) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
-    const { supabase, workspaceId, role } = auth
+    const { supabase, workspaceId, userId, role } = auth
 
     const appRole = normalizeRole(role)
     if (appRole === 'viewer') {
@@ -77,27 +94,33 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
+    const result = createProjectSchema.safeParse(body)
+    if (!result.success) {
+      return NextResponse.json({ error: 'Datos inválidos', details: result.error.flatten().fieldErrors }, { status: 400 })
+    }
+    const parsed = result.data
 
     const { data, error } = await supabase
       .from('projects')
       .insert({
         workspace_id: workspaceId,
-        clientId: body.clientId || null,
-        name: body.name,
-        description: body.description || null,
-        status: body.status || 'active',
-        color: body.color || '#2563eb',
-        startDate: body.startDate || null,
-        endDate: body.endDate || null,
-        budget: body.budget || null,
-        owner_id: body.ownerId || null,
+        clientId: parsed.clientId || null,
+        name: parsed.name,
+        description: parsed.description || null,
+        status: parsed.status || 'active',
+        color: parsed.color || '#2563eb',
+        startDate: parsed.startDate || null,
+        endDate: parsed.endDate || null,
+        budget: parsed.budget || null,
+        // owner_id: siempre el creador actual (si no se especifica otro)
+        owner_id: parsed.ownerId || userId,
       })
       .select()
       .single()
 
     if (error) {
       console.error('Error creating project:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     return NextResponse.json({ data }, { status: 201 })

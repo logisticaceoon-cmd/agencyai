@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import {
   TrendingUp,
@@ -11,8 +11,8 @@ import {
   Calendar,
   RefreshCw,
   FileText,
-  ChevronRight,
   AlertCircle,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -25,7 +25,7 @@ interface PerfLog {
   client_id: string | null
   action_type: string
   title: string
-  description: string | null
+  status: string
   hours_spent: number | null
   delay_hours: number | null
   was_on_time: boolean
@@ -77,6 +77,24 @@ const MONTHS_ES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ]
 
+const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode; badge: string }> = {
+  completed: {
+    label: 'Completada',
+    icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,
+    badge: 'bg-green-50 text-green-600',
+  },
+  in_progress: {
+    label: 'En progreso',
+    icon: <Loader2 className="h-4 w-4 text-blue-500" />,
+    badge: 'bg-blue-50 text-blue-600',
+  },
+  pending: {
+    label: 'Pendiente',
+    icon: <Clock className="h-4 w-4 text-slate-400" />,
+    badge: 'bg-slate-50 text-slate-500',
+  },
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function PerformancePage() {
@@ -92,6 +110,9 @@ export default function PerformancePage() {
   const [alertsLoading, setAlertsLoading] = useState(false)
   const [generatingReport, setGeneratingReport] = useState(false)
   const [reportSuccess, setReportSuccess] = useState(false)
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const now = new Date()
   const [filterMonth, setFilterMonth] = useState(now.getMonth() + 1)
@@ -113,9 +134,9 @@ export default function PerformancePage() {
   }, [selectedUserId])
 
   // Load performance data for selected member
-  const loadPerformanceData = useCallback(async () => {
+  const loadPerformanceData = useCallback(async (silent = false) => {
     if (!selectedUserId) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const params = new URLSearchParams({
         user_id: selectedUserId,
@@ -137,26 +158,27 @@ export default function PerformancePage() {
         const data = await logsRes.json()
         setLogs(data.data || [])
       }
+
+      setLastRefresh(new Date())
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [selectedUserId, filterMonth, filterYear])
 
   // Load alerts (all members, not filtered by month)
-  const loadAlerts = useCallback(async () => {
-    setAlertsLoading(true)
+  const loadAlerts = useCallback(async (silent = false) => {
+    if (!silent) setAlertsLoading(true)
     try {
       const res = await fetch('/api/performance/alerts')
       if (res.ok) {
         const data = await res.json()
-        // Filter alerts for selected user
         const memberAlerts = selectedUserId
           ? (data.data || []).filter((a: Alert) => a.assignedTo?.includes(selectedUserId))
           : data.data || []
         setAlerts(memberAlerts)
       }
     } finally {
-      setAlertsLoading(false)
+      if (!silent) setAlertsLoading(false)
     }
   }, [selectedUserId])
 
@@ -168,6 +190,19 @@ export default function PerformancePage() {
     if (selectedUserId) {
       loadPerformanceData()
       loadAlerts()
+    }
+  }, [selectedUserId, filterMonth, filterYear, loadPerformanceData, loadAlerts])
+
+  // Auto-refresh every 30 seconds (silent — no loading spinner)
+  useEffect(() => {
+    if (!selectedUserId) return
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    intervalRef.current = setInterval(() => {
+      loadPerformanceData(true)
+      loadAlerts(true)
+    }, 30_000)
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [selectedUserId, filterMonth, filterYear, loadPerformanceData, loadAlerts])
 
@@ -196,11 +231,18 @@ export default function PerformancePage() {
   }
 
   const selectedMember = members.find(m => m.userId === selectedUserId)
-  const onTimeCount = logs.filter(l => l.was_on_time).length
-  const onTimeRate = logs.length > 0 ? Math.round((onTimeCount / logs.length) * 100) : 0
+  const completedLogs = logs.filter(l => l.status === 'completed')
+  const onTimeCount = completedLogs.filter(l => l.was_on_time).length
+  const onTimeRate = completedLogs.length > 0 ? Math.round((onTimeCount / completedLogs.length) * 100) : 0
 
-  // Years for filter
-  const years = [2025, 2026, 2027]
+  const currentYear = new Date().getFullYear()
+  const years = [currentYear - 1, currentYear, currentYear + 1]
+
+  const refreshLabel = (() => {
+    const diff = Math.round((new Date().getTime() - lastRefresh.getTime()) / 1000)
+    if (diff < 60) return `Actualizado hace ${diff}s`
+    return `Actualizado hace ${Math.round(diff / 60)}min`
+  })()
 
   return (
     <div className="space-y-6">
@@ -213,7 +255,6 @@ export default function PerformancePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Month/Year filter */}
           <select
             value={filterMonth}
             onChange={(e) => setFilterMonth(parseInt(e.target.value))}
@@ -232,10 +273,11 @@ export default function PerformancePage() {
           </select>
           <button
             onClick={() => { loadPerformanceData(); loadAlerts() }}
-            className="rounded-lg border border-[var(--border-base)] bg-white p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] transition-colors"
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--border-base)] bg-white px-3 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] transition-colors"
             title="Actualizar"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{refreshLabel}</span>
           </button>
         </div>
       </div>
@@ -290,15 +332,15 @@ export default function PerformancePage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatCard
                   label="Tareas completadas"
-                  value={summary?.completed ?? logs.length}
+                  value={summary?.completed ?? completedLogs.length}
                   icon={<CheckCircle2 className="h-5 w-5 text-green-500" />}
                   color="text-green-600"
                   bg="bg-green-50"
                   period={`${MONTHS_ES[filterMonth]} ${filterYear}`}
                 />
                 <StatCard
-                  label="Pendientes"
-                  value={summary?.pending ?? 0}
+                  label="Pendientes / En progreso"
+                  value={`${summary?.pending ?? 0} / ${summary?.in_progress ?? 0}`}
                   icon={<Clock className="h-5 w-5 text-blue-500" />}
                   color="text-blue-600"
                   bg="bg-blue-50"
@@ -330,7 +372,7 @@ export default function PerformancePage() {
                       <h2 className="text-sm font-semibold text-[var(--text-primary)]">
                         Bitácora — {(selectedMember.user?.fullName || selectedMember.user?.email || 'Miembro').split(' ')[0]}
                       </h2>
-                      <p className="text-xs text-[var(--text-muted)] mt-0.5">{MONTHS_ES[filterMonth]} {filterYear}</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">{MONTHS_ES[filterMonth]} {filterYear} · Auto-actualiza cada 30s</p>
                     </div>
                     <button
                       onClick={handleGenerateReport}
@@ -359,7 +401,7 @@ export default function PerformancePage() {
                         <CheckCircle2 className="h-10 w-10 text-slate-200 mb-3" />
                         <p className="text-sm font-medium text-[var(--text-secondary)]">Sin actividad registrada</p>
                         <p className="text-xs text-[var(--text-muted)] mt-1">
-                          Las tareas completadas apareceran aqui automaticamente.
+                          Las tareas asignadas apareceran aqui automaticamente.
                         </p>
                       </div>
                     ) : (
@@ -479,37 +521,44 @@ function LogEntry({ log }: { log: PerfLog }) {
   const dateStr = date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
   const timeStr = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
 
+  const status = log.status || (log.action_type === 'task_completed' ? 'completed' : 'pending')
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending
+  const isCompleted = status === 'completed'
+
   return (
     <div className="flex items-start gap-3 px-5 py-3.5 hover:bg-[var(--bg-subtle)] transition-colors">
       <div className={cn(
         'flex-shrink-0 mt-0.5 h-7 w-7 rounded-full flex items-center justify-center',
-        log.was_on_time ? 'bg-green-50' : 'bg-orange-50'
+        isCompleted
+          ? (log.was_on_time ? 'bg-green-50' : 'bg-orange-50')
+          : status === 'in_progress' ? 'bg-blue-50' : 'bg-slate-50'
       )}>
-        {log.was_on_time ? (
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-        ) : (
-          <AlertTriangle className="h-4 w-4 text-orange-500" />
-        )}
+        {isCompleted ? (
+          log.was_on_time
+            ? <CheckCircle2 className="h-4 w-4 text-green-500" />
+            : <AlertTriangle className="h-4 w-4 text-orange-500" />
+        ) : cfg.icon}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-[var(--text-primary)] truncate">{log.title}</p>
         <div className="flex items-center gap-2 mt-0.5">
           <span className="text-xs text-[var(--text-muted)]">{dateStr} {timeStr}</span>
-          {!log.was_on_time && log.delay_hours && (
+          {isCompleted && !log.was_on_time && log.delay_hours && (
             <span className="text-xs text-orange-600 font-medium">
-              +{log.delay_hours}h de retraso
+              +{log.delay_hours}h retraso
             </span>
-          )}
-          {log.hours_spent && (
-            <span className="text-xs text-[var(--text-muted)]">{log.hours_spent}h</span>
           )}
         </div>
       </div>
       <span className={cn(
         'flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full',
-        log.was_on_time ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'
+        isCompleted
+          ? (log.was_on_time ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600')
+          : cfg.badge
       )}>
-        {log.was_on_time ? 'A tiempo' : 'Retrasado'}
+        {isCompleted
+          ? (log.was_on_time ? 'A tiempo' : 'Retrasado')
+          : cfg.label}
       </span>
     </div>
   )

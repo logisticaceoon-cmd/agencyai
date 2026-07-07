@@ -1,10 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 
 export interface ApiAuthContext {
   supabase: ReturnType<typeof createAdminClient>
   organizationId: string
   keyName: string
+  userId: string
 }
 
 /**
@@ -33,10 +35,12 @@ export async function validateApiKey(
 
   const supabase = createAdminClient()
 
+  const keyHash = createHash('sha256').update(apiKey).digest('hex')
+
   const { data, error } = await supabase
     .from('api_keys')
     .select('id, organization_id, name')
-    .eq('key', apiKey)
+    .eq('key', keyHash)
     .eq('status', 'active')
     .single()
 
@@ -52,12 +56,23 @@ export async function validateApiKey(
     .from('api_keys')
     .update({ last_used_at: new Date().toISOString() })
     .eq('id', data.id)
-    .then()
+    .then(() => {}, () => {})
+
+  // Resolve a valid userId for this workspace (needed for FK constraints)
+  const { data: sampleTask } = await supabase
+    .from('tasks')
+    .select('createdById')
+    .eq('workspace_id', data.organization_id)
+    .not('createdById', 'is', null)
+    .limit(1)
+    .maybeSingle()
+  const userId = sampleTask?.createdById || data.organization_id
 
   return {
     supabase,
     organizationId: data.organization_id,
     keyName: data.name,
+    userId,
   }
 }
 

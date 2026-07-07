@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     // Ensure bucket exists
     try {
-      await supabase.storage.createBucket('contracts', { public: true })
+      await supabase.storage.createBucket('contracts', { public: false })
     } catch {
       // Bucket may already exist, ignore error
     }
@@ -50,35 +50,35 @@ export async function POST(request: Request) {
       })
 
     if (uploadError) {
-      console.error('Error uploading file:', uploadError)
-      return NextResponse.json({ error: uploadError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al subir archivo' }, { status: 500 })
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
+    // Get signed URL (bucket is private)
+    const { data: signedData, error: signError } = await supabase.storage
       .from('contracts')
-      .getPublicUrl(filePath)
+      .createSignedUrl(filePath, 60 * 60 * 24 * 365) // 1 year expiry
 
-    const publicUrl = urlData.publicUrl
+    if (signError || !signedData) {
+      return NextResponse.json({ error: 'Error al generar URL del archivo' }, { status: 500 })
+    }
+    const fileUrl = signedData.signedUrl
 
     // Update contract with PDF URL
     const { error: updateError } = await supabase
       .from('trafficker_contracts')
       .update({
-        contract_pdf_url: publicUrl,
+        contract_pdf_url: fileUrl,
         updated_at: new Date().toISOString(),
       })
       .eq('id', contractId)
       .eq('workspace_id', workspaceId)
 
     if (updateError) {
-      console.error('Error updating contract PDF URL:', updateError)
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al actualizar contrato' }, { status: 500 })
     }
 
-    return NextResponse.json({ url: publicUrl })
-  } catch (err) {
-    console.error('Error in POST /api/finances/contracts/upload:', err)
+    return NextResponse.json({ url: fileUrl })
+  } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

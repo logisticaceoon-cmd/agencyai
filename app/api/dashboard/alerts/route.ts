@@ -13,19 +13,19 @@ export async function GET() {
     const [tasksResult, reportsResult] = await Promise.all([
       supabase
         .from('tasks')
-        .select('id, title, due_date, assignee_id, priority')
+        .select('id, title, deadline, assignee_id, priority')
         .eq('workspace_id', workspaceId)
         .is('deleted_at', null)
-        .lt('due_date', now)
+        .lt('deadline', now)
         .in('status', ['pending', 'in_progress'])
-        .order('due_date', { ascending: true })
+        .order('deadline', { ascending: true })
         .limit(10),
       supabase
         .from('reports')
-        .select('id, title, created_at')
+        .select('id, title, createdAt')
         .eq('workspace_id', workspaceId)
         .eq('status', 'pending')
-        .lt('created_at', yesterday)
+        .lt('createdAt', yesterday)
         .limit(10),
     ])
 

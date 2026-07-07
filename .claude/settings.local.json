@@ -85,7 +85,29 @@
       "Bash(grep:*)",
       "Bash(sort -t: -k2 -rn)",
       "Bash(wc -l \"C:/Users/Rafael B/agencyai/app/\\(dashboard\\)\"/**/page.tsx)",
-      "Bash(find \"/c/Users/Rafael B/agencyai/app/api\" -type f -name \"*.ts\" -exec grep -l \"workspace_ai_config\" {} \\\\;)"
+      "Bash(find \"/c/Users/Rafael B/agencyai/app/api\" -type f -name \"*.ts\" -exec grep -l \"workspace_ai_config\" {} \\\\;)",
+      "Bash(node -e ':*)",
+      "Bash(vercel ls:*)",
+      "Bash(vercel --prod)",
+      "Bash(node -e \"console.log\\(require\\('react/package.json'\\).version\\)\")",
+      "Bash(node -e ' *)",
+      "WebFetch(domain:agencyai-iota.vercel.app)",
+      "WebFetch(domain:agencyai-r18y44bf5-logisticaceoon-9457s-projects.vercel.app)",
+      "Bash(gh api *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if 'git' in k.lower\\(\\) or 'source' in k.lower\\(\\) or 'commit' in k.lower\\(\\)}, indent=2\\)\\)\")",
+      "WebFetch(domain:agencyai-f0b27t2f8-logisticaceoon-9457s-projects.vercel.app)",
+      "Bash(find components *)",
+      "Bash(find lib *)",
+      "Bash(npx supabase *)",
+      "Bash(sed -n '1751,4249p' 'app/\\(dashboard\\)/finances/page.tsx')",
+      "Read(//tmp/**)",
+      "Bash(grep -rl *)",
+      "Bash(head -5 .git/rebase-merge/done)",
+      "Bash(cat .git/rebase-merge/git-rebase-todo)",
+      "Bash(cat .git/rebase-merge/stopped-sha)",
+      "Bash(ls .git/rebase-merge/)",
+      "Bash(grep \" *)",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }

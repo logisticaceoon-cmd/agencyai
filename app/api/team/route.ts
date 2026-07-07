@@ -3,6 +3,7 @@ import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 import { createAdminClient } from '@/lib/supabase/server'
 import { randomUUID } from 'crypto'
 import nodemailer from 'nodemailer'
+import { FOUNDER_WORKSPACE_IDS, PLAN_MAP } from '@/lib/plans'
 
 // ─── Email helper (internal, no API key needed) ────────────────────────────
 async function sendInviteEmail({
@@ -72,12 +73,12 @@ async function sendInviteEmail({
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.GMAIL_USER || 'logisticaceoon@gmail.com',
+      user: process.env.GMAIL_USER || '',
       pass: process.env.GMAIL_APP_PASSWORD,
     },
   })
 
-  const fromAddress = process.env.EMAIL_FROM || 'AgencyAI <logisticaceoon@gmail.com>'
+  const fromAddress = process.env.EMAIL_FROM || 'AgencyAI <noreply@agencyai.app>'
   await transporter.sendMail({ from: fromAddress, to, subject: `Invitación a ${workspaceName} en AgencyAI`, html })
   return { sent: true }
 }
@@ -94,7 +95,10 @@ export async function GET() {
     .eq('workspace_id', workspaceId)
     .order('created_at', { ascending: true })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error(error)
+    return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+  }
 
   // Incluir invitaciones pendientes (no aceptadas)
   const adminClient = createAdminClient()
@@ -124,6 +128,45 @@ export async function POST(request: Request) {
     const { email, role: invitedRole = 'trafficker', name } = body
 
     if (!email) return NextResponse.json({ error: 'Email requerido' }, { status: 400 })
+
+    // ─── Verificar límite de miembros según el plan ──────────────────────────
+    if (!FOUNDER_WORKSPACE_IDS.has(workspaceId)) {
+      const adminClient = createAdminClient()
+
+      // Obtener el plan del workspace
+      const { data: ws } = await adminClient
+        .from('workspaces')
+        .select('plan')
+        .eq('id', workspaceId)
+        .single()
+
+      const plan = ws?.plan || 'free'
+      const planDef = PLAN_MAP[plan as keyof typeof PLAN_MAP] ?? PLAN_MAP.free
+      const maxUsers = planDef.maxUsers
+
+      if (maxUsers !== Infinity) {
+        // Contar miembros activos actuales
+        const { count } = await adminClient
+          .from('workspace_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('workspace_id', workspaceId)
+          .eq('status', 'active')
+
+        if ((count ?? 0) >= maxUsers) {
+          const planNames: Record<string, string> = {
+            free: 'Free (owner + 1)',
+            pro: 'Pro (owner + 3)',
+            agency: 'Agency (owner + 10)',
+          }
+          return NextResponse.json({
+            error: `Límite de usuarios alcanzado. Tu plan ${planNames[plan] || plan} permite máximo ${maxUsers} miembros. Actualizá tu plan para agregar más.`,
+            limitReached: true,
+            maxUsers,
+          }, { status: 403 })
+        }
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     const adminClient = createAdminClient()
 
@@ -156,6 +199,26 @@ export async function POST(request: Request) {
       // Obtener nombre del workspace e invitador
       const { data: ws } = await adminClient.from('workspaces').select('name').eq('id', workspaceId).single()
       const { data: inviter } = await supabase.from('workspace_members').select('name').eq('workspace_id', workspaceId).eq('user_id', userId).single()
+
+      // Asegurar que el miembro existe en workspace_members como 'invited'
+      const { data: existingMemberInvited } = await adminClient
+        .from('workspace_members')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('email', email)
+        .eq('status', 'invited')
+        .single()
+
+      if (!existingMemberInvited) {
+        await adminClient.from('workspace_members').insert({
+          workspace_id: workspaceId,
+          email,
+          name: name || email.split('@')[0],
+          role: invitedRole,
+          status: 'invited',
+          user_id: `invited_${existingInvite.token}`,
+        })
+      }
 
       await sendInviteEmail({
         to: email,
@@ -192,18 +255,23 @@ export async function POST(request: Request) {
 
     if (inviteError) {
       console.error('[team/invite] Error creando invitación:', inviteError)
-      return NextResponse.json({ error: inviteError.message }, { status: 500 })
+      console.error(inviteError)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
-    // También registrar en workspace_members con status 'invited' para mostrar en lista
-    await adminClient.from('workspace_members').upsert({
+    // Registrar en workspace_members con status 'invited' para mostrar en lista
+    // Intentar INSERT — si ya existe con ese email, ignorar el error de duplicado
+    const { error: memberError } = await adminClient.from('workspace_members').insert({
       workspace_id: workspaceId,
       email,
       name: name || email.split('@')[0],
       role: invitedRole,
       status: 'invited',
       user_id: `invited_${token}`,
-    }, { onConflict: 'workspace_id,email' }).select().single()
+    })
+    if (memberError && !memberError.message?.includes('duplicate') && !memberError.code?.includes('23505')) {
+      console.warn('[team/invite] workspace_members insert warn:', memberError.message)
+    }
 
     // Obtener datos para el email
     const { data: ws } = await adminClient.from('workspaces').select('name').eq('id', workspaceId).single()

@@ -24,7 +24,8 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (clientError) {
-      return NextResponse.json({ error: clientError.message }, { status: 500 })
+      console.error(clientError)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
     if (!client) {
       return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 })
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
 
     // Try to create bucket (ignore errors)
     try {
-      await supabase.storage.createBucket('contracts', { public: true })
+      await supabase.storage.createBucket('contracts', { public: false })
     } catch {
       // ignore
     }
@@ -48,16 +49,24 @@ export async function POST(request: Request) {
       })
 
     if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 500 })
+      console.error(uploadError)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
-    const { data: publicData } = supabase.storage.from('contracts').getPublicUrl(path)
-    const url = publicData.publicUrl
+    // Get signed URL (bucket is private)
+    const { data: signedData, error: signError } = await supabase.storage
+      .from('contracts')
+      .createSignedUrl(path, 60 * 60 * 24 * 365) // 1 year expiry
+
+    if (signError || !signedData) {
+      return NextResponse.json({ error: 'Error al generar URL del archivo' }, { status: 500 })
+    }
+    const fileUrl = signedData.signedUrl
 
     const { error: updateError } = await supabase
       .from('finance_clients')
       .update({
-        contract_pdf_url: url,
+        contract_pdf_url: fileUrl,
         contract_pdf_name: file.name,
         updated_at: new Date().toISOString(),
       })
@@ -65,11 +74,12 @@ export async function POST(request: Request) {
       .eq('workspace_id', workspaceId)
 
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+      console.error(updateError)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
-    return NextResponse.json({ url, name: file.name })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Error interno' }, { status: 500 })
+    return NextResponse.json({ url: fileUrl, name: file.name })
+  } catch {
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }

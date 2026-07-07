@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Target, Plus, X, ChevronDown, ChevronUp, Loader2, TrendingUp, DollarSign, Users, Cpu, Settings, Lightbulb, ArrowRight, AlertTriangle, Clock, CheckCircle2, BookOpen } from 'lucide-react'
+import { Target, Plus, X, ChevronDown, ChevronUp, Loader2, TrendingUp, DollarSign, Users, Cpu, Settings, Lightbulb, ArrowRight, AlertTriangle, Clock, CheckCircle2, BookOpen, Pencil, Trash2, Download } from 'lucide-react'
+import { downloadCSV } from '@/lib/export'
+import { downloadPDF } from '@/lib/pdf'
 import * as Dialog from '@radix-ui/react-dialog'
 import { cn } from '@/lib/utils'
 import { InfoBanner } from '@/components/shared/InfoBanner'
@@ -146,6 +148,13 @@ export default function ObjectivesPage() {
   const [guideKRs, setGuideKRs] = useState<{ title: string; target_value: string; unit: string }[]>([])
   const [creatingFromGuide, setCreatingFromGuide] = useState(false)
 
+  // Edit / Delete state
+  const [editObj, setEditObj] = useState<Objective | null>(null)
+  const [editObjData, setEditObjData] = useState({ title: '', description: '', quarter: '', year: 0, client_id: '' })
+  const [editObjSaving, setEditObjSaving] = useState(false)
+  const [deleteObjId, setDeleteObjId] = useState<string | null>(null)
+  const [deletingObj, setDeletingObj] = useState(false)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     const [oRes, cRes] = await Promise.all([
@@ -278,6 +287,55 @@ export default function ObjectivesPage() {
     return Math.min(100, Math.round(((Number(kr.current_value) - Number(kr.start_value)) / range) * 100))
   }
 
+  function openEditObj(obj: Objective) {
+    setEditObj(obj)
+    setEditObjData({
+      title: obj.title,
+      description: obj.description || '',
+      quarter: obj.quarter,
+      year: obj.year,
+      client_id: obj.client_id || '',
+    })
+  }
+
+  async function handleEditObj() {
+    if (!editObj) return
+    setEditObjSaving(true)
+    try {
+      const res = await fetch(`/api/objectives/${editObj.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editObjData.title,
+          description: editObjData.description,
+          quarter: editObjData.quarter,
+          year: editObjData.year,
+          client_id: editObjData.client_id || null,
+        }),
+      })
+      if (res.ok) {
+        setEditObj(null)
+        fetchData()
+      }
+    } finally {
+      setEditObjSaving(false)
+    }
+  }
+
+  async function handleDeleteObj() {
+    if (!deleteObjId) return
+    setDeletingObj(true)
+    try {
+      const res = await fetch(`/api/objectives/${deleteObjId}`, { method: 'DELETE' })
+      if (res.ok) {
+        setDeleteObjId(null)
+        fetchData()
+      }
+    } finally {
+      setDeletingObj(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <InfoBanner id="objectives" title="Objetivos y OKRs" description="Establece objetivos trimestrales con key results medibles para tu agencia y clientes." />
@@ -296,8 +354,64 @@ export default function ObjectivesPage() {
             ))}
           </div>
           <select value={year} onChange={e => setYear(parseInt(e.target.value))} className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
-            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+            {[new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
+          <button
+            onClick={() => {
+              const exportData = objectives.map(obj => ({
+                titulo: obj.title,
+                tipo: obj.type === 'agency' ? 'Agencia' : 'Cliente',
+                cliente: obj.clients?.name || 'Sin cliente',
+                trimestre: `${obj.quarter} ${obj.year}`,
+                key_results: (obj.key_results || []).length,
+                progreso: `${getObjProgress(obj)}%`,
+                estado: obj.status,
+              }))
+              downloadCSV(exportData as Record<string, unknown>[], `objetivos-${quarter}-${year}`, [
+                { key: 'titulo', label: 'Titulo' },
+                { key: 'tipo', label: 'Tipo' },
+                { key: 'cliente', label: 'Cliente' },
+                { key: 'trimestre', label: 'Trimestre' },
+                { key: 'key_results', label: 'Key Results' },
+                { key: 'progreso', label: 'Progreso' },
+                { key: 'estado', label: 'Estado' },
+              ])
+            }}
+            disabled={objectives.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Download size={15} strokeWidth={1.5} /> CSV
+          </button>
+          <button
+            onClick={() => {
+              const exportData = objectives.map(obj => ({
+                titulo: obj.title,
+                tipo: obj.type === 'agency' ? 'Agencia' : 'Cliente',
+                cliente: obj.clients?.name || 'Sin cliente',
+                key_results: (obj.key_results || []).length,
+                progreso: `${getObjProgress(obj)}%`,
+                estado: obj.status,
+              }))
+              downloadPDF({
+                title: 'Objetivos y OKRs',
+                subtitle: `${quarter} ${year}`,
+                filename: `objetivos-${quarter}-${year}`,
+                columns: [
+                  { key: 'titulo', label: 'Titulo' },
+                  { key: 'tipo', label: 'Tipo' },
+                  { key: 'cliente', label: 'Cliente' },
+                  { key: 'key_results', label: 'Key Results' },
+                  { key: 'progreso', label: 'Progreso' },
+                  { key: 'estado', label: 'Estado' },
+                ],
+                data: exportData as Record<string, unknown>[],
+              })
+            }}
+            disabled={objectives.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Download size={15} strokeWidth={1.5} /> PDF
+          </button>
           <button onClick={() => setShowTemplates(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700">
             <Plus className="h-4 w-4" /> Nuevo objetivo
           </button>
@@ -544,7 +658,8 @@ export default function ObjectivesPage() {
             const isExpanded = expanded === obj.id
             return (
               <div key={obj.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                <button onClick={() => setExpanded(isExpanded ? null : obj.id)} className="w-full flex items-center gap-4 p-5 text-left hover:bg-slate-50 transition-colors">
+                <div className="flex items-center hover:bg-slate-50 transition-colors">
+                <button onClick={() => setExpanded(isExpanded ? null : obj.id)} className="flex-1 flex items-center gap-4 p-5 text-left">
                   <div className="relative h-12 w-12 flex-shrink-0">
                     <svg className="h-12 w-12 -rotate-90" viewBox="0 0 36 36">
                       <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e2e8f0" strokeWidth="3" />
@@ -565,6 +680,15 @@ export default function ObjectivesPage() {
                   </div>
                   {isExpanded ? <ChevronUp className="h-5 w-5 text-slate-400" /> : <ChevronDown className="h-5 w-5 text-slate-400" />}
                 </button>
+                <div className="flex items-center gap-1 pr-4 flex-shrink-0">
+                  <button onClick={(e) => { e.stopPropagation(); openEditObj(obj) }} className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Editar objetivo">
+                    <Pencil size={14} strokeWidth={1.5} />
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); setDeleteObjId(obj.id) }} className="p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Eliminar objetivo">
+                    <Trash2 size={14} strokeWidth={1.5} />
+                  </button>
+                </div>
+                </div>
 
                 {isExpanded && (
                   <div className="border-t border-slate-100 p-5 space-y-4">
@@ -626,6 +750,80 @@ export default function ObjectivesPage() {
           })}
         </div>
       )}
+
+      {/* ── Edit Objective Modal ── */}
+      <Dialog.Root open={!!editObj} onOpenChange={open => { if (!open) setEditObj(null) }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <Dialog.Title className="text-lg font-bold text-slate-900">Editar objetivo</Dialog.Title>
+              <Dialog.Close className="rounded-lg p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+                <X size={16} strokeWidth={1.5} />
+              </Dialog.Close>
+            </div>
+            <Dialog.Description className="text-sm text-slate-500">Modifica los datos del objetivo</Dialog.Description>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block font-medium">Titulo *</label>
+                <input value={editObjData.title} onChange={e => setEditObjData(p => ({ ...p, title: e.target.value }))} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block font-medium">Descripcion</label>
+                <textarea value={editObjData.description} onChange={e => setEditObjData(p => ({ ...p, description: e.target.value }))} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900 h-20 resize-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block font-medium">Trimestre</label>
+                  <select value={editObjData.quarter} onChange={e => setEditObjData(p => ({ ...p, quarter: e.target.value }))} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900">
+                    {QUARTERS.map(q => <option key={q} value={q}>{q}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block font-medium">Ano</label>
+                  <select value={editObjData.year} onChange={e => setEditObjData(p => ({ ...p, year: parseInt(e.target.value) }))} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900">
+                    {[new Date().getFullYear() - 2, new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block font-medium">Cliente</label>
+                <select value={editObjData.client_id} onChange={e => setEditObjData(p => ({ ...p, client_id: e.target.value }))} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-900">
+                  <option value="">Sin cliente</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setEditObj(null)} className="text-sm text-slate-500 hover:text-slate-900 font-medium px-4 py-2">Cancelar</button>
+              <button onClick={handleEditObj} disabled={editObjSaving || !editObjData.title} className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                {editObjSaving ? <Loader2 size={14} strokeWidth={1.5} className="animate-spin inline mr-1" /> : null}
+                Guardar
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* ── Delete Objective Confirmation ── */}
+      <Dialog.Root open={!!deleteObjId} onOpenChange={open => { if (!open) setDeleteObjId(null) }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-xl border border-slate-200 bg-white shadow-xl p-6 space-y-4">
+            <Dialog.Title className="text-lg font-bold text-slate-900">Eliminar objetivo</Dialog.Title>
+            <Dialog.Description className="text-sm text-slate-500">
+              Este objetivo y todos sus key results seran eliminados permanentemente. Esta accion no se puede deshacer.
+            </Dialog.Description>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setDeleteObjId(null)} className="text-sm text-slate-500 hover:text-slate-900 font-medium px-4 py-2">Cancelar</button>
+              <button onClick={handleDeleteObj} disabled={deletingObj} className="bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors">
+                {deletingObj ? <Loader2 size={14} strokeWidth={1.5} className="animate-spin inline mr-1" /> : null}
+                Eliminar
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {!loading && objectives.length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">

@@ -38,7 +38,10 @@ export async function GET(request: Request) {
       .select('token')
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    }
     return NextResponse.json({ token: created.token })
 
   } catch (err) {

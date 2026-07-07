@@ -89,13 +89,15 @@ export default function AIAgentPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [verifying, setVerifying] = useState<string | null>(null)
-  const [alerts, setAlerts] = useState<Record<string, boolean>>({
+  const defaultAlerts: Record<string, boolean> = {
     task_overdue: true,
     objective_stalled: false,
     client_inactive: true,
     weekly_summary: false,
     kpi_drop: true,
-  })
+  }
+  const [alerts, setAlerts] = useState<Record<string, boolean>>(defaultAlerts)
+  const [savingAlerts, setSavingAlerts] = useState(false)
 
   useEffect(() => {
     async function loadConfig() {
@@ -113,6 +115,10 @@ export default function AIAgentPage() {
               openai_api_key: json.data.has_openai_key ? '••••••••••••' : '',
               language: json.data.language || 'es',
             })
+            // Load persisted alert config
+            if (json.data.alert_config && typeof json.data.alert_config === 'object' && Object.keys(json.data.alert_config).length > 0) {
+              setAlerts({ ...defaultAlerts, ...json.data.alert_config })
+            }
           }
         }
       } catch {
@@ -146,41 +152,53 @@ export default function AIAgentPage() {
     setVerifying(provider)
     const key = provider === 'anthropic' ? config.anthropic_api_key : config.openai_api_key
     if (!key || key.length < 10) {
-      toast({ title: 'API key invalida o vacia', variant: 'destructive' })
+      toast({ title: 'API key inválida o vacía', variant: 'destructive' })
       setVerifying(null)
       return
     }
     try {
-      // Real verification: test the key with a minimal API call
-      if (provider === 'anthropic') {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-          body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
-        })
-        if (res.ok || res.status === 429) {
-          toast({ title: 'API key de Anthropic verificada' })
-        } else {
-          toast({ title: 'API key de Anthropic invalida', variant: 'destructive' })
-        }
+      // Verify via server-side endpoint to avoid CORS issues
+      const res = await fetch('/api/ai/verify-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, key }),
+      })
+      const data = await res.json()
+      if (data.valid) {
+        toast({ title: `✓ API key de ${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} verificada correctamente` })
       } else {
-        const res = await fetch('https://api.openai.com/v1/models', {
-          headers: { Authorization: `Bearer ${key}` },
+        toast({
+          title: `API key de ${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} inválida`,
+          description: data.error || 'Verificá que la key sea correcta y tenga créditos cargados.',
+          variant: 'destructive',
         })
-        if (res.ok) {
-          toast({ title: 'API key de OpenAI verificada' })
-        } else {
-          toast({ title: 'API key de OpenAI invalida', variant: 'destructive' })
-        }
       }
     } catch {
-      toast({ title: 'Error de conexion al verificar', variant: 'destructive' })
+      toast({ title: 'Error de conexión al verificar', variant: 'destructive' })
     }
     setVerifying(null)
   }
 
-  function toggleAlert(key: string) {
-    setAlerts(prev => ({ ...prev, [key]: !prev[key] }))
+  async function toggleAlert(key: string) {
+    const updated = { ...alerts, [key]: !alerts[key] }
+    setAlerts(updated)
+    setSavingAlerts(true)
+    try {
+      const res = await fetch('/api/ai/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alert_config: updated }),
+      })
+      if (res.ok) {
+        toast({ title: 'Guardado' })
+      } else {
+        toast({ title: 'Error al guardar alerta', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error de conexion', variant: 'destructive' })
+    } finally {
+      setSavingAlerts(false)
+    }
   }
 
   function maskKey(key: string) {

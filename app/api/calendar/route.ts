@@ -23,20 +23,20 @@ export async function GET(request: Request) {
     const [tasksResult, milestonesResult] = await Promise.all([
       supabase
         .from('tasks')
-        .select('id, title, status, priority, due_date, project_id, assignee_id')
+        .select('id, title, status, priority, deadline, projectId, assignee_id')
         .eq('workspace_id', workspaceId)
         .is('deleted_at', null)
-        .gte('due_date', startDate)
-        .lte('due_date', endDate)
-        .order('due_date', { ascending: true }),
+        .gte('deadline', startDate)
+        .lte('deadline', endDate)
+        .order('deadline', { ascending: true }),
 
       supabase
         .from('project_milestones')
-        .select('id, title, due_date, completed, description, project_id')
+        .select('id, title, deadline, completed, description, project_id')
         .eq('workspace_id', workspaceId)
-        .gte('due_date', startDate)
-        .lte('due_date', endDate)
-        .order('due_date', { ascending: true }),
+        .gte('deadline', startDate)
+        .lte('deadline', endDate)
+        .order('deadline', { ascending: true }),
     ])
 
     // Enrich milestones with project names

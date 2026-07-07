@@ -31,6 +31,29 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // CSRF protection for state-changing API requests
+  if (pathname.startsWith('/api/') && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
+    const skipCsrf = ['/api/cron/', '/api/cowork/', '/api/stripe/webhook', '/api/auth/callback']
+    const shouldSkipCsrf = skipCsrf.some(p => pathname.startsWith(p))
+
+    if (!shouldSkipCsrf) {
+      const origin = request.headers.get('origin')
+      const host = request.headers.get('host') || ''
+
+      if (origin) {
+        const isValid =
+          origin === `https://${host}` ||
+          origin === `http://${host}` ||
+          origin.endsWith('.vercel.app') ||
+          origin === (process.env.NEXT_PUBLIC_APP_URL || '')
+
+        if (!isValid) {
+          return NextResponse.json({ error: 'CSRF validation failed' }, { status: 403 })
+        }
+      }
+    }
+  }
+
   // Skip API routes and static assets
   if (pathname.startsWith('/api/') || pathname.startsWith('/_next/')) {
     return supabaseResponse

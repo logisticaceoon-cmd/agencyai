@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createHmac, timingSafeEqual } from 'crypto'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -12,7 +13,13 @@ export async function GET(request: Request) {
 
   let state: { workspaceId: string; userId: string }
   try {
-    state = JSON.parse(Buffer.from(stateB64, 'base64').toString())
+    const stateObj = JSON.parse(Buffer.from(stateB64, 'base64url').toString())
+    const hmacSecret = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+    const expectedSig = createHmac('sha256', hmacSecret).update(stateObj.data).digest('hex')
+    if (!timingSafeEqual(Buffer.from(stateObj.sig, 'hex'), Buffer.from(expectedSig, 'hex'))) {
+      return NextResponse.redirect(new URL('/calendar?error=invalid_state', request.url))
+    }
+    state = JSON.parse(stateObj.data)
   } catch {
     return NextResponse.redirect(new URL('/calendar?error=invalid_state', request.url))
   }

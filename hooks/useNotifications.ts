@@ -21,16 +21,26 @@ export function useNotifications() {
 
   const handleMarkAsRead = useCallback(
     async (id: string) => {
+      const prev = notifications
       markAsRead(id)
-      await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' })
+      try {
+        await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' })
+      } catch {
+        setNotifications(prev)
+      }
     },
-    [markAsRead]
+    [markAsRead, notifications, setNotifications]
   )
 
   const handleMarkAllAsRead = useCallback(async () => {
+    const prev = notifications
     markAllAsRead()
-    await fetch('/api/notifications/read-all', { method: 'PATCH' })
-  }, [markAllAsRead])
+    try {
+      await fetch('/api/notifications/read-all', { method: 'PATCH' })
+    } catch {
+      setNotifications(prev)
+    }
+  }, [markAllAsRead, notifications, setNotifications])
 
   useEffect(() => {
     fetchNotifications()

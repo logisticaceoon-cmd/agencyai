@@ -22,7 +22,10 @@ export async function GET(request: Request) {
         .eq('client_id', clientId)
         .eq('workspace_id', workspaceId)
         .single()
-      if (error) return NextResponse.json({ error: error.message }, { status: 404 })
+      if (error) {
+        console.error(error)
+        return NextResponse.json({ error: 'Recurso no encontrado' }, { status: 404 })
+      }
       return NextResponse.json({ data })
     }
 
@@ -35,7 +38,10 @@ export async function GET(request: Request) {
       .order('report_month', { ascending: false })
       .limit(24)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
+    }
 
     // Reporte más reciente completo
     const latest = data?.find(r => r.status === 'completed')

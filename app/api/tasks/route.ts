@@ -1,6 +1,22 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 import { normalizeRole, getDataScope } from '@/lib/roles'
+import { sanitizeError } from '@/lib/sanitize-error'
+
+const createTaskSchema = z.object({
+  title: z.string().min(1, 'El título es obligatorio'),
+  description: z.string().optional().nullable(),
+  status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']).optional(),
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+  deadline: z.string().optional().nullable(),
+  due_date: z.string().optional().nullable(),
+  projectId: z.string().optional().nullable(),
+  project_id: z.string().optional().nullable(),
+  parentTaskId: z.string().optional().nullable(),
+  parent_task_id: z.string().optional().nullable(),
+  assignedTo: z.array(z.string()).optional(),
+})
 
 export async function GET(request: Request) {
   try {
@@ -9,6 +25,9 @@ export async function GET(request: Request) {
     const { supabase, workspaceId, userId, role } = auth
 
     const { searchParams } = new URL(request.url)
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')))
+    const offset = (page - 1) * pageSize
     const status = searchParams.get('status')
     const priority = searchParams.get('priority')
     const projectId = searchParams.get('project_id') || searchParams.get('projectId')
@@ -22,8 +41,8 @@ export async function GET(request: Request) {
       .select('*')
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
-      .limit(500)
       .order('createdAt', { ascending: true })
+      .range(offset, offset + pageSize - 1)
 
     // Filtrar por asignado si el rol no tiene acceso total
     if (scope === 'assigned') {
@@ -45,13 +64,14 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error('Error fetching tasks:', error)
-      return NextResponse.json({ data: [] })
+      return NextResponse.json({ data: [], page, pageSize, hasMore: false })
     }
 
-    return NextResponse.json({ data: data || [] })
+    const results = data || []
+    return NextResponse.json({ data: results, page, pageSize, hasMore: results.length === pageSize })
   } catch (err) {
     console.error('Error in GET /api/tasks:', err)
-    return NextResponse.json({ data: [] })
+    return NextResponse.json({ data: [], page: 1, pageSize: 50, hasMore: false })
   }
 }
 
@@ -62,27 +82,31 @@ export async function POST(request: Request) {
     const { supabase, workspaceId, userId } = auth
 
     const body = await request.json()
+    const result = createTaskSchema.safeParse(body)
+    if (!result.success) {
+      return NextResponse.json({ error: 'Datos inválidos', details: result.error.flatten().fieldErrors }, { status: 400 })
+    }
+    const parsed = result.data
 
     const { data, error } = await supabase
       .from('tasks')
       .insert({
         workspace_id: workspaceId,
-        projectId: body.projectId || body.project_id || null,
-        parentTaskId: body.parentTaskId || body.parent_task_id || null,
-        title: body.title,
-        description: body.description || null,
-        status: body.status || 'pending',
-        priority: body.priority || 'medium',
-        deadline: body.deadline || body.due_date || null,
-        assignedTo: body.assignedTo || [],
+        projectId: parsed.projectId || parsed.project_id || null,
+        parentTaskId: parsed.parentTaskId || parsed.parent_task_id || null,
+        title: parsed.title,
+        description: parsed.description || null,
+        status: parsed.status || 'pending',
+        priority: parsed.priority || 'medium',
+        deadline: parsed.deadline || parsed.due_date || null,
+        assignedTo: parsed.assignedTo || [],
         createdById: userId,
       })
       .select()
       .single()
 
     if (error) {
-      console.error('Error creating task:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: sanitizeError(error, 'POST /api/tasks') }, { status: 500 })
     }
 
     return NextResponse.json({ data }, { status: 201 })

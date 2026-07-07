@@ -115,7 +115,7 @@ export async function PATCH(
 
     if (error) {
       console.error('Cowork task PATCH error:', error)
-      return NextResponse.json({ error: `Error updating task: ${error.message}` }, { status: 500 })
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     if (!data) {
@@ -226,7 +226,8 @@ export async function POST(
       .single()
 
     if (error || !data) {
-      return NextResponse.json({ error: 'Task not found or error completing' }, { status: 500 })
+      console.error('Cowork task complete error:', error)
+      return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
     await logPerformance(supabase, organizationId, data as Record<string, unknown>)

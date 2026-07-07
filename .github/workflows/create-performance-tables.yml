@@ -21,22 +21,29 @@ jobs:
           done
 
       - name: Create performance tables in Supabase
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           node << 'SCRIPT'
           const { Client } = require('pg');
 
-          const password = 'agenciaai2026';
-          const ref = 'rntpmsckiplrxfgubngt';
+          const password = process.env.DB_PASSWORD;
+          const ref = process.env.SUPABASE_PROJECT_REF;
+          if (!password || !ref) {
+            console.error('Missing DB_PASSWORD or SUPABASE_PROJECT_REF secrets');
+            process.exit(1);
+          }
 
           const configs = [
             // Try pooler in different regions
-            { host: 'aws-0-us-east-1.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: false } },
-            { host: 'aws-0-us-east-2.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: false } },
-            { host: 'aws-0-us-east-1.pooler.supabase.com', port: 5432, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: false } },
-            { host: 'aws-0-us-west-2.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: false } },
-            { host: 'aws-0-eu-central-1.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: false } },
+            { host: 'aws-0-us-east-1.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: true } },
+            { host: 'aws-0-us-east-2.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: true } },
+            { host: 'aws-0-us-east-1.pooler.supabase.com', port: 5432, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: true } },
+            { host: 'aws-0-us-west-2.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: true } },
+            { host: 'aws-0-eu-central-1.pooler.supabase.com', port: 6543, user: `postgres.${ref}`, password, database: 'postgres', ssl: { rejectUnauthorized: true } },
             // Direct with family:4
-            { host: `db.${ref}.supabase.co`, port: 5432, user: 'postgres', password, database: 'postgres', ssl: { rejectUnauthorized: false }, family: 4 },
+            { host: `db.${ref}.supabase.co`, port: 5432, user: 'postgres', password, database: 'postgres', ssl: { rejectUnauthorized: true }, family: 4 },
           ];
 
           const SQL_LOGS = `CREATE TABLE IF NOT EXISTS performance_logs (

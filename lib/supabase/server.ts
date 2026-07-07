@@ -28,13 +28,16 @@ export function createAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!url || !key) {
-    console.error('CRITICAL: Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+  if (!url) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL is required')
+  }
+  if (!key) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is required')
   }
 
   return createServerClient(
-    url || '',
-    key || '',
+    url,
+    key,
     {
       cookies: {
         getAll() { return [] },

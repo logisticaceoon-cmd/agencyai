@@ -44,6 +44,7 @@ export default function ApiKeysPage() {
   const [description, setDescription] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [newKey, setNewKey] = useState<string | null>(null)
+  const [confirmRevoke, setConfirmRevoke] = useState<{ id: string; name: string } | null>(null)
 
   async function fetchKeys() {
     setLoading(true)
@@ -89,7 +90,10 @@ export default function ApiKeysPage() {
   }
 
   async function handleRevoke(id: string, keyName: string) {
-    if (!confirm(`¿Revocar "${keyName}"? Dejara de funcionar inmediatamente y no se puede deshacer.`)) return
+    setConfirmRevoke({ id, name: keyName })
+  }
+
+  async function executeRevoke(id: string) {
     try {
       const res = await fetch(`/api/cowork/api-keys?id=${id}`, { method: 'DELETE' })
       if (res.ok) {
@@ -350,6 +354,20 @@ export default function ApiKeysPage() {
           </div>
         )}
       </div>
+
+      {/* Confirm revoke modal */}
+      {confirmRevoke && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2">Confirmar revocación</h3>
+            <p className="text-gray-600 mb-4">¿Revocar &quot;{confirmRevoke.name}&quot;? Dejará de funcionar inmediatamente y no se puede deshacer.</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setConfirmRevoke(null)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
+              <button onClick={() => { executeRevoke(confirmRevoke.id); setConfirmRevoke(null) }} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Revocar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

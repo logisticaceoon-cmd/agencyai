@@ -97,48 +97,48 @@ export default function MeetingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-[var(--text-muted)] mb-1 block">Título *</label>
-              <input name="title" required className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Reunión semanal..." />
+              <input name="title" required className="w-full bg-slate-50 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400" placeholder="Reunión semanal..." />
             </div>
             <div>
               <label className="text-xs text-[var(--text-muted)] mb-1 block">Cliente</label>
-              <select name="clientId" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white">
+              <select name="clientId" className="w-full bg-slate-50 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-slate-900">
                 <option value="">Sin cliente</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs text-[var(--text-muted)] mb-1 block">Fecha *</label>
-              <input name="date" type="datetime-local" required className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" />
+              <input name="date" type="datetime-local" required className="w-full bg-slate-50 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-slate-900" />
             </div>
             <div>
               <label className="text-xs text-[var(--text-muted)] mb-1 block">Asistentes (separados por coma)</label>
-              <input name="attendees" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Juan, María, Carlos..." />
+              <input name="attendees" className="w-full bg-slate-50 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400" placeholder="Juan, María, Carlos..." />
             </div>
           </div>
 
           <div>
             <label className="text-xs text-[var(--text-muted)] mb-1 block">Resumen</label>
-            <textarea name="summary" rows={3} className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Resumen de la reunión..." />
+            <textarea name="summary" rows={3} className="w-full bg-slate-50 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400" placeholder="Resumen de la reunión..." />
           </div>
 
           <div>
             <label className="text-xs text-[var(--text-muted)] mb-1 block">Decisiones</label>
-            <textarea name="decisions" rows={2} className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Decisiones tomadas..." />
+            <textarea name="decisions" rows={2} className="w-full bg-slate-50 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400" placeholder="Decisiones tomadas..." />
           </div>
 
           <div>
             <label className="text-xs text-[var(--text-muted)] mb-1 block">Tareas acordadas (una por línea → se crean automáticamente)</label>
-            <textarea name="agreedTasks" rows={3} className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Crear landing page&#10;Revisar campañas Meta&#10;Enviar reporte mensual" />
+            <textarea name="agreedTasks" rows={3} className="w-full bg-slate-50 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400" placeholder="Crear landing page&#10;Revisar campañas Meta&#10;Enviar reporte mensual" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-[var(--text-muted)] mb-1 block">Próxima reunión</label>
-              <input name="nextMeetingDate" type="datetime-local" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" />
+              <input name="nextMeetingDate" type="datetime-local" className="w-full bg-slate-50 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-slate-900" />
             </div>
             <div>
               <label className="text-xs text-[var(--text-muted)] mb-1 block">Notas adicionales</label>
-              <input name="notes" className="w-full bg-slate-100 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-white" placeholder="Notas..." />
+              <input name="notes" className="w-full bg-slate-50 border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400" placeholder="Notas..." />
             </div>
           </div>
 
@@ -156,7 +156,7 @@ export default function MeetingsPage() {
       ) : meetings.length === 0 ? (
         <div className="rounded-xl border border-[var(--border-base)] bg-white p-12 text-center">
           <MessageSquare className="h-12 w-12 text-[var(--text-secondary)] mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-white mb-2">No hay minutas aún</h3>
+          <h3 className="text-lg font-medium text-slate-900 mb-2">No hay minutas aún</h3>
           <p className="text-sm text-[var(--text-muted)]">Registra tu primera reunión y convierte acuerdos en tareas automáticamente.</p>
         </div>
       ) : (
@@ -172,7 +172,7 @@ export default function MeetingsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <p className="text-sm font-medium text-white truncate">{meeting.title}</p>
+                    <p className="text-sm font-medium text-slate-900 truncate">{meeting.title}</p>
                     {meeting.client && (
                       <span className="text-xs bg-slate-100 text-[var(--text-muted)] px-2 py-0.5 rounded-full">{meeting.client.name}</span>
                     )}

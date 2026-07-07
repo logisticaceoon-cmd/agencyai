@@ -5,10 +5,21 @@ import {
   BarChart2, Plus, X, TrendingUp, TrendingDown, AlertTriangle,
   Loader2, BookOpen, Search, ArrowRight, ArrowLeft, Check,
   Target, Clock, Calculator, Lightbulb, ChevronRight,
-  Users, DollarSign, Briefcase, Brain, Share2, FolderKanban
+  Users, DollarSign, Briefcase, Brain, Share2, FolderKanban,
+  Pencil, Trash2, Download
 } from 'lucide-react'
+import { downloadCSV } from '@/lib/export'
+import { downloadPDF } from '@/lib/pdf'
 import { cn } from '@/lib/utils'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import dynamic from 'next/dynamic'
+
+const LineChart = dynamic(() => import('recharts').then(m => m.LineChart), { ssr: false })
+const Line = dynamic(() => import('recharts').then(m => m.Line), { ssr: false })
+const XAxis = dynamic(() => import('recharts').then(m => m.XAxis), { ssr: false })
+const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false })
+const CartesianGrid = dynamic(() => import('recharts').then(m => m.CartesianGrid), { ssr: false })
+const Tooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false })
+const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false })
 import { AgentWidget } from '@/components/ai/AgentWidget'
 import { InfoBanner } from '@/components/shared/InfoBanner'
 import * as Dialog from '@radix-ui/react-dialog'
@@ -152,6 +163,13 @@ export default function KPIsPage() {
   const [recordNotes, setRecordNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Edit / Delete state
+  const [editKpi, setEditKpi] = useState<KPI | null>(null)
+  const [editData, setEditData] = useState({ name: '', target_value: '', unit: '', client_id: '', category: '' })
+  const [editSaving, setEditSaving] = useState(false)
+  const [deleteKpiId, setDeleteKpiId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
   // Library modal state
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [libraryStep, setLibraryStep] = useState<'browse' | 'tutorial' | 'configure' | 'confirm'>('browse')
@@ -227,6 +245,53 @@ export default function KPIsPage() {
       }),
     })
     setSaving(false); setShowRecordForm(null); setRecordValue(''); setRecordNotes(''); fetchKpis()
+  }
+
+  function openEditKpi(kpi: KPI) {
+    setEditKpi(kpi)
+    setEditData({
+      name: kpi.name,
+      target_value: String(kpi.target_value),
+      unit: kpi.unit,
+      client_id: kpi.client_id || '',
+      category: kpi.category || '',
+    })
+  }
+
+  async function handleEditKpi() {
+    if (!editKpi) return
+    setEditSaving(true)
+    try {
+      const res = await fetch(`/api/kpis/${editKpi.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editData.name,
+          target_value: parseFloat(editData.target_value) || 0,
+          unit: editData.unit,
+        }),
+      })
+      if (res.ok) {
+        setEditKpi(null)
+        fetchKpis()
+      }
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  async function handleDeleteKpi() {
+    if (!deleteKpiId) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/kpis/${deleteKpiId}`, { method: 'DELETE' })
+      if (res.ok) {
+        setDeleteKpiId(null)
+        fetchKpis()
+      }
+    } finally {
+      setDeleting(false)
+    }
   }
 
   function getProgress(kpi: KPI) {
@@ -346,6 +411,66 @@ export default function KPIsPage() {
             <option value="">Todos los clientes</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          <button
+            onClick={() => {
+              const exportData = kpis.map(k => ({
+                nombre: k.name,
+                cliente: k.clients?.name || 'Sin cliente',
+                valor_actual: k.current_value,
+                valor_objetivo: k.target_value,
+                unidad: k.unit,
+                progreso: `${Math.round(getProgress(k))}%`,
+                categoria: k.category,
+                frecuencia: k.frequency,
+              }))
+              downloadCSV(exportData as Record<string, unknown>[], 'kpis', [
+                { key: 'nombre', label: 'Nombre' },
+                { key: 'cliente', label: 'Cliente' },
+                { key: 'valor_actual', label: 'Valor actual' },
+                { key: 'valor_objetivo', label: 'Valor objetivo' },
+                { key: 'unidad', label: 'Unidad' },
+                { key: 'progreso', label: 'Progreso' },
+                { key: 'categoria', label: 'Categoria' },
+                { key: 'frecuencia', label: 'Frecuencia' },
+              ])
+            }}
+            disabled={kpis.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Download size={15} strokeWidth={1.5} /> CSV
+          </button>
+          <button
+            onClick={() => {
+              const exportData = kpis.map(k => ({
+                nombre: k.name,
+                cliente: k.clients?.name || 'Sin cliente',
+                valor_actual: k.current_value,
+                valor_objetivo: k.target_value,
+                unidad: k.unit,
+                progreso: `${Math.round(getProgress(k))}%`,
+                categoria: k.category,
+                frecuencia: k.frequency,
+              }))
+              downloadPDF({
+                title: 'KPIs y Metricas',
+                subtitle: filterClient ? `Cliente: ${clients.find(c => c.id === filterClient)?.name || ''}` : 'Todos los clientes',
+                filename: 'kpis',
+                columns: [
+                  { key: 'nombre', label: 'Nombre' },
+                  { key: 'cliente', label: 'Cliente' },
+                  { key: 'valor_actual', label: 'Valor actual' },
+                  { key: 'valor_objetivo', label: 'Objetivo' },
+                  { key: 'progreso', label: 'Progreso' },
+                  { key: 'frecuencia', label: 'Frecuencia' },
+                ],
+                data: exportData as Record<string, unknown>[],
+              })
+            }}
+            disabled={kpis.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Download size={15} strokeWidth={1.5} /> PDF
+          </button>
           <button onClick={openLibrary} className="flex items-center gap-2 bg-white border border-[var(--border-base)] text-[var(--text-primary)] px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--bg-muted)] transition-colors">
             <BookOpen size={16} strokeWidth={1.5} /> Biblioteca de KPIs
           </button>
@@ -470,6 +595,12 @@ export default function KPIsPage() {
                     {belowTarget && <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full font-medium flex items-center gap-1"><AlertTriangle size={12} strokeWidth={1.5} /> Bajo</span>}
                     {trend === 'up' && <TrendingUp size={16} strokeWidth={1.5} className="text-green-500" />}
                     {trend === 'down' && <TrendingDown size={16} strokeWidth={1.5} className="text-red-500" />}
+                    <button onClick={() => openEditKpi(kpi)} className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Editar KPI">
+                      <Pencil size={14} strokeWidth={1.5} />
+                    </button>
+                    <button onClick={() => setDeleteKpiId(kpi.id)} className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Eliminar KPI">
+                      <Trash2 size={14} strokeWidth={1.5} />
+                    </button>
                   </div>
                 </div>
                 <div className="flex items-end justify-between">
@@ -507,6 +638,77 @@ export default function KPIsPage() {
           })}
         </div>
       )}
+
+      {/* ── Edit KPI Modal ── */}
+      <Dialog.Root open={!!editKpi} onOpenChange={open => { if (!open) setEditKpi(null) }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-md rounded-xl border border-[var(--border-base)] bg-white shadow-xl p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <Dialog.Title className="text-lg font-bold text-[var(--text-primary)]">Editar KPI</Dialog.Title>
+              <Dialog.Close className="rounded-lg p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)] transition-colors">
+                <X size={16} strokeWidth={1.5} />
+              </Dialog.Close>
+            </div>
+            <Dialog.Description className="text-sm text-[var(--text-muted)]">Modifica los datos del KPI</Dialog.Description>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-[var(--text-muted)] mb-1 block font-medium">Nombre *</label>
+                <input value={editData.name} onChange={e => setEditData(p => ({ ...p, name: e.target.value }))} className="w-full bg-white border border-[var(--border-base)] rounded-lg px-3 py-2.5 text-sm text-[var(--text-primary)]" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-[var(--text-muted)] mb-1 block font-medium">Valor objetivo</label>
+                  <input type="number" step="0.01" value={editData.target_value} onChange={e => setEditData(p => ({ ...p, target_value: e.target.value }))} className="w-full bg-white border border-[var(--border-base)] rounded-lg px-3 py-2.5 text-sm text-[var(--text-primary)]" />
+                </div>
+                <div>
+                  <label className="text-xs text-[var(--text-muted)] mb-1 block font-medium">Unidad</label>
+                  <select value={editData.unit} onChange={e => setEditData(p => ({ ...p, unit: e.target.value }))} className="w-full bg-white border border-[var(--border-base)] rounded-lg px-3 py-2.5 text-sm text-[var(--text-primary)]">
+                    <option value="numero">Numero</option>
+                    <option value="porcentaje">Porcentaje</option>
+                    <option value="personas">Personas</option>
+                    <option value="moneda">Moneda</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-[var(--text-muted)] mb-1 block font-medium">Cliente</label>
+                <select value={editData.client_id} onChange={e => setEditData(p => ({ ...p, client_id: e.target.value }))} className="w-full bg-white border border-[var(--border-base)] rounded-lg px-3 py-2.5 text-sm text-[var(--text-primary)]">
+                  <option value="">Sin cliente</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setEditKpi(null)} className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] font-medium px-4 py-2">Cancelar</button>
+              <button onClick={handleEditKpi} disabled={editSaving || !editData.name} className="bg-[var(--blue)] text-white px-5 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity">
+                {editSaving ? <Loader2 size={14} strokeWidth={1.5} className="animate-spin inline mr-1" /> : null}
+                Guardar
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* ── Delete KPI Confirmation ── */}
+      <Dialog.Root open={!!deleteKpiId} onOpenChange={open => { if (!open) setDeleteKpiId(null) }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm rounded-xl border border-[var(--border-base)] bg-white shadow-xl p-6 space-y-4">
+            <Dialog.Title className="text-lg font-bold text-[var(--text-primary)]">Eliminar KPI</Dialog.Title>
+            <Dialog.Description className="text-sm text-[var(--text-muted)]">
+              Este KPI y todos sus registros seran eliminados permanentemente. Esta accion no se puede deshacer.
+            </Dialog.Description>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setDeleteKpiId(null)} className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] font-medium px-4 py-2">Cancelar</button>
+              <button onClick={handleDeleteKpi} disabled={deleting} className="bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors">
+                {deleting ? <Loader2 size={14} strokeWidth={1.5} className="animate-spin inline mr-1" /> : null}
+                Eliminar
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {/* ── Library Modal ── */}
       <Dialog.Root open={libraryOpen} onOpenChange={setLibraryOpen}>

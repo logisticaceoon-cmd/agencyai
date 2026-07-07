@@ -53,7 +53,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) {
+      console.error(error)
+      return NextResponse.json({ error: 'Error en la solicitud' }, { status: 400 })
+    }
 
     return NextResponse.json({ data })
   } catch {
