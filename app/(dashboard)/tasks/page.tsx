@@ -37,6 +37,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core'
 import { InfoBanner } from '@/components/shared/InfoBanner'
+import { useTranslation } from '@/lib/i18n'
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -148,6 +149,7 @@ type TaskFormData = z.infer<typeof taskFormSchema>
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
+  const { t } = useTranslation()
   const { user, org } = useCurrentUser()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -387,7 +389,7 @@ export default function TasksPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Tareas</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('tasks.title')}</h1>
           <p className="mt-1 text-sm text-slate-500">
             {isCEO ? 'Gestion de tareas del equipo' : 'Mis tareas asignadas'}
           </p>
@@ -405,7 +407,7 @@ export default function TasksPage() {
               )}
             >
               <List className="h-4 w-4" />
-              Lista
+              {t('tasks.list')}
             </button>
             <button
               onClick={() => setViewMode('kanban')}
@@ -417,7 +419,7 @@ export default function TasksPage() {
               )}
             >
               <LayoutGrid className="h-4 w-4" />
-              Kanban
+              {t('tasks.kanban')}
             </button>
           </div>
           <button
@@ -432,7 +434,7 @@ export default function TasksPage() {
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Nueva tarea
+            {t('tasks.newTask')}
           </button>
         </div>
       </div>
@@ -454,7 +456,7 @@ export default function TasksPage() {
           onChange={(e) => setStatusFilter(e.target.value)}
           className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none"
         >
-          <option value="">Todos los estados</option>
+          <option value="">{t('projects.allStatuses')}</option>
           {KANBAN_COLUMNS.map((col) => (
             <option key={col.key} value={col.key}>
               {col.label}
@@ -494,7 +496,7 @@ export default function TasksPage() {
           className="px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-2"
         >
           <Download className="w-4 h-4" />
-          Exportar
+          {t('common.export')}
         </button>
       </div>
 
@@ -512,7 +514,7 @@ export default function TasksPage() {
             onClick={() => openCreateModal()}
             className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
           >
-            <Plus className="h-4 w-4" /> Nueva tarea
+            <Plus className="h-4 w-4" /> {t('tasks.newTask')}
           </button>
         </div>
       ) : viewMode === 'list' ? (
@@ -658,8 +660,8 @@ export default function TasksPage() {
             <h3 className="text-lg font-semibold mb-2">Confirmar eliminación</h3>
             <p className="text-gray-600 mb-4">¿Estás seguro de que deseas eliminar esta tarea?</p>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setDeleteTaskId(null)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
-              <button onClick={confirmDeleteTask} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar</button>
+              <button onClick={() => setDeleteTaskId(null)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">{t('common.cancel')}</button>
+              <button onClick={confirmDeleteTask} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">{t('common.delete')}</button>
             </div>
           </div>
         </div>

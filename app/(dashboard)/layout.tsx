@@ -1,12 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Sidebar } from '@/components/dashboard/Sidebar'
 import { Header } from '@/components/dashboard/Header'
 import { DailyGreetingToast } from '@/components/ai/DailyGreetingToast'
 import { ProfessionalTypeProvider } from '@/components/providers/ProfessionalTypeProvider'
+import { I18nProvider } from '@/lib/i18n'
 import { RoleGuard } from '@/components/dashboard/RoleGuard'
 import { AccountGuard } from '@/components/dashboard/AccountGuard'
+import { OnlineUsers } from '@/components/shared/OnlineUsers'
+import { ProductTour } from '@/components/shared/ProductTour'
+import { OnboardingChecklist } from '@/components/shared/OnboardingChecklist'
 
 export default function DashboardLayout({
   children,
@@ -14,8 +18,25 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [tourCompleted, setTourCompleted] = useState<boolean | undefined>(undefined)
+  const [onboardingCompleted, setOnboardingCompleted] = useState(true)
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.workspace) {
+          setWorkspaceId(data.workspace.id)
+          setTourCompleted(data.workspace.tour_completed ?? undefined)
+          setOnboardingCompleted(data.workspace.onboarding_completed ?? false)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   return (
+    <I18nProvider>
     <ProfessionalTypeProvider>
       <AccountGuard>
         <div className="flex h-screen overflow-hidden bg-white">
@@ -38,6 +59,10 @@ export default function DashboardLayout({
               <span className="font-semibold text-lg">AgencyAI</span>
             </div>
             <Header />
+            {/* Indicador de usuarios en linea */}
+            <div className="hidden lg:flex items-center px-6 py-1.5 border-b border-[var(--border-base)] bg-white">
+              <OnlineUsers />
+            </div>
             <main className="flex-1 overflow-y-auto bg-white p-6">
               <RoleGuard>
                 {children}
@@ -45,8 +70,10 @@ export default function DashboardLayout({
             </main>
           </div>
           <DailyGreetingToast />
+          <ProductTour tourCompleted={tourCompleted} />
         </div>
       </AccountGuard>
     </ProfessionalTypeProvider>
+    </I18nProvider>
   )
 }

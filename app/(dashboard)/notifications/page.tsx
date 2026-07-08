@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Bell, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { timeAgo } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n'
 
 interface Notification {
   id: string; title: string; message: string; type: string
@@ -14,6 +15,7 @@ interface Notification {
 const TYPE_ICONS: Record<string, string> = { warning: '⚠️', success: '✅', info: 'ℹ️', milestone: '🎯' }
 
 export default function NotificationsPage() {
+  const { t } = useTranslation()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
@@ -51,16 +53,16 @@ export default function NotificationsPage() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Notificaciones</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('notifications.title')}</h1>
           <p className="mt-1 text-sm text-slate-500">{total} notificaciones en total</p>
         </div>
         <button onClick={markAllAsRead} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-          <Check className="h-4 w-4" /> Marcar todas como leidas
+          <Check className="h-4 w-4" /> {t('notifications.markAllRead')}
         </button>
       </div>
 
       <div className="flex items-center gap-2">
-        {[{ value: '', label: 'Todas' }, { value: 'unread', label: 'No leidas' }, { value: 'warning', label: 'Warnings' }, { value: 'info', label: 'Info' }].map(f => (
+        {[{ value: '', label: t('notifications.all') }, { value: 'unread', label: t('notifications.unread') }, { value: 'warning', label: 'Warnings' }, { value: 'info', label: 'Info' }].map(f => (
           <button key={f.value} onClick={() => { setFilter(f.value); setPage(1) }} className={cn(
             'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
             filter === f.value ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -74,7 +76,7 @@ export default function NotificationsPage() {
         ) : notifications.length === 0 ? (
           <div className="py-16 text-center">
             <Bell className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm text-slate-400">No hay notificaciones</p>
+            <p className="text-sm text-slate-400">{t('notifications.noNotifications')}</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
@@ -102,7 +104,7 @@ export default function NotificationsPage() {
         <div className="flex items-center justify-center gap-2">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 rounded-lg text-xs border border-slate-200 disabled:opacity-50">Anterior</button>
           <span className="text-xs text-slate-500">Pagina {page} de {totalPages}</span>
-          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-3 py-1.5 rounded-lg text-xs border border-slate-200 disabled:opacity-50">Siguiente</button>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-3 py-1.5 rounded-lg text-xs border border-slate-200 disabled:opacity-50">{t('common.next')}</button>
         </div>
       )}
     </div>

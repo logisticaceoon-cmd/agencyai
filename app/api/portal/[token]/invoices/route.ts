@@ -28,5 +28,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     console.error(error)
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
   }
+
+  // Log activity
+  await supabase.from('portal_activity').insert({
+    workspace_id: access.workspace_id,
+    client_id: access.client_id,
+    portal_token: token,
+    action: 'viewed_invoices',
+    entity_type: 'invoice',
+  })
+
   return NextResponse.json({ data })
 }

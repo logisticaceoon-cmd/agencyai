@@ -107,7 +107,9 @@
       "Bash(cat .git/rebase-merge/stopped-sha)",
       "Bash(ls .git/rebase-merge/)",
       "Bash(grep \" *)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(grep -n \"useTranslation\" \"app/\\(dashboard\\)/reports/page.tsx\")",
+      "Bash(grep -n \"useTranslation\" \"app/\\(dashboard\\)/dashboard/page.tsx\")"
     ]
   }
 }

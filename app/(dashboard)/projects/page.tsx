@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { downloadCSV } from '@/lib/export'
 import { InfoBanner } from '@/components/shared/InfoBanner'
+import { useTranslation } from '@/lib/i18n'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ const PROJECT_COLORS = [
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function ProjectsPage() {
+  const { t } = useTranslation()
   const { user } = useCurrentUser()
   const [projects, setProjects] = useState<Project[]>([])
   const [clients, setClients] = useState<ClientOption[]>([])
@@ -335,7 +337,7 @@ export default function ProjectsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Proyectos</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('projects.title')}</h1>
           <p className="mt-1 text-sm text-slate-500">
             Gestion de proyectos de la agencia
           </p>
@@ -345,7 +347,7 @@ export default function ProjectsPage() {
           className="flex items-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
         >
           <Plus className="h-4 w-4" />
-          Nuevo proyecto
+          {t('projects.newProject')}
         </button>
       </div>
 
@@ -356,7 +358,7 @@ export default function ProjectsPage() {
           onChange={(e) => setFilterClient(e.target.value)}
           className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
-          <option value="">Todos los clientes</option>
+          <option value="">{t('projects.allClients')}</option>
           {clients.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -368,7 +370,7 @@ export default function ProjectsPage() {
           onChange={(e) => setFilterStatus(e.target.value)}
           className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
-          <option value="">Todos los estados</option>
+          <option value="">{t('projects.allStatuses')}</option>
           <option value="onboarding">Planificacion</option>
           <option value="active">Activo</option>
           <option value="review">Revision</option>
@@ -394,7 +396,7 @@ export default function ProjectsPage() {
           className="px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-2"
         >
           <Download className="w-4 h-4" />
-          Exportar
+          {t('common.export')}
         </button>
       </div>
 
@@ -422,7 +424,7 @@ export default function ProjectsPage() {
             <FolderKanban className="h-8 w-8 text-slate-400" />
           </div>
           <h3 className="text-lg font-medium text-slate-700">
-            No hay proyectos
+            {t('projects.noProjects')}
           </h3>
           <p className="mt-2 max-w-sm text-sm text-slate-500">
             Crea tu primer proyecto para empezar a organizar el trabajo
@@ -491,14 +493,14 @@ export default function ProjectsPage() {
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
-                        Editar
+                        {t('common.edit')}
                       </button>
                       <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeletingProject(project); setProjectMenuOpen(null) }}
                         className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                        Eliminar
+                        {t('common.delete')}
                       </button>
                     </div>
                   )}
@@ -530,7 +532,7 @@ export default function ProjectsPage() {
               {/* Progress bar */}
               <div className="mb-3">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-500">Progreso</span>
+                  <span className="text-xs text-slate-500">{t('projects.progress')}</span>
                   <span className="text-xs font-medium text-slate-700">
                     {project.progressPercent}%
                   </span>
@@ -576,8 +578,8 @@ export default function ProjectsPage() {
           <button onClick={() => bulkStatusChange('active')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-green-600 rounded-full hover:bg-green-700 disabled:opacity-50">Activar</button>
           <button onClick={() => bulkStatusChange('completed')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-emerald-600 rounded-full hover:bg-emerald-700 disabled:opacity-50">Completar</button>
           <button onClick={() => bulkStatusChange('paused')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-amber-600 rounded-full hover:bg-amber-700 disabled:opacity-50">Pausar</button>
-          <button onClick={bulkDelete} disabled={bulkLoading} className="text-sm px-3 py-1 bg-red-600 rounded-full hover:bg-red-700 disabled:opacity-50">Eliminar</button>
-          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-slate-400 hover:text-white">Cancelar</button>
+          <button onClick={bulkDelete} disabled={bulkLoading} className="text-sm px-3 py-1 bg-red-600 rounded-full hover:bg-red-700 disabled:opacity-50">{t('common.delete')}</button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-slate-400 hover:text-white">{t('common.cancel')}</button>
         </div>
       )}
 
@@ -588,7 +590,7 @@ export default function ProjectsPage() {
           <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <Dialog.Title className="text-lg font-semibold text-slate-900">
-                {editingProject ? 'Editar proyecto' : 'Nuevo proyecto'}
+                {editingProject ? `${t('common.edit')} proyecto` : t('projects.newProject')}
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
@@ -800,7 +802,7 @@ export default function ProjectsPage() {
                     type="button"
                     className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                   >
-                    Cancelar
+                    {t('common.cancel')}
                   </button>
                 </Dialog.Close>
                 <button
@@ -812,8 +814,8 @@ export default function ProjectsPage() {
                     <Loader2 className="h-4 w-4 animate-spin" />
                   )}
                   {editingProject
-                    ? 'Guardar cambios'
-                    : 'Crear proyecto'}
+                    ? `${t('common.save')} cambios`
+                    : `${t('common.create')} proyecto`}
                 </button>
               </div>
             </form>
@@ -838,8 +840,8 @@ export default function ProjectsPage() {
               Se eliminara el proyecto y todas sus tareas asociadas. Esta accion no se puede deshacer.
             </p>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setDeletingProject(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-              <button onClick={() => handleDeleteProject(deletingProject)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar</button>
+              <button onClick={() => setDeletingProject(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
+              <button onClick={() => handleDeleteProject(deletingProject)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">{t('common.delete')}</button>
             </div>
           </div>
         </div>

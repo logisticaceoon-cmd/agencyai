@@ -45,7 +45,7 @@ export async function GET() {
     if (workspaceId) {
       const { data: workspace } = await admin
         .from('workspaces')
-        .select('id, name, slug, plan, currency, agency_type')
+        .select('id, name, slug, plan, currency, agency_type, onboarding_completed, tour_completed, has_sample_data')
         .eq('id', workspaceId)
         .single()
 
@@ -57,6 +57,9 @@ export async function GET() {
           plan: workspace.plan || 'free',
           maxUsers: 100,
           maxClients: 100,
+          onboardingCompleted: workspace.onboarding_completed ?? false,
+          tourCompleted: workspace.tour_completed ?? false,
+          hasSampleData: workspace.has_sample_data ?? false,
         }
       }
     }

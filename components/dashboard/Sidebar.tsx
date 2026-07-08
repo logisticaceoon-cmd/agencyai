@@ -9,6 +9,7 @@ import { Avatar } from '@/components/shared/Avatar'
 import { toast } from '@/hooks/use-toast'
 import { normalizeRole, canAccessSection, ROLE_LABELS, type AppRole } from '@/lib/roles'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { useTranslation } from '@/lib/i18n'
 import {
   LayoutDashboard,
   CheckSquare,
@@ -75,10 +76,11 @@ type NavItem = {
   icon: React.ElementType
   minPlan?: OrgPlan
   proRequired?: boolean   // nuevo: se bloquea en free, visible con badge PRO
+  tourId?: string         // data-tour attribute para el tour guiado
 }
 
 const adminItems: NavItem[] = [
-  { href: '/settings', label: 'Workspace', icon: Building2 },
+  { href: '/settings', label: 'Workspace', icon: Building2, tourId: 'settings' },
   { href: '/settings/team', label: 'Equipo', icon: Users },
   { href: '/settings/roles', label: 'Roles', icon: Shield },
   { href: '/settings/ai', label: 'Agente de IA', icon: Zap },
@@ -101,47 +103,49 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
   const isOwner = role === 'owner'
   const canAdmin = role === 'owner' || role === 'admin'
   const { isPro } = usePlanLimits()
+  const { t } = useTranslation()
 
   const navGroups: { label: string | null; items: NavItem[] }[] = [
     {
       label: null,
       items: [
-        { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { href: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard, tourId: 'dashboard-nav' },
       ],
     },
     {
-      label: 'Operaciones',
+      label: t('nav.operations'),
       items: [
-        { href: '/clients',   label: config.terminology.clients,  icon: Users },
-        { href: '/projects',  label: config.terminology.projects, icon: FolderKanban },
-        { href: '/tasks',     label: config.terminology.tasks,    icon: CheckSquare },
-        { href: '/minutes',   label: 'Minutas',                   icon: MessageSquare, proRequired: !isPro },
-        { href: '/calendar',  label: 'Calendario',                icon: Calendar },
-        { href: '/time',            label: 'Tiempo',                    icon: Clock },
-        { href: '/approvals',       label: 'Aprobaciones',              icon: CheckCircle },
-        { href: '/communications',  label: 'Comunicaciones',            icon: MessageCircle },
-        { href: '/assets',          label: 'Archivos',                  icon: ImageIcon },
+        { href: '/clients',          label: t('nav.clients'),        icon: Users, tourId: 'clients' },
+        { href: '/projects',         label: t('nav.projects'),       icon: FolderKanban, tourId: 'projects' },
+        { href: '/tasks',            label: t('nav.tasks'),          icon: CheckSquare, tourId: 'tasks' },
+        { href: '/minutes',          label: t('nav.minutes'),        icon: MessageSquare, proRequired: !isPro },
+        { href: '/calendar',         label: t('nav.calendar'),       icon: Calendar },
+        { href: '/time',             label: t('nav.time'),           icon: Clock, tourId: 'time' },
+        { href: '/approvals',        label: t('nav.approvals'),      icon: CheckCircle },
+        { href: '/communications',   label: t('nav.communications'), icon: MessageCircle },
+        { href: '/assets',           label: t('nav.assets'),         icon: ImageIcon },
       ],
     },
     {
-      label: 'Reportes',
+      label: t('nav.reporting'),
       items: [
-        { href: '/reports',    label: config.terminology.reports, icon: FileText },
-        { href: '/kpis',       label: 'KPIs y Metricas',          icon: BarChart2,  proRequired: !isPro },
-        { href: '/objectives', label: 'Objetivos',                icon: Target,     proRequired: !isPro },
+        { href: '/reports',    label: t('nav.reports'),     icon: FileText, tourId: 'reports' },
+        { href: '/kpis',       label: t('nav.kpis'),        icon: BarChart2,  proRequired: !isPro },
+        { href: '/objectives', label: t('nav.objectives'),  icon: Target,     proRequired: !isPro },
       ],
     },
     {
-      label: 'Gestion',
+      label: t('nav.management'),
       items: [
-        { href: '/audits',      label: 'Auditorias',   icon: Search,    proRequired: !isPro },
-        { href: '/performance', label: 'Rendimiento',  icon: TrendingUp, proRequired: !isPro },
-        { href: '/docs',        label: 'Documentos',   icon: BookOpen,  proRequired: !isPro },
-        { href: '/finances',    label: 'Finanzas',     icon: DollarSign },
-        { href: '/invoices',    label: 'Facturas',     icon: Receipt },
-        { href: '/ad-spend',    label: 'Inversion Ads', icon: Megaphone },
-        { href: '/recordings',  label: 'Grabaciones',  icon: Video,     proRequired: !isPro },
-        { href: '/alerts',      label: 'IA & Alertas', icon: Zap,       proRequired: !isPro },
+        { href: '/audits',         label: t('nav.audits'),        icon: Search,    proRequired: !isPro },
+        { href: '/performance',    label: t('nav.performance'),   icon: TrendingUp, proRequired: !isPro },
+        { href: '/docs',           label: t('nav.docs'),          icon: BookOpen,  proRequired: !isPro },
+        { href: '/finances',       label: t('nav.finances'),      icon: DollarSign },
+        { href: '/profitability',  label: t('nav.profitability'), icon: TrendingUp },
+        { href: '/invoices',       label: t('nav.invoices'),      icon: Receipt, tourId: 'invoices' },
+        { href: '/ad-spend',       label: t('nav.adSpend'),       icon: Megaphone },
+        { href: '/recordings',     label: t('nav.recordings'),    icon: Video,     proRequired: !isPro },
+        { href: '/alerts',         label: t('nav.alerts'),        icon: Zap,       proRequired: !isPro },
       ],
     },
   ]
@@ -212,6 +216,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                       key={item.href}
                       href="/settings/billing"
                       title="Función Pro — Activar por $30/mes"
+                      data-tour={item.tourId}
                       className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-muted)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-secondary)] transition-all group"
                     >
                       <item.icon size={16} strokeWidth={1.5} className="flex-shrink-0 opacity-50" />
@@ -230,6 +235,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                       key={item.href}
                       href="/settings/billing"
                       title={`Requiere plan ${PLAN_LABEL[item.minPlan!]} — Actualizar plan`}
+                      data-tour={item.tourId}
                       className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--text-muted)] opacity-50 hover:opacity-70 transition-all"
                     >
                       <item.icon size={16} strokeWidth={1.5} className="flex-shrink-0" />
@@ -243,6 +249,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                   <Link
                     key={item.href}
                     href={item.href}
+                    data-tour={item.tourId}
                     className={cn(
                       'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150 relative',
                       active
@@ -272,6 +279,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
               <Link
                 key={item.href}
                 href={item.href}
+                data-tour={item.tourId}
                 className={cn(
                   'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-150 relative',
                   isActive(item.href)

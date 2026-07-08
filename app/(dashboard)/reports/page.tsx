@@ -21,8 +21,11 @@ import {
   Share2,
   Link2,
   Copy,
+  Zap,
+  Settings2,
 } from 'lucide-react'
 import { InfoBanner } from '@/components/shared/InfoBanner'
+import { useTranslation } from '@/lib/i18n'
 import { downloadPDF, downloadReportPDF } from '@/lib/pdf'
 import { downloadCSV } from '@/lib/export'
 
@@ -37,6 +40,10 @@ interface Report {
   submittedBy: { id: string; fullName: string; avatarUrl: string | null }
   client: { id: string; name: string } | null
   task: { id: string; title: string } | null
+  auto_generated?: boolean
+  template_id?: string | null
+  last_generated_at?: string | null
+  next_generation_at?: string | null
 }
 
 const typeLabel: Record<string, string> = {
@@ -78,6 +85,7 @@ const statusColor: Record<string, string> = {
 }
 
 export default function ReportsPage() {
+  const { t } = useTranslation()
   const { user } = useCurrentUser()
   const [reports, setReports] = useState<Report[]>([])
   const [loading, setLoading] = useState(true)
@@ -190,7 +198,7 @@ export default function ReportsPage() {
       date: new Date(r.createdAt).toLocaleDateString('es-ES'),
     }))
     downloadPDF({
-      title: 'Reportes',
+      title: t('reports.title'),
       subtitle: `${data.length} reportes`,
       filename: 'reportes',
       columns,
@@ -223,12 +231,19 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Reportes</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('reports.title')}</h1>
           <p className="mt-1 text-sm text-slate-500">
             {isCEO ? 'Gestion y validacion de reportes del equipo' : 'Mis reportes enviados'}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/reports/templates"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+            {t('reports.templates')}
+          </Link>
           <button
             onClick={exportCSV}
             disabled={filteredReports.length === 0}
@@ -250,7 +265,7 @@ export default function ReportsPage() {
             className="flex items-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Nuevo reporte
+            {t('reports.newReport')}
           </Link>
         </div>
       </div>
@@ -331,12 +346,20 @@ export default function ReportsPage() {
               {filteredReports.map((report) => (
                 <tr key={report.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/reports/${report.id}`}
-                      className="font-medium text-slate-900 hover:text-[#2563eb] transition-colors"
-                    >
-                      {report.title}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/reports/${report.id}`}
+                        className="font-medium text-slate-900 hover:text-[#2563eb] transition-colors"
+                      >
+                        {report.title}
+                      </Link>
+                      {report.auto_generated && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 border border-violet-200 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+                          <Zap className="h-3 w-3" />
+                          Auto-generado
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-slate-600">
                     {report.client?.name || <span className="text-slate-400">--</span>}
@@ -381,7 +404,7 @@ export default function ReportsPage() {
                         title="Compartir enlace"
                         className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
                       >
-                        <Share2 className="h-3.5 w-3.5" /> Compartir
+                        <Share2 className="h-3.5 w-3.5" /> {t('reports.share')}
                       </button>
                       {isCEO && report.status === 'pending' && (
                         <>

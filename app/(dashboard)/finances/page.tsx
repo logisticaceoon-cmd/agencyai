@@ -27,6 +27,7 @@ import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { ProGate, UpgradeBanner } from '@/components/shared/ProGate'
 import { Lock, Sparkles } from 'lucide-react'
 import Link from 'next/link'
+import { useTranslation } from '@/lib/i18n'
 
 // ═══════════════════════════════════════
 // TYPES
@@ -161,6 +162,7 @@ function hexToRgba(hex: string, alpha: number) {
 // ═══════════════════════════════════════
 
 export default function FinancesPage() {
+  const { t } = useTranslation()
   const { hasFinanceResumen, hasFinanceNominas, hasFinanceGastos } = usePlanLimits()
   const [tab, setTab] = useState('clientes') // free siempre empieza en clientes
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -646,7 +648,7 @@ export default function FinancesPage() {
       <InfoBanner id="finances" title="Finanzas" description="Controla clientes, nominas y gastos de tu agencia." />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Finanzas</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('nav.finances')}</h1>
           <p className="mt-1 text-sm text-slate-500">Clientes por categoria, nominas y control de gastos</p>
         </div>
         <div className="flex items-center gap-3">
@@ -1539,7 +1541,7 @@ export default function FinancesPage() {
             <h2 className="text-base font-semibold text-slate-900">Nominas - {MONTHS[month - 1]} {year}</h2>
             <button onClick={() => setShowPayrollForm(!showPayrollForm)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
               {showPayrollForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {showPayrollForm ? 'Cancelar' : 'Nueva nomina'}
+              {showPayrollForm ? t('common.cancel') : 'Nueva nomina'}
             </button>
           </div>
 
@@ -1568,8 +1570,8 @@ export default function FinancesPage() {
                 <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase">Bonus</th>
                 <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase">Deducciones</th>
                 <th className="text-right px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase">Neto</th>
-                <th className="text-center px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase">Estado</th>
-                <th className="text-center px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase w-16">Acciones</th>
+                <th className="text-center px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase">{t('common.status')}</th>
+                <th className="text-center px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase w-16">{t('common.actions')}</th>
               </tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
@@ -1594,10 +1596,10 @@ export default function FinancesPage() {
                           {payrollMenuOpen === p.id && (
                             <div className="absolute right-0 top-8 z-20 bg-white border border-slate-200 rounded-lg shadow-lg py-1 w-44">
                               <button onClick={() => { setEditingPayroll(p); setPayrollMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                                <Pencil className="h-3.5 w-3.5" /> Editar
+                                <Pencil className="h-3.5 w-3.5" /> {t('common.edit')}
                               </button>
                               <button onClick={() => { setDeletingPayroll(p); setPayrollMenuOpen(null) }} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50">
-                                <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                                <Trash2 className="h-3.5 w-3.5" /> {t('common.delete')}
                               </button>
                             </div>
                           )}
@@ -1664,8 +1666,8 @@ export default function FinancesPage() {
                     </div>
                   </div>
                   <div className="flex gap-3 justify-end pt-2">
-                    <button type="button" onClick={() => setEditingPayroll(null)} className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancelar</button>
-                    <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Guardar cambios</button>
+                    <button type="button" onClick={() => setEditingPayroll(null)} className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">{t('common.cancel')}</button>
+                    <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">{t('common.save')}</button>
                   </div>
                 </form>
               </div>
@@ -1703,7 +1705,7 @@ export default function FinancesPage() {
                   </button>
                 </div>
                 <div className="flex justify-end mt-4">
-                  <button onClick={() => setDeletingPayroll(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                  <button onClick={() => setDeletingPayroll(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
                 </div>
               </div>
             </div>
@@ -1719,7 +1721,7 @@ export default function FinancesPage() {
               <button onClick={exportExpensesCSV} className="flex items-center gap-2 border border-slate-200 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-50"><Download className="h-4 w-4" /> CSV</button>
               <button onClick={() => setShowExpenseForm(!showExpenseForm)} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700">
                 {showExpenseForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                {showExpenseForm ? 'Cancelar' : 'Nuevo gasto'}
+                {showExpenseForm ? t('common.cancel') : 'Nuevo gasto'}
               </button>
             </div>
           </div>
@@ -1868,7 +1870,7 @@ export default function FinancesPage() {
             <p className="text-sm text-amber-800">Los registros de meses anteriores se conservaran en el historial.</p>
           </div>
           <div className="flex justify-end gap-3">
-            <button onClick={() => setDeletingClient(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+            <button onClick={() => setDeletingClient(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
             <button onClick={handleDeleteClient} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar cliente</button>
           </div>
         </Modal>
@@ -1929,8 +1931,8 @@ export default function FinancesPage() {
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setEditingExpense(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                <button type="submit" className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Guardar cambios</button>
+                <button type="button" onClick={() => setEditingExpense(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
+                <button type="submit" className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">{t('common.save')}</button>
               </div>
             </form>
           </div>
@@ -1953,8 +1955,8 @@ export default function FinancesPage() {
               Se eliminara el gasto de <strong>${Number(deletingExpense.amount).toLocaleString()}</strong> del {new Date(deletingExpense.date).toLocaleDateString('es-ES')}. Esta accion no se puede deshacer.
             </p>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setDeletingExpense(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-              <button onClick={() => handleDeleteExpense(deletingExpense)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar</button>
+              <button onClick={() => setDeletingExpense(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
+              <button onClick={() => handleDeleteExpense(deletingExpense)} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">{t('common.delete')}</button>
             </div>
           </div>
         </div>
@@ -1977,8 +1979,8 @@ export default function FinancesPage() {
             <h3 className="text-lg font-semibold mb-2">Confirmar eliminación</h3>
             <p className="text-gray-600 mb-4">¿Eliminar categoria &quot;{confirmDeleteCategory.name}&quot;? Esta acción no se puede deshacer.</p>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setConfirmDeleteCategory(null)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">Cancelar</button>
-              <button onClick={() => { executeDeleteCategory(confirmDeleteCategory); setConfirmDeleteCategory(null) }} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar</button>
+              <button onClick={() => setConfirmDeleteCategory(null)} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">{t('common.cancel')}</button>
+              <button onClick={() => { executeDeleteCategory(confirmDeleteCategory); setConfirmDeleteCategory(null) }} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">{t('common.delete')}</button>
             </div>
           </div>
         </div>
@@ -2034,6 +2036,7 @@ function CategoryModal({ category, onSave, onDelete, onClose }: {
   onDelete?: () => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [name, setName] = useState(category?.name || '')
   const [description, setDescription] = useState(category?.description || '')
   const [color, setColor] = useState(category?.color || '#2563eb')
@@ -2070,11 +2073,11 @@ function CategoryModal({ category, onSave, onDelete, onClose }: {
       </div>
       <div className="flex justify-between gap-3 mt-6">
         {onDelete ? (
-          <button onClick={onDelete} className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg">Eliminar</button>
+          <button onClick={onDelete} className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg">{t('common.delete')}</button>
         ) : <div />}
         <div className="flex gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-          <button onClick={() => onSave({ name, description, color, icon })} disabled={!name} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">{category ? 'Guardar cambios' : 'Crear categoria'}</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
+          <button onClick={() => onSave({ name, description, color, icon })} disabled={!name} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">{category ? t('common.save') : t('common.create')}</button>
         </div>
       </div>
     </Modal>
@@ -2092,6 +2095,7 @@ function ClientModal({ client, categoryId, categories, onSave, onClose }: {
   onSave: (data: Record<string, unknown>, pdfFile: File | null, mode?: 'this_month' | 'forward') => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [catId, setCatId] = useState(client?.category_id || categoryId || '')
   const [clientName, setClientName] = useState(client?.client_name || '')
   const [companyName, setCompanyName] = useState(client?.company_name || '')
@@ -2151,7 +2155,7 @@ function ClientModal({ client, categoryId, categories, onSave, onClose }: {
           </button>
         </div>
         <div className="flex justify-end mt-4">
-          <button onClick={() => setShowModeConfirm(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+          <button onClick={() => setShowModeConfirm(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
         </div>
       </Modal>
     )
@@ -2340,8 +2344,8 @@ function ClientModal({ client, categoryId, categories, onSave, onClose }: {
       </div>
 
       <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
-        <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-        <button onClick={handleSave} disabled={!clientName} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">Guardar cliente</button>
+        <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
+        <button onClick={handleSave} disabled={!clientName} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">{t('common.save')}</button>
       </div>
     </Modal>
   )
@@ -2356,6 +2360,7 @@ function CloseMonthModal({ client, month, year, existingRecord, onSave, onClose 
   onSave: (data: { billed_amount: number; commission_amount: number; currency: string; status: string; notes: string }) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [billedAmount, setBilledAmount] = useState<number>(existingRecord ? Number(existingRecord.billed_amount) : 0)
   const [commissionAmount, setCommissionAmount] = useState<number>(existingRecord ? Number(existingRecord.commission_amount) : 0)
   const [notes, setNotes] = useState(existingRecord?.notes || '')
@@ -2430,8 +2435,8 @@ function CloseMonthModal({ client, month, year, existingRecord, onSave, onClose 
       </div>
 
       <div className="flex justify-end gap-3 mt-6">
-        <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-        <button onClick={() => onSave({ billed_amount: billedAmount, commission_amount: commissionAmount, currency: client.currency, status: paid ? 'paid' : 'pending', notes })} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Guardar cierre del mes</button>
+        <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
+        <button onClick={() => onSave({ billed_amount: billedAmount, commission_amount: commissionAmount, currency: client.currency, status: paid ? 'paid' : 'pending', notes })} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">{t('common.save')}</button>
       </div>
     </Modal>
   )

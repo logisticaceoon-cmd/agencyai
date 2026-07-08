@@ -6,6 +6,7 @@ import { downloadCSV } from '@/lib/export'
 import { downloadPDF } from '@/lib/pdf'
 import * as Dialog from '@radix-ui/react-dialog'
 import { cn } from '@/lib/utils'
+import { useTranslation } from '@/lib/i18n'
 import { InfoBanner } from '@/components/shared/InfoBanner'
 
 interface KeyResult {
@@ -126,6 +127,7 @@ function getCurrentQuarter() {
 }
 
 export default function ObjectivesPage() {
+  const { t } = useTranslation()
   const [objectives, setObjectives] = useState<Objective[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
@@ -341,7 +343,7 @@ export default function ObjectivesPage() {
       <InfoBanner id="objectives" title="Objetivos y OKRs" description="Establece objetivos trimestrales con key results medibles para tu agencia y clientes." />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Objetivos y OKRs</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('nav.objectives')}</h1>
           <p className="mt-1 text-sm text-slate-500">Seguimiento de objetivos por trimestre</p>
         </div>
         <div className="flex items-center gap-3">
@@ -713,7 +715,7 @@ export default function ObjectivesPage() {
                             <div className="flex items-center gap-2 pt-1">
                               <input type="number" step="0.01" value={krValue} onChange={e => setKRValue(e.target.value)} className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm" placeholder="Nuevo valor" />
                               <button onClick={() => handleUpdateKR(kr.id, obj.id)} disabled={saving} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50">
-                                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Guardar'}
+                                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : t('common.save')}
                               </button>
                             </div>
                           )}
@@ -735,7 +737,7 @@ export default function ObjectivesPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <button type="submit" disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-50">Crear KR</button>
-                          <button type="button" onClick={() => setShowKRForm(null)} className="text-xs text-slate-500 hover:text-slate-700">Cancelar</button>
+                          <button type="button" onClick={() => setShowKRForm(null)} className="text-xs text-slate-500 hover:text-slate-700">{t('common.cancel')}</button>
                         </div>
                       </form>
                     ) : (
@@ -795,10 +797,10 @@ export default function ObjectivesPage() {
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setEditObj(null)} className="text-sm text-slate-500 hover:text-slate-900 font-medium px-4 py-2">Cancelar</button>
+              <button onClick={() => setEditObj(null)} className="text-sm text-slate-500 hover:text-slate-900 font-medium px-4 py-2">{t('common.cancel')}</button>
               <button onClick={handleEditObj} disabled={editObjSaving || !editObjData.title} className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
                 {editObjSaving ? <Loader2 size={14} strokeWidth={1.5} className="animate-spin inline mr-1" /> : null}
-                Guardar
+                {t('common.save')}
               </button>
             </div>
           </Dialog.Content>
@@ -815,10 +817,10 @@ export default function ObjectivesPage() {
               Este objetivo y todos sus key results seran eliminados permanentemente. Esta accion no se puede deshacer.
             </Dialog.Description>
             <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setDeleteObjId(null)} className="text-sm text-slate-500 hover:text-slate-900 font-medium px-4 py-2">Cancelar</button>
+              <button onClick={() => setDeleteObjId(null)} className="text-sm text-slate-500 hover:text-slate-900 font-medium px-4 py-2">{t('common.cancel')}</button>
               <button onClick={handleDeleteObj} disabled={deletingObj} className="bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors">
                 {deletingObj ? <Loader2 size={14} strokeWidth={1.5} className="animate-spin inline mr-1" /> : null}
-                Eliminar
+                {t('common.delete')}
               </button>
             </div>
           </Dialog.Content>

@@ -20,6 +20,7 @@ const YAxis = dynamic(() => import('recharts').then(m => m.YAxis), { ssr: false 
 const CartesianGrid = dynamic(() => import('recharts').then(m => m.CartesianGrid), { ssr: false })
 const Tooltip = dynamic(() => import('recharts').then(m => m.Tooltip), { ssr: false })
 const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false })
+import { useTranslation } from '@/lib/i18n'
 import { AgentWidget } from '@/components/ai/AgentWidget'
 import { InfoBanner } from '@/components/shared/InfoBanner'
 import * as Dialog from '@radix-ui/react-dialog'
@@ -149,6 +150,7 @@ const FREQUENCY_MAP: Record<string, string> = {
    Main Page Component
    ──────────────────────────────────────────── */
 export default function KPIsPage() {
+  const { t } = useTranslation()
   const [kpis, setKpis] = useState<KPI[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
@@ -187,9 +189,9 @@ export default function KPIsPage() {
     { icon: '💰', name: 'Conversiones / Ventas', description: 'Ventas o leads generados desde contenido', unit: 'numero', target: '50' },
   ]
 
-  function selectTemplate(t: typeof KPI_TEMPLATES[0] | null) {
-    if (t) {
-      setWizardData(prev => ({ ...prev, name: t.name, description: t.description, unit: t.unit, target_value: t.target }))
+  function selectTemplate(tmpl: typeof KPI_TEMPLATES[0] | null) {
+    if (tmpl) {
+      setWizardData(prev => ({ ...prev, name: tmpl.name, description: tmpl.description, unit: tmpl.unit, target_value: tmpl.target }))
     } else {
       setWizardData(prev => ({ ...prev, name: '', description: '', unit: 'numero', target_value: '' }))
     }
@@ -403,12 +405,12 @@ export default function KPIsPage() {
       <InfoBanner id="kpis" title="KPIs y Metricas" description="Define y trackea indicadores clave de rendimiento para cada cliente." />
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">KPIs y Metricas</h1>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('nav.kpis')}</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">Seguimiento de indicadores clave</p>
         </div>
         <div className="flex items-center gap-3">
           <select value={filterClient} onChange={e => setFilterClient(e.target.value)} className="bg-white border border-[var(--border-base)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)]">
-            <option value="">Todos los clientes</option>
+            <option value="">{t('projects.allClients')}</option>
             {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
           <button
@@ -495,12 +497,12 @@ export default function KPIsPage() {
             <div className="space-y-3">
               <p className="text-sm text-[var(--text-muted)]">Elegi un tipo de KPI o crea uno personalizado</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {KPI_TEMPLATES.map((t, i) => (
-                  <button key={i} onClick={() => selectTemplate(t)} className="text-left p-4 rounded-xl border border-[var(--border-base)] hover:border-[var(--blue)] hover:bg-blue-50/50 transition-colors">
-                    <span className="text-2xl">{t.icon}</span>
-                    <p className="text-sm font-semibold text-[var(--text-primary)] mt-2">{t.name}</p>
-                    <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2">{t.description}</p>
-                    <p className="text-xs text-[var(--blue)] mt-1 font-medium">Meta: {t.target}/{t.unit === 'porcentaje' ? '%' : 'mes'}</p>
+                {KPI_TEMPLATES.map((tmpl, i) => (
+                  <button key={i} onClick={() => selectTemplate(tmpl)} className="text-left p-4 rounded-xl border border-[var(--border-base)] hover:border-[var(--blue)] hover:bg-blue-50/50 transition-colors">
+                    <span className="text-2xl">{tmpl.icon}</span>
+                    <p className="text-sm font-semibold text-[var(--text-primary)] mt-2">{tmpl.name}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-1 line-clamp-2">{tmpl.description}</p>
+                    <p className="text-xs text-[var(--blue)] mt-1 font-medium">Meta: {tmpl.target}/{tmpl.unit === 'porcentaje' ? '%' : 'mes'}</p>
                   </button>
                 ))}
                 <button onClick={() => selectTemplate(null)} className="text-left p-4 rounded-xl border-2 border-dashed border-slate-300 hover:border-[var(--blue)] transition-colors">
@@ -680,10 +682,10 @@ export default function KPIsPage() {
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setEditKpi(null)} className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] font-medium px-4 py-2">Cancelar</button>
+              <button onClick={() => setEditKpi(null)} className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] font-medium px-4 py-2">{t('common.cancel')}</button>
               <button onClick={handleEditKpi} disabled={editSaving || !editData.name} className="bg-[var(--blue)] text-white px-5 py-2 rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity">
                 {editSaving ? <Loader2 size={14} strokeWidth={1.5} className="animate-spin inline mr-1" /> : null}
-                Guardar
+                {t('common.save')}
               </button>
             </div>
           </Dialog.Content>
@@ -700,10 +702,10 @@ export default function KPIsPage() {
               Este KPI y todos sus registros seran eliminados permanentemente. Esta accion no se puede deshacer.
             </Dialog.Description>
             <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setDeleteKpiId(null)} className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] font-medium px-4 py-2">Cancelar</button>
+              <button onClick={() => setDeleteKpiId(null)} className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] font-medium px-4 py-2">{t('common.cancel')}</button>
               <button onClick={handleDeleteKpi} disabled={deleting} className="bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors">
                 {deleting ? <Loader2 size={14} strokeWidth={1.5} className="animate-spin inline mr-1" /> : null}
-                Eliminar
+                {t('common.delete')}
               </button>
             </div>
           </Dialog.Content>
@@ -764,7 +766,7 @@ export default function KPIsPage() {
                       type="text"
                       value={librarySearch}
                       onChange={e => setLibrarySearch(e.target.value)}
-                      placeholder="Buscar KPI por nombre o descripcion..."
+                      placeholder={`${t('common.search')}...`}
                       className="w-full pl-10 pr-4 py-2.5 bg-white border border-[var(--border-base)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
                     />
                   </div>
@@ -967,7 +969,7 @@ export default function KPIsPage() {
               {libraryStep === 'browse' && (
                 <>
                   <p className="text-xs text-[var(--text-muted)]">{filteredLibrary.length} KPIs disponibles</p>
-                  <Dialog.Close className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] font-medium">Cerrar</Dialog.Close>
+                  <Dialog.Close className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] font-medium">{t('common.close')}</Dialog.Close>
                 </>
               )}
               {libraryStep === 'tutorial' && (

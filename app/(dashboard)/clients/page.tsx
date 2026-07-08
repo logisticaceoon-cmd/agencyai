@@ -31,6 +31,7 @@ import { InfoBanner } from '@/components/shared/InfoBanner'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { getInitials } from '@/lib/utils'
 import { Zap } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n'
 
 // -- Helpers ------------------------------------------------------------------
 
@@ -123,6 +124,7 @@ const industries = [
 // -- Component ----------------------------------------------------------------
 
 export default function ClientsPage() {
+  const { t } = useTranslation()
   const { user } = useCurrentUser()
   const { maxClients, isFounder } = usePlanLimits()
   const [clients, setClients] = useState<Client[]>([])
@@ -428,7 +430,7 @@ export default function ClientsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('clients.title')}</h1>
           <p className="mt-1 text-sm text-slate-500">
             Gestion de clientes de la agencia
           </p>
@@ -454,7 +456,7 @@ export default function ClientsPage() {
               className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors ${atLimit ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
               {atLimit ? <Zap className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {atLimit ? 'Límite alcanzado' : 'Nuevo cliente'}
+              {atLimit ? 'Límite alcanzado' : t('clients.newClient')}
             </button>
           )}
         </div>
@@ -466,7 +468,7 @@ export default function ClientsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Buscar por nombre, empresa o email..."
+            placeholder={t('clients.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -477,13 +479,13 @@ export default function ClientsPage() {
           onChange={(e) => setStatusFilter(e.target.value)}
           className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
-          <option value="">Todos los estados</option>
-          <option value="active">Activos</option>
-          <option value="inactive">Inactivos</option>
-          <option value="onboarding">Onboarding</option>
-          <option value="paused">Pausados</option>
-          <option value="risk">En riesgo</option>
-          <option value="scaling">Escalando</option>
+          <option value="">{t('clients.allStatuses')}</option>
+          <option value="active">{t('clients.active')}</option>
+          <option value="inactive">{t('clients.inactive')}</option>
+          <option value="onboarding">{t('clients.onboarding')}</option>
+          <option value="paused">{t('clients.paused')}</option>
+          <option value="risk">{t('clients.risk')}</option>
+          <option value="scaling">{t('clients.scaling')}</option>
         </select>
         <button
           onClick={() => downloadCSV(clients as unknown as Record<string, unknown>[], 'clientes', [
@@ -498,7 +500,7 @@ export default function ClientsPage() {
           className="px-3 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-2"
         >
           <Download className="w-4 h-4" />
-          Exportar
+          {t('common.export')}
         </button>
       </div>
 
@@ -526,10 +528,10 @@ export default function ClientsPage() {
             <Users className="h-8 w-8 text-slate-400" />
           </div>
           <h3 className="text-lg font-medium text-slate-700">
-            No hay clientes
+            {t('clients.noClients')}
           </h3>
           <p className="mt-2 max-w-sm text-sm text-slate-500">
-            Agrega el primer cliente de la agencia para comenzar
+            {t('clients.addFirst')}
           </p>
         </div>
       ) : (
@@ -655,7 +657,7 @@ export default function ClientsPage() {
                                 onSelect={() => openEditDialog(client)}
                               >
                                 <Pencil className="h-3.5 w-3.5" />
-                                Editar
+                                {t('common.edit')}
                               </DropdownMenu.Item>
                               <DropdownMenu.Item asChild>
                                 <Link
@@ -675,7 +677,7 @@ export default function ClientsPage() {
                                 }}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
-                                Eliminar
+                                {t('common.delete')}
                               </DropdownMenu.Item>
                             </DropdownMenu.Content>
                           </DropdownMenu.Portal>
@@ -696,8 +698,8 @@ export default function ClientsPage() {
           <span className="text-sm">{selectedIds.size} seleccionados</span>
           <button onClick={() => bulkStatusChange('active')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-green-600 rounded-full hover:bg-green-700 disabled:opacity-50">Activar</button>
           <button onClick={() => bulkStatusChange('inactive')} disabled={bulkLoading} className="text-sm px-3 py-1 bg-slate-600 rounded-full hover:bg-slate-700 disabled:opacity-50">Desactivar</button>
-          <button onClick={bulkDelete} disabled={bulkLoading} className="text-sm px-3 py-1 bg-red-600 rounded-full hover:bg-red-700 disabled:opacity-50">Eliminar</button>
-          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-slate-400 hover:text-white">Cancelar</button>
+          <button onClick={bulkDelete} disabled={bulkLoading} className="text-sm px-3 py-1 bg-red-600 rounded-full hover:bg-red-700 disabled:opacity-50">{t('common.delete')}</button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-slate-400 hover:text-white">{t('common.cancel')}</button>
         </div>
       )}
 
@@ -708,7 +710,7 @@ export default function ClientsPage() {
           <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <Dialog.Title className="text-lg font-semibold text-slate-900">
-                {editingClient ? 'Editar cliente' : 'Nuevo cliente'}
+                {editingClient ? t('common.edit') : t('clients.newClient')}
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
@@ -934,7 +936,7 @@ export default function ClientsPage() {
                     type="button"
                     className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                   >
-                    Cancelar
+                    {t('common.cancel')}
                   </button>
                 </Dialog.Close>
                 <button
@@ -945,7 +947,7 @@ export default function ClientsPage() {
                   {submitting && (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   )}
-                  {editingClient ? 'Guardar cambios' : 'Crear cliente'}
+                  {editingClient ? t('common.save') : t('clients.newClient')}
                 </button>
               </div>
             </form>
@@ -990,14 +992,14 @@ export default function ClientsPage() {
                 }}
                 className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
               >
-                Cancelar
+                {t('common.cancel')}
               </button>
               <button
                 onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
                 disabled={deleteInput !== 'ELIMINAR'}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Eliminar
+                {t('common.delete')}
               </button>
             </div>
           </Dialog.Content>

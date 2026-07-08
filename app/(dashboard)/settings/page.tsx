@@ -9,8 +9,9 @@ import { cn } from '@/lib/utils'
 import {
   Building2, Users, Copy, Check, Plus, Crown, Shield, User as UserIcon,
   Mail, ExternalLink, RefreshCw, Clock, CheckCircle2, Target, Eye, Zap,
-  Loader2, Link as LinkIcon
+  Loader2, Link as LinkIcon, Globe
 } from 'lucide-react'
+import { useTranslation, type Locale } from '@/lib/i18n'
 
 interface OrgData {
   id: string
@@ -95,6 +96,7 @@ function MemberAvatar({ name }: { name: string }) {
 }
 
 export default function SettingsPage() {
+  const { t } = useTranslation()
   const [org, setOrg] = useState<OrgData | null>(null)
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [loading, setLoading] = useState(true)
@@ -183,7 +185,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Workspace" description="Configuración de tu organización" />
+        <PageHeader title={t('settings.title')} description="Configuración de tu organización" />
         <div className="h-48 rounded-xl border border-[var(--border-base)] bg-white animate-pulse" />
       </div>
     )
@@ -192,7 +194,7 @@ export default function SettingsPage() {
   if (!org) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Workspace" description="Configuración de tu organización" />
+        <PageHeader title={t('settings.title')} description="Configuración de tu organización" />
         <div className="rounded-xl border border-[var(--border-base)] bg-white p-8 text-center">
           <p className="text-[var(--text-muted)]">No se encontró organización. <a href="/onboarding" className="text-indigo-400">Configurar workspace</a></p>
         </div>
@@ -202,7 +204,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Workspace" description="Configuración de tu organización" />
+      <PageHeader title={t('settings.title')} description="Configuración de tu organización" />
 
       {/* Org overview */}
       <div className="rounded-xl border border-[var(--border-base)] bg-white p-5">
@@ -235,13 +237,16 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Language */}
+      <LanguageSection />
+
       {/* Members — datos reales desde /api/team con auto-refresh */}
       <div className="rounded-xl border border-[var(--border-base)] bg-white overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-blue-500" />
             <h3 className="font-semibold text-slate-900">
-              Equipo ({teamMembers.filter(m => m.status === 'active').length}/{org.maxUsers ?? '∞'})
+              {t('settings.team')} ({teamMembers.filter(m => m.status === 'active').length}/{org.maxUsers ?? '∞'})
             </h3>
             <span className="text-xs text-slate-400 font-normal">
               · {teamMembers.filter(m => m.status === 'invited').length} pendiente(s)
@@ -452,6 +457,44 @@ export default function SettingsPage() {
         <p className="text-xs text-[var(--text-secondary)] mt-3 text-center">
           Para cambiar de plan, contactanos en soporte@agencyai.com
         </p>
+      </div>
+    </div>
+  )
+}
+
+function LanguageSection() {
+  const { locale, setLocale, t } = useTranslation()
+
+  return (
+    <div className="rounded-xl border border-[var(--border-base)] bg-white p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <Globe className="h-4 w-4 text-blue-500" />
+        <h3 className="font-semibold text-slate-900">{t('settings.language')}</h3>
+      </div>
+      <p className="text-sm text-slate-500 mb-3">{t('settings.languageDesc')}</p>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setLocale('es')}
+          className={cn(
+            'flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors',
+            locale === 'es'
+              ? 'border-blue-500 bg-blue-50 text-blue-700'
+              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+          )}
+        >
+          🇪🇸 {t('settings.spanish')}
+        </button>
+        <button
+          onClick={() => setLocale('en')}
+          className={cn(
+            'flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors',
+            locale === 'en'
+              ? 'border-blue-500 bg-blue-50 text-blue-700'
+              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+          )}
+        >
+          🇺🇸 {t('settings.english')}
+        </button>
       </div>
     </div>
   )

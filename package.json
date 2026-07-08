@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -38,6 +43,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "driver.js": "^1.6.0",
     "framer-motion": "^12.38.0",
     "imapflow": "^1.0.169",
     "jspdf": "^4.2.1",
@@ -60,17 +66,23 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.11.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.3",
     "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

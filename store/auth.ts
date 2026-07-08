@@ -15,6 +15,9 @@ export interface OrgInfo {
   plan: string
   maxUsers: number
   maxClients: number
+  onboardingCompleted?: boolean
+  tourCompleted?: boolean
+  hasSampleData?: boolean
 }
 
 interface AuthState {

@@ -7,7 +7,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
 
   const { data: access, error } = await supabase
     .from('client_portal_access')
-    .select('*, clients(id, name, company, email, portal_token_expires_at), workspaces(id, name, logo_url)')
+    .select('*, clients(id, name, company, email, portal_token_expires_at), workspaces(id, name, logo_url, primary_color, portal_welcome_message)')
     .eq('access_token', token)
     .single()
 
@@ -32,5 +32,57 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     .update({ last_access: new Date().toISOString() })
     .eq('id', access.id)
 
-  return NextResponse.json({ data: access })
+  // Fetch counts for dashboard cards
+  const clientId = access.client_id
+  const workspaceId = access.workspace_id
+
+  const [projectsRes, reportsRes, invoicesRes, deliverablesRes] = await Promise.all([
+    supabase
+      .from('projects')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'active'),
+    supabase
+      .from('reports')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'sent'),
+    supabase
+      .from('invoices')
+      .select('id, total')
+      .eq('client_id', clientId)
+      .eq('workspace_id', workspaceId)
+      .in('status', ['sent', 'overdue']),
+    supabase
+      .from('deliverables')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', clientId)
+      .eq('workspace_id', workspaceId)
+      .eq('portal_visible', true)
+      .eq('status', 'pending'),
+  ])
+
+  const unpaidInvoices = invoicesRes.data || []
+  const unpaidTotal = unpaidInvoices.reduce((sum: number, inv: { total: number }) => sum + Number(inv.total || 0), 0)
+
+  const counts = {
+    active_projects: projectsRes.count || 0,
+    reports: reportsRes.count || 0,
+    unpaid_invoices: unpaidInvoices.length,
+    unpaid_total: unpaidTotal,
+    pending_deliverables: deliverablesRes.count || 0,
+  }
+
+  // Log activity
+  await supabase.from('portal_activity').insert({
+    workspace_id: workspaceId,
+    client_id: clientId,
+    portal_token: token,
+    action: 'viewed_portal',
+    entity_type: 'portal',
+  })
+
+  return NextResponse.json({ data: { ...access, counts } })
 }

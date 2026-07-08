@@ -6,15 +6,16 @@ import dynamic from 'next/dynamic'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { cn, formatDate, getInitials } from '@/lib/utils'
 import { AgentChat, AgentChatMobile } from '@/components/ai/AgentChat'
+import { OnboardingChecklist } from '@/components/shared/OnboardingChecklist'
+import { ProductTour } from '@/components/shared/ProductTour'
+import { useTranslation } from '@/lib/i18n'
 import {
   Users,
   FolderKanban,
   CheckSquare,
   AlertTriangle,
   Clock,
-  ArrowRight,
   BarChart2,
-  Rocket,
   TrendingUp,
   Activity,
 } from 'lucide-react'
@@ -107,7 +108,8 @@ const priorityColor: Record<string, string> = {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { user } = useCurrentUser()
+  const { t } = useTranslation()
+  const { user, org } = useCurrentUser()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [activityData, setActivityData] = useState<{ date: string; tasks: number; projects: number }[]>([])
@@ -176,10 +178,10 @@ export default function DashboardPage() {
   }, [])
 
   const firstName = user?.fullName?.split(' ')[0] ?? ''
-  const isFirstAccess = stats !== null && stats.totalClients === 0
+  const showOnboarding = org && org.onboardingCompleted === false
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-56px-48px)]">
+    <div className="flex gap-6 h-[calc(100vh-56px-48px)]" data-tour="dashboard">
       {/* ── Left column: Dashboard metrics (65%) ─────────────────────── */}
       <div className="flex-1 min-w-0 overflow-y-auto space-y-6 pr-1">
         {/* Header */}
@@ -190,33 +192,12 @@ export default function DashboardPage() {
           <p className="mt-1 text-sm text-[var(--text-muted)] capitalize">{dateString}</p>
         </div>
 
-        {/* First-access checklist */}
-        {isFirstAccess && (
-          <div className="rounded-[var(--radius-lg)] border border-blue-200 bg-[var(--blue-light)] p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Rocket size={16} strokeWidth={1.5} className="text-[var(--blue)]" />
-              <h2 className="text-sm font-semibold text-[var(--text-primary)]">Primeros pasos</h2>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-5 w-5 items-center justify-center rounded border border-green-300 bg-green-100">
-                  <CheckSquare size={12} strokeWidth={1.5} className="text-[var(--green)]" />
-                </div>
-                <span className="text-sm text-[var(--text-muted)] line-through">Crear tu workspace</span>
-              </div>
-              {[
-                { href: '/clients', label: 'Agregar tu primer cliente' },
-                { href: '/projects', label: 'Crear tu primer proyecto' },
-                { href: '/settings', label: 'Invitar a tu equipo' },
-              ].map((item) => (
-                <Link key={item.href} href={item.href} className="flex items-center gap-3 group">
-                  <div className="flex h-5 w-5 items-center justify-center rounded border border-[var(--border-base)] bg-white" />
-                  <span className="text-sm text-[var(--text-secondary)] group-hover:text-[var(--blue)] transition-colors">{item.label}</span>
-                  <ArrowRight size={14} strokeWidth={1.5} className="text-[var(--text-muted)] group-hover:text-[var(--blue)] transition-colors" />
-                </Link>
-              ))}
-            </div>
-          </div>
+        {/* Onboarding Checklist */}
+        {showOnboarding && org && (
+          <OnboardingChecklist
+            workspaceId={org.id}
+            hasSampleData={org.hasSampleData}
+          />
         )}
 
         {/* Metric Cards */}
@@ -235,10 +216,10 @@ export default function DashboardPage() {
           </div>
         ) : stats ? (
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <MetricCard icon={Users} label="Clientes activos" value={stats.activeClients} footer={`de ${stats.totalClients} totales`} iconBg="bg-[var(--blue-light)]" iconColor="text-[var(--blue)]" />
-            <MetricCard icon={FolderKanban} label="Proyectos activos" value={stats.activeProjects} footer="en progreso" iconBg="bg-[var(--purple-light)]" iconColor="text-[var(--purple)]" />
-            <MetricCard icon={CheckSquare} label="Tareas completadas" value={stats.tasksCompletedThisWeek} footer="esta semana" iconBg="bg-[var(--green-light)]" iconColor="text-[var(--green)]" />
-            <MetricCard icon={AlertTriangle} label="Tareas vencidas" value={stats.tasksOverdue} footer={stats.tasksOverdue > 0 ? 'requieren atencion' : 'todo al dia'} footerColor={stats.tasksOverdue > 0 ? 'text-[var(--red)]' : 'text-[var(--green)]'} iconBg="bg-[var(--red-light)]" iconColor="text-[var(--red)]" />
+            <MetricCard icon={Users} label={t('dashboard.activeClients')} value={stats.activeClients} footer={`de ${stats.totalClients} totales`} iconBg="bg-[var(--blue-light)]" iconColor="text-[var(--blue)]" />
+            <MetricCard icon={FolderKanban} label={t('dashboard.activeProjects')} value={stats.activeProjects} footer="en progreso" iconBg="bg-[var(--purple-light)]" iconColor="text-[var(--purple)]" />
+            <MetricCard icon={CheckSquare} label={t('dashboard.tasksCompleted')} value={stats.tasksCompletedThisWeek} footer={t('dashboard.thisWeek')} iconBg="bg-[var(--green-light)]" iconColor="text-[var(--green)]" />
+            <MetricCard icon={AlertTriangle} label={t('dashboard.tasksOverdue')} value={stats.tasksOverdue} footer={stats.tasksOverdue > 0 ? t('dashboard.needsAttention') : t('dashboard.allUpToDate')} footerColor={stats.tasksOverdue > 0 ? 'text-[var(--red)]' : 'text-[var(--green)]'} iconBg="bg-[var(--red-light)]" iconColor="text-[var(--red)]" />
           </div>
         ) : null}
 
@@ -267,7 +248,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
                 <Clock size={16} strokeWidth={1.5} className="text-[var(--blue)]" />
-                Tareas proximas
+                {t('dashboard.upcomingTasks')}
               </h2>
               <Link href="/tasks" className="text-xs text-[var(--blue)] hover:text-[#1d4ed8] font-medium transition-colors">Ver todas</Link>
             </div>
@@ -306,7 +287,7 @@ export default function DashboardPage() {
             ) : (
               <div className="flex flex-col items-center justify-center py-6 text-center">
                 <CheckSquare size={20} strokeWidth={1.5} className="text-[var(--text-muted)] mb-2" />
-                <p className="text-sm text-[var(--text-muted)]">No hay tareas pendientes</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('dashboard.noPendingTasks')}</p>
               </div>
             )}
           </div>
@@ -317,7 +298,7 @@ export default function DashboardPage() {
           <div className="rounded-[var(--radius-lg)] border border-[var(--border-base)] bg-white p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                <Users size={16} strokeWidth={1.5} className="text-[var(--blue)]" /> Clientes recientes
+                <Users size={16} strokeWidth={1.5} className="text-[var(--blue)]" /> {t('dashboard.recentClients')}
               </h2>
               <Link href="/clients" className="text-xs text-[var(--blue)] hover:text-[#1d4ed8] font-medium transition-colors">Ver todos</Link>
             </div>
@@ -336,7 +317,7 @@ export default function DashboardPage() {
             ) : (
               <div className="flex flex-col items-center justify-center py-6 text-center">
                 <Users size={20} strokeWidth={1.5} className="text-[var(--text-muted)] mb-2" />
-                <p className="text-sm text-[var(--text-muted)]">Sin clientes aun</p>
+                <p className="text-sm text-[var(--text-muted)]">{t('dashboard.noClients')}</p>
               </div>
             )}
           </div>
@@ -344,15 +325,15 @@ export default function DashboardPage() {
           <div className="rounded-[var(--radius-lg)] border border-[var(--border-base)] bg-white p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
-                <TrendingUp size={16} strokeWidth={1.5} className="text-[var(--blue)]" /> Accesos rapidos
+                <TrendingUp size={16} strokeWidth={1.5} className="text-[var(--blue)]" /> {t('dashboard.quickActions')}
               </h2>
             </div>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { href: '/clients', icon: Users, label: 'Clientes', desc: 'Gestionar CRM', bg: 'bg-[var(--blue-light)]', color: 'text-[var(--blue)]' },
-                { href: '/projects', icon: FolderKanban, label: 'Proyectos', desc: 'Ver proyectos', bg: 'bg-[var(--purple-light)]', color: 'text-[var(--purple)]' },
-                { href: '/tasks', icon: CheckSquare, label: 'Tareas', desc: 'Gestionar tareas', bg: 'bg-[var(--green-light)]', color: 'text-[var(--green)]' },
-                { href: '/reports', icon: BarChart2, label: 'Reportes', desc: 'Ver reportes', bg: 'bg-[var(--yellow-light)]', color: 'text-[var(--yellow)]' },
+                { href: '/clients', icon: Users, label: t('nav.clients'), desc: t('dashboard.manageClients'), bg: 'bg-[var(--blue-light)]', color: 'text-[var(--blue)]' },
+                { href: '/projects', icon: FolderKanban, label: t('nav.projects'), desc: t('dashboard.viewProjects'), bg: 'bg-[var(--purple-light)]', color: 'text-[var(--purple)]' },
+                { href: '/tasks', icon: CheckSquare, label: t('nav.tasks'), desc: t('dashboard.manageTasks'), bg: 'bg-[var(--green-light)]', color: 'text-[var(--green)]' },
+                { href: '/reports', icon: BarChart2, label: t('nav.reports'), desc: t('dashboard.viewReports'), bg: 'bg-[var(--yellow-light)]', color: 'text-[var(--yellow)]' },
               ].map(({ href, icon: Icon, label, desc, bg, color }) => (
                 <Link key={href} href={href} className="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border-base)] bg-white p-3 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)] transition-all group">
                   <div className={cn('flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)]', bg)}>
@@ -376,6 +357,9 @@ export default function DashboardPage() {
 
       {/* Mobile floating button */}
       <AgentChatMobile />
+
+      {/* Product Tour */}
+      {org && <ProductTour tourCompleted={org.tourCompleted} />}
     </div>
   )
 }
