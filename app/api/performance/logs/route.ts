@@ -1,52 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
-type TaskRow = {
-  id: string
-  title: string
-  status: string
-  assignedTo: string[] | null
-  deadline: string | null
-  updatedAt?: string | null
-  createdAt: string
-  clientId?: string | null
-}
-
-function mapTaskToLog(task: TaskRow, userId: string) {
-  // For completed tasks use updatedAt (= completion date); otherwise use createdAt
-  const eventDate = task.status === 'completed'
-    ? (task.updatedAt || task.createdAt)
-    : task.createdAt
-  const eventTime = new Date(eventDate)
-  const deadline = task.deadline ? new Date(task.deadline) : null
-
-  // was_on_time only meaningful for completed tasks
-  const wasOnTime = task.status === 'completed'
-    ? (deadline ? eventTime <= deadline : true)
-    : true
-
-  const delayHours = (task.status === 'completed' && !wasOnTime && deadline)
-    ? Math.round((eventTime.getTime() - deadline.getTime()) / 3600000)
-    : null
-
-  return {
-    id: task.id,
-    workspace_id: null,
-    user_id: userId,
-    task_id: task.id,
-    client_id: task.clientId || null,
-    action_type: task.status === 'completed' ? 'task_completed' : 'task_active',
-    title: task.title,
-    status: task.status,
-    was_on_time: wasOnTime,
-    delay_hours: delayHours,
-    hours_spent: null,
-    month: eventTime.getMonth() + 1,
-    year: eventTime.getFullYear(),
-    created_at: eventDate,
-  }
-}
-
+// This route now just redirects to the main performance endpoint
+// Kept for backwards compatibility
 export async function GET(request: Request) {
   try {
     const auth = await getAuthContext()
@@ -55,49 +11,50 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('user_id')
-    const month = searchParams.get('month')
-    const year = searchParams.get('year')
+    const month = parseInt(searchParams.get('month') || '0')
+    const year = parseInt(searchParams.get('year') || '0')
 
-    // Fetch all tasks assigned to this user in this workspace
-    let query = supabase
-      .from('tasks')
-      .select('id, title, status, assignedTo, deadline, createdAt, updatedAt, clientId')
-      .eq('workspace_id', workspaceId)
-      .is('deleted_at', null)
-      .order('updatedAt', { ascending: false })
-      .limit(500)
-
-    if (userId) {
-      query = query.contains('assignedTo', [userId])
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      console.warn('Error fetching tasks for performance logs:', error)
+    if (!month || !year) {
       return NextResponse.json({ data: [] })
     }
 
-    const tasks = (data || []) as TaskRow[]
+    const startOfMonth = new Date(year, month - 1, 1).toISOString()
+    const endOfMonth = new Date(year, month, 1).toISOString()
 
-    let rows = tasks.map(t => mapTaskToLog(t, userId || ''))
+    let query = supabase
+      .from('tasks')
+      .select('id, title, status, assignee_id, due_date, completed_at, created_at, project_id, projects(name)')
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .eq('status', 'completed')
+      .gte('completed_at', startOfMonth)
+      .lt('completed_at', endOfMonth)
+      .order('completed_at', { ascending: false })
 
-    // Filter by month/year using the event date (updatedAt for completed, createdAt for others)
-    if (month || year) {
-      rows = rows.filter(r => {
-        if (month && r.month !== parseInt(month)) return false
-        if (year && r.year !== parseInt(year)) return false
-        return true
-      })
+    if (userId) {
+      query = query.eq('assignee_id', userId)
     }
 
-    // Sort: completed first by date desc, then active by createdAt desc
-    rows.sort((a, b) => {
-      const aCompleted = a.action_type === 'task_completed'
-      const bCompleted = b.action_type === 'task_completed'
-      if (aCompleted && !bCompleted) return -1
-      if (!aCompleted && bCompleted) return 1
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    const { data } = await query
+
+    const rows = (data || []).map(t => {
+      const completedDate = new Date(t.completed_at!)
+      const dueDate = t.due_date ? new Date(t.due_date + 'T23:59:59') : null
+      const wasOnTime = !dueDate || completedDate <= dueDate
+      const delayHours = !wasOnTime && dueDate
+        ? Math.round((completedDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60))
+        : null
+
+      return {
+        id: t.id,
+        title: t.title,
+        project_name: (t.projects as unknown as { name: string } | null)?.name || null,
+        status: 'completed',
+        was_on_time: wasOnTime,
+        delay_hours: delayHours,
+        completed_at: t.completed_at,
+        created_at: t.created_at,
+      }
     })
 
     return NextResponse.json({ data: rows })

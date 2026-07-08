@@ -9,69 +9,132 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('user_id')
-    const month = searchParams.get('month')
-    const year = searchParams.get('year')
+    const month = parseInt(searchParams.get('month') || '0')
+    const year = parseInt(searchParams.get('year') || '0')
 
-    // Fetch all tasks for this user in this workspace (from tasks table only)
-    let query = supabase
+    if (!month || !year) {
+      return NextResponse.json({ error: 'month and year are required' }, { status: 400 })
+    }
+
+    // Build date range for the selected month
+    const startOfMonth = new Date(year, month - 1, 1).toISOString()
+    const endOfMonth = new Date(year, month, 1).toISOString()
+
+    // Previous month for trend
+    const prevStartOfMonth = new Date(year, month - 2, 1).toISOString()
+    const prevEndOfMonth = startOfMonth
+
+    // 1. Tasks completed in the selected month (filtered by completed_at)
+    let completedQuery = supabase
       .from('tasks')
-      .select('id, title, status, deadline, assignedTo, clientId, createdAt, updatedAt')
+      .select('id, title, status, assignee_id, due_date, completed_at, created_at, project_id, projects(name)')
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
-      .limit(500)
+      .eq('status', 'completed')
+      .gte('completed_at', startOfMonth)
+      .lt('completed_at', endOfMonth)
 
     if (userId) {
-      query = query.contains('assignedTo', [userId])
+      completedQuery = completedQuery.eq('assignee_id', userId)
     }
 
-    const { data: tasks, error: tasksError } = await query
+    const { data: completedTasks } = await completedQuery
 
-    if (tasksError) {
-      console.warn('Error fetching tasks for performance:', tasksError)
+    // 2. Tasks completed in previous month (for trend)
+    let prevCompletedQuery = supabase
+      .from('tasks')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .eq('status', 'completed')
+      .gte('completed_at', prevStartOfMonth)
+      .lt('completed_at', prevEndOfMonth)
+
+    if (userId) {
+      prevCompletedQuery = prevCompletedQuery.eq('assignee_id', userId)
     }
 
-    const taskList = tasks || []
-    const now = new Date()
-    const deadline48hAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000)
+    const { data: prevCompleted } = await prevCompletedQuery
 
-    // Completed in selected period — filter by updatedAt month/year
-    const completedInPeriod = taskList.filter((t: { status: string; updatedAt?: string | null; createdAt: string }) => {
-      if (t.status !== 'completed') return false
-      const d = new Date(t.updatedAt || t.createdAt)
-      if (month && d.getMonth() + 1 !== parseInt(month)) return false
-      if (year && d.getFullYear() !== parseInt(year)) return false
-      return true
-    })
+    // 3. Current pending/in-progress tasks (NOT filtered by month — these are current state)
+    let pendingQuery = supabase
+      .from('tasks')
+      .select('id, status')
+      .eq('workspace_id', workspaceId)
+      .is('deleted_at', null)
+      .in('status', ['pending', 'in_progress'])
 
-    // Overdue: deadline > 48h ago, not completed, assigned to user
-    const overdueTasks = taskList.filter((t: { deadline: string | null; status: string }) => {
-      if (!t.deadline) return false
-      if (t.status === 'completed') return false
-      return new Date(t.deadline) < deadline48hAgo
-    })
+    if (userId) {
+      pendingQuery = pendingQuery.eq('assignee_id', userId)
+    }
 
-    const pending = taskList.filter((t: { status: string }) => t.status === 'pending')
-    const inProgress = taskList.filter((t: { status: string }) => t.status === 'in_progress')
+    const { data: pendingTasks } = await pendingQuery
+
+    const completed = completedTasks || []
+    const pending = (pendingTasks || []).filter(t => t.status === 'pending')
+    const inProgress = (pendingTasks || []).filter(t => t.status === 'in_progress')
+
+    // Calculate on-time rate: completed tasks where completed_at <= due_date
+    const completedWithDeadline = completed.filter(t => t.due_date)
+    const onTimeCount = completedWithDeadline.filter(t => {
+      const completedDate = new Date(t.completed_at!)
+      const dueDate = new Date(t.due_date + 'T23:59:59')
+      return completedDate <= dueDate
+    }).length
+    const onTimeRate = completedWithDeadline.length > 0
+      ? Math.round((onTimeCount / completedWithDeadline.length) * 100)
+      : 100
+
+    // Average completion time (created_at → completed_at) in hours
+    const completionTimes = completed
+      .filter(t => t.created_at && t.completed_at)
+      .map(t => {
+        const created = new Date(t.created_at).getTime()
+        const done = new Date(t.completed_at!).getTime()
+        return (done - created) / (1000 * 60 * 60) // hours
+      })
+    const avgCompletionHours = completionTimes.length > 0
+      ? Math.round(completionTimes.reduce((a, b) => a + b, 0) / completionTimes.length)
+      : 0
+
+    // Build bitacora entries from completed tasks
+    const bitacora = completed.map(t => {
+      const completedDate = new Date(t.completed_at!)
+      const dueDate = t.due_date ? new Date(t.due_date + 'T23:59:59') : null
+      const wasOnTime = !dueDate || completedDate <= dueDate
+      const delayHours = !wasOnTime && dueDate
+        ? Math.round((completedDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60))
+        : null
+
+      return {
+        id: t.id,
+        title: t.title,
+        project_name: (t.projects as unknown as { name: string } | null)?.name || null,
+        completed_at: t.completed_at,
+        created_at: t.created_at,
+        due_date: t.due_date,
+        was_on_time: wasOnTime,
+        delay_hours: delayHours,
+      }
+    }).sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
 
     return NextResponse.json({
-      tasks: taskList,
-      logs: completedInPeriod,
-      alerts: overdueTasks,
       summary: {
-        total: taskList.length,
-        completed: completedInPeriod.length,
+        completed: completed.length,
         pending: pending.length,
         in_progress: inProgress.length,
-        overdue: overdueTasks.length,
-      }
+        on_time_rate: onTimeRate,
+        avg_completion_hours: avgCompletionHours,
+        prev_month_completed: (prevCompleted || []).length,
+        trend: completed.length - (prevCompleted || []).length,
+      },
+      bitacora,
     })
   } catch (err) {
     console.error('Error in GET /api/performance:', err)
     return NextResponse.json({
-      tasks: [],
-      logs: [],
-      alerts: [],
-      summary: { total: 0, completed: 0, pending: 0, in_progress: 0, overdue: 0 }
+      summary: { completed: 0, pending: 0, in_progress: 0, on_time_rate: 100, avg_completion_hours: 0, prev_month_completed: 0, trend: 0 },
+      bitacora: [],
     })
   }
 }

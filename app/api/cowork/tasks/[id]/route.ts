@@ -98,10 +98,23 @@ export async function PATCH(
     if (body.description !== undefined) updates.description = body.description
     if (body.status !== undefined) updates.status = body.status
     if (body.priority !== undefined) updates.priority = body.priority
-    if (body.deadline !== undefined) updates.deadline = body.deadline
-    if (body.assignedTo !== undefined) updates.assignedTo = body.assignedTo
+    if (body.deadline !== undefined) updates.due_date = body.deadline
+    if (body.due_date !== undefined) updates.due_date = body.due_date
+    if (body.assignedTo !== undefined) {
+      updates.assignee_id = Array.isArray(body.assignedTo) ? body.assignedTo[0] || null : body.assignedTo
+    }
+    if (body.assignee_id !== undefined) updates.assignee_id = body.assignee_id
 
-    if (Object.keys(updates).length === 0) {
+    // Track completed_at
+    if (body.status === 'completed') {
+      updates.completed_at = new Date().toISOString()
+    } else if (body.status && body.status !== 'completed') {
+      updates.completed_at = null
+    }
+
+    updates.updated_at = new Date().toISOString()
+
+    if (Object.keys(updates).length <= 1) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
     }
 
@@ -219,7 +232,7 @@ export async function POST(
 
     const { data, error } = await supabase
       .from('tasks')
-      .update({ status: 'completed' })
+      .update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('id', id)
       .eq('workspace_id', organizationId)
       .select()
