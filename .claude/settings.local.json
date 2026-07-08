@@ -109,7 +109,8 @@
       "Bash(grep \" *)",
       "Bash(echo \"exit: $?\")",
       "Bash(grep -n \"useTranslation\" \"app/\\(dashboard\\)/reports/page.tsx\")",
-      "Bash(grep -n \"useTranslation\" \"app/\\(dashboard\\)/dashboard/page.tsx\")"
+      "Bash(grep -n \"useTranslation\" \"app/\\(dashboard\\)/dashboard/page.tsx\")",
+      "mcp__claude_ai_Supabase__get_logs"
     ]
   }
 }

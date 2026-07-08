@@ -87,12 +87,14 @@ export default function PerformancePage() {
   const isCEO = user?.role === 'CEO' || user?.role === 'Manager' || user?.role === 'admin' || user?.role === 'owner'
 
   const [members, setMembers] = useState<Member[]>([])
-  const [selectedUserId, setSelectedUserId] = useState<string>('')
+  const [selectedUserId, setSelectedUserId] = useState<string>('all')
   const [summary, setSummary] = useState<PerfSummary | null>(null)
   const [bitacora, setBitacora] = useState<BitacoraEntry[]>([])
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
   const [alertsLoading, setAlertsLoading] = useState(false)
+  const [showDebug, setShowDebug] = useState(false)
+  const [debugData, setDebugData] = useState<Record<string, unknown> | null>(null)
   const [generatingReport, setGeneratingReport] = useState(false)
   const [reportSuccess, setReportSuccess] = useState(false)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
@@ -112,20 +114,14 @@ export default function PerformancePage() {
         const data = await res.json()
         const memberList: Member[] = data.data || []
         setMembers(memberList)
-        // If not CEO, only show self
+        // If not admin, only show self
         if (!isCEO && user?.id) {
-          const selfMember = memberList.find(m => m.userId === user.id)
-          if (selfMember) {
-            setSelectedUserId(selfMember.userId)
-          } else if (memberList.length > 0) {
-            setSelectedUserId(memberList[0].userId)
-          }
-        } else if (memberList.length > 0 && !selectedUserId) {
-          setSelectedUserId(memberList[0].userId)
+          setSelectedUserId(user.id)
         }
+        // Admin defaults to 'all' (already set as initial state)
       }
     } catch {}
-  }, [isCEO, user?.id, selectedUserId])
+  }, [isCEO, user?.id])
 
   // Load performance data
   const loadPerformanceData = useCallback(async (silent = false) => {
@@ -137,12 +133,14 @@ export default function PerformancePage() {
         month: String(filterMonth),
         year: String(filterYear),
       })
+      if (isCEO) params.set('debug', '1')
 
       const res = await fetch(`/api/performance?${params}`)
       if (res.ok) {
         const data = await res.json()
         setSummary(data.summary)
         setBitacora(data.bitacora || [])
+        if (data.debug) setDebugData(data.debug)
       }
 
       setLastRefresh(new Date())
@@ -158,7 +156,7 @@ export default function PerformancePage() {
       const res = await fetch('/api/performance/alerts')
       if (res.ok) {
         const data = await res.json()
-        const memberAlerts = selectedUserId
+        const memberAlerts = selectedUserId && selectedUserId !== 'all'
           ? (data.data || []).filter((a: Alert) => a.assignee_id === selectedUserId)
           : data.data || []
         setAlerts(memberAlerts)
@@ -239,7 +237,9 @@ export default function PerformancePage() {
     }
   }
 
-  const selectedMember = members.find(m => m.userId === selectedUserId)
+  const selectedMember = selectedUserId === 'all'
+    ? { userId: 'all', user: { id: 'all', fullName: 'Todo el equipo', email: '' } } as Member
+    : members.find(m => m.userId === selectedUserId) || null
   const visibleMembers = isCEO ? members : members.filter(m => m.userId === user?.id)
 
   const currentYear = new Date().getFullYear()
@@ -299,7 +299,7 @@ export default function PerformancePage() {
       </div>
 
       {/* Member Tabs */}
-      {visibleMembers.length === 0 ? (
+      {visibleMembers.length === 0 && !isCEO ? (
         <div className="rounded-xl border border-[var(--border-base)] bg-white p-8 text-center">
           <User className="h-10 w-10 text-slate-300 mx-auto mb-3" />
           <h3 className="text-base font-semibold text-[var(--text-primary)]">Sin miembros del equipo</h3>
@@ -310,8 +310,27 @@ export default function PerformancePage() {
       ) : (
         <>
           {/* Member tabs */}
-          {visibleMembers.length > 1 && (
+          {(isCEO || visibleMembers.length > 1) && (
             <div className="flex items-center gap-2 flex-wrap">
+              {isCEO && (
+                <button
+                  onClick={() => setSelectedUserId('all')}
+                  className={cn(
+                    'flex items-center gap-2.5 rounded-xl px-4 py-2.5 border text-sm font-medium transition-all',
+                    selectedUserId === 'all'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white text-[var(--text-secondary)] border-[var(--border-base)] hover:border-blue-300 hover:text-blue-600'
+                  )}
+                >
+                  <div className={cn(
+                    'flex items-center justify-center h-6 w-6 rounded-full text-xs font-bold',
+                    selectedUserId === 'all' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-600'
+                  )}>
+                    <User className="h-3.5 w-3.5" />
+                  </div>
+                  Todos
+                </button>
+              )}
               {visibleMembers.map((m) => {
                 const isActive = m.userId === selectedUserId
                 const name = m.user?.fullName || m.user?.email || 'NN'
@@ -573,11 +592,56 @@ export default function PerformancePage() {
                     <p className="text-xs text-blue-600 mt-0.5">
                       Los SOPs y manuales estan disponibles en{' '}
                       <a href="/docs" className="underline font-medium">Documentos &rarr; SOPs</a>.
-                      Asegurate de que {(selectedMember.user?.fullName || 'Miembro').split(' ')[0]} los tenga actualizados.
                     </p>
                   </div>
                 </div>
               </div>
+
+              {/* Debug panel — admin only */}
+              {isCEO && debugData && (
+                <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                  <button
+                    onClick={() => setShowDebug(!showDebug)}
+                    className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors"
+                  >
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      Panel de Diagnostico (Admin)
+                    </span>
+                    <span className="text-xs text-slate-400">{showDebug ? 'Ocultar' : 'Mostrar'}</span>
+                  </button>
+                  {showDebug && (
+                    <div className="px-5 pb-4 border-t border-slate-100">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+                        <div className="bg-slate-50 rounded-lg p-3">
+                          <p className="text-xs text-slate-500">Total tareas en DB</p>
+                          <p className="text-lg font-bold text-slate-900">{(debugData.total_tasks_all as number) ?? '?'}</p>
+                        </div>
+                        <div className="bg-slate-50 rounded-lg p-3">
+                          <p className="text-xs text-slate-500">Activas (no eliminadas)</p>
+                          <p className="text-lg font-bold text-green-600">{(debugData.total_tasks_active as number) ?? '?'}</p>
+                        </div>
+                        <div className="bg-slate-50 rounded-lg p-3">
+                          <p className="text-xs text-slate-500">Eliminadas (soft delete)</p>
+                          <p className="text-lg font-bold text-red-600">{(debugData.total_tasks_deleted as number) ?? '?'}</p>
+                        </div>
+                        <div className="bg-slate-50 rounded-lg p-3">
+                          <p className="text-xs text-slate-500">Con completed_at</p>
+                          <p className="text-lg font-bold text-blue-600">{(debugData.tasks_with_completed_at as number) ?? '?'}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-2 text-xs text-slate-600">
+                        <p><span className="font-medium">Status:</span> {JSON.stringify(debugData.status_counts)}</p>
+                        <p><span className="font-medium">completed_at rango:</span> {(debugData.completed_at_min as string) || 'ninguno'} — {(debugData.completed_at_max as string) || 'ninguno'}</p>
+                        <p><span className="font-medium">Filtros aplicados:</span> {JSON.stringify((debugData.query_filters as Record<string, string>))}</p>
+                        <p><span className="font-medium">Muestra assignee:</span></p>
+                        <pre className="bg-slate-100 rounded p-2 overflow-x-auto text-[10px]">
+                          {JSON.stringify(debugData.assignee_sample, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           )}
         </>
