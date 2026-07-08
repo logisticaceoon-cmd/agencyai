@@ -55,7 +55,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       .select('*')
       .eq('workspace_id', id)
       .is('accepted_at', null)
-      .order('createdAt', { ascending: false })
+      .order('created_at', { ascending: false })
 
     return NextResponse.json({ data: data || [] })
   } catch {

@@ -11,9 +11,9 @@ export async function PATCH() {
     // Using safe parameterized filter (user.id comes from auth, not user input)
     await supabase
       .from('notifications')
-      .update({ isRead: true, read: true, readAt: new Date().toISOString() })
+      .update({ is_read: true, read: true })
       .eq('workspace_id', workspaceId)
-      .or(`"userId".eq.${userId},user_id.eq.${userId}`)
+      .eq('user_id', userId)
 
     return NextResponse.json({ success: true })
   } catch {

@@ -14,7 +14,7 @@ export async function PATCH(
     const admin = createAdminClient()
     await admin
       .from('notifications')
-      .update({ isRead: true, readAt: new Date().toISOString() })
+      .update({ is_read: true, read: true })
       .eq('id', id)
 
     return NextResponse.json({ success: true })

@@ -27,7 +27,7 @@ export async function GET(
         .select('*')
         .eq('projectId', id)
         .eq('workspace_id', workspaceId)
-        .order('createdAt', { ascending: true }),
+        .order('created_at', { ascending: true }),
       supabase
         .from('project_milestones')
         .select('*')

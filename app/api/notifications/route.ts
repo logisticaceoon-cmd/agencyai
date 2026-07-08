@@ -49,7 +49,7 @@ export async function GET(request: Request) {
       .select('*')
       .eq('user_id', user.id)
       .eq('workspace_id', workspaceId)
-      .order('createdAt', { ascending: false })
+      .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
 
     if (notifError) {
@@ -61,11 +61,11 @@ export async function GET(request: Request) {
       title: n.title,
       message: n.message,
       type: n.type,
-      isRead: n.isRead ?? n.read ?? false,
+      isRead: n.is_read ?? n.read ?? false,
       link: n.link || null,
-      relatedEntityType: n.relatedEntityType || null,
-      relatedEntityId: n.relatedEntityId || null,
-      createdAt: n.createdAt || n.created_at,
+      relatedEntityType: n?.relatedEntityType || null,
+      relatedEntityId: n?.relatedEntityId || null,
+      createdAt: n.created_at,
     }))
 
     const unreadCount = notifications.filter((n) => !n.isRead).length

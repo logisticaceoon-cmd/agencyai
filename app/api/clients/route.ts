@@ -73,7 +73,7 @@ export async function GET(request: Request) {
       .select('*')
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
-      .order('createdAt', { ascending: false })
+      .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
 
     if (clientIds !== null) {
