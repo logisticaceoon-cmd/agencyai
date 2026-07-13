@@ -76,6 +76,9 @@ export async function POST(request: Request) {
       createdById = ownerData?.user_id || null
     }
 
+    // Accept both snake_case and camelCase for assignedTo
+    const assignedTo = body.assigned_to || body.assignedTo || []
+
     const { data, error } = await supabase
       .from('tasks')
       .insert({
@@ -85,7 +88,7 @@ export async function POST(request: Request) {
         clientId: body.client_id || null,
         projectId: body.project_id || body.projectId || null,
         parentTaskId: body.parent_task_id || body.parentTaskId || null,
-        assignedTo: body.assigned_to || [],
+        assignedTo,
         deadline: body.deadline || null,
         priority: body.priority || 'medium',
         status: body.status || 'pending',
@@ -106,6 +109,52 @@ export async function POST(request: Request) {
     }, { status: 201 })
   } catch (err) {
     console.error('Cowork tasks POST error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const auth = await validateApiKey(request)
+    if (isApiAuthError(auth)) return auth
+    const { supabase, organizationId } = auth
+
+    const { searchParams } = new URL(request.url)
+    const taskId = searchParams.get('id')
+    const body = await request.json()
+
+    if (!taskId) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 })
+    }
+
+    const updateData: Record<string, unknown> = {}
+    if (body.status !== undefined) updateData.status = body.status
+    if (body.title !== undefined) updateData.title = body.title
+    if (body.description !== undefined) updateData.description = body.description
+    if (body.priority !== undefined) updateData.priority = body.priority
+    if (body.deadline !== undefined) updateData.deadline = body.deadline
+    if (body.assigned_to !== undefined) updateData.assignedTo = body.assigned_to
+    if (body.assignedTo !== undefined) updateData.assignedTo = body.assignedTo
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(updateData)
+      .eq('id', taskId)
+      .eq('workspace_id', organizationId)
+      .select()
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: sanitizeError(error, 'PATCH /api/cowork/tasks') }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { task: data, message: 'Task updated successfully' },
+      timestamp: new Date().toISOString(),
+    })
+  } catch (err) {
+    console.error('Cowork tasks PATCH error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
