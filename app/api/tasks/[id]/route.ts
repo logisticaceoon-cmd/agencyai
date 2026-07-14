@@ -27,7 +27,7 @@ export async function GET(
     const { data: subtasks } = await supabase
       .from('tasks')
       .select('*')
-      .eq('parent_task_id', id)
+      .eq('parentTaskId', id)
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
       .order('position', { ascending: true })
@@ -38,21 +38,27 @@ export async function GET(
   }
 }
 
-// Map from camelCase (frontend) to snake_case (DB)
+// Map from frontend field names to actual DB column names (table uses camelCase)
 const FIELD_MAP: Record<string, string> = {
-  assignedTo: 'assignee_id',
-  deadline: 'due_date',
-  clientId: 'client_id',
-  projectId: 'project_id',
-  actualHours: 'actual_hours',
+  due_date: 'deadline',
+  client_id: 'clientId',
+  project_id: 'projectId',
+  actual_hours: 'actualHours',
+  estimated_hours: 'estimatedHours',
+  parent_task_id: 'parentTaskId',
 }
 
 const ALLOWED_FIELDS = [
   'title', 'description', 'status', 'priority',
-  'due_date', 'deadline', 'assignee_id', 'assignedTo',
-  'client_id', 'clientId', 'project_id', 'projectId',
-  'tags', 'notes', 'estimated_hours', 'actual_hours', 'actualHours',
-  'category', 'position', 'parent_task_id',
+  'deadline', 'due_date',
+  'assignee_id', 'assignedTo',
+  'clientId', 'client_id',
+  'projectId', 'project_id',
+  'tags', 'notes',
+  'estimatedHours', 'estimated_hours',
+  'actualHours', 'actual_hours',
+  'position', 'parentTaskId', 'parent_task_id',
+  'progressPercent', 'department', 'taskType',
 ]
 
 export async function PATCH(
@@ -70,7 +76,7 @@ export async function PATCH(
     // Get current task to check status change
     const { data: currentTask } = await supabase
       .from('tasks')
-      .select('status, due_date, project_id, title, assignee_id')
+      .select('status, deadline, projectId, title, assignee_id, assignedTo')
       .eq('id', id)
       .eq('workspace_id', workspaceId)
       .single()
@@ -79,33 +85,25 @@ export async function PATCH(
       return NextResponse.json({ error: 'Tarea no encontrada' }, { status: 404 })
     }
 
-    // Build update data mapping camelCase → snake_case
+    // Build update data — DB columns are camelCase
     const updateData: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     }
 
     for (const field of ALLOWED_FIELDS) {
       if (field in body) {
         const dbField = FIELD_MAP[field] || field
-        // For assignedTo (array from frontend), store first user as assignee_id
         if (field === 'assignedTo') {
-          const arr = Array.isArray(body[field]) ? body[field] : [body[field]]
+          // Store array in assignedTo AND first item in assignee_id for compatibility
+          const arr = Array.isArray(body[field]) ? body[field] : [body[field]].filter(Boolean)
+          updateData.assignedTo = arr
           updateData.assignee_id = arr[0] || null
+        } else if (field === 'assignee_id') {
+          updateData.assignee_id = body[field]
         } else {
           updateData[dbField] = body[field]
         }
       }
-    }
-
-    // Handle completed_at tracking
-    const newStatus = body.status as string | undefined
-    const isBecomingCompleted = newStatus === 'completed' && currentTask.status !== 'completed'
-    const isLeavingCompleted = newStatus && newStatus !== 'completed' && currentTask.status === 'completed'
-
-    if (isBecomingCompleted) {
-      updateData.completed_at = new Date().toISOString()
-    } else if (isLeavingCompleted) {
-      updateData.completed_at = null
     }
 
     const { data, error } = await supabase
