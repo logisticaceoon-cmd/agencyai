@@ -156,6 +156,7 @@ export default function TasksPage() {
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban')
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
+  const [showMyTasksOnly, setShowMyTasksOnly] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -182,6 +183,8 @@ export default function TasksPage() {
       const params = new URLSearchParams()
       if (statusFilter) params.set('status', statusFilter)
       if (priorityFilter) params.set('priority', priorityFilter)
+      // Si showMyTasksOnly está activo y el usuario es owner/CEO → filtrar solo sus tareas
+      if (showMyTasksOnly && user?.id) params.set('assigned_to', user.id)
       const res = await fetch(`/api/tasks?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -190,7 +193,7 @@ export default function TasksPage() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, priorityFilter])
+  }, [statusFilter, priorityFilter, showMyTasksOnly, user?.id])
 
   const loadProjects = useCallback(async () => {
     try {
@@ -475,6 +478,20 @@ export default function TasksPage() {
             </option>
           ))}
         </select>
+        {/* Toggle Mis tareas / Todas — solo visible para owner/CEO */}
+        {isCEO && (
+          <button
+            onClick={() => setShowMyTasksOnly(v => !v)}
+            className={[
+              'px-3 py-2 text-sm border rounded-lg flex items-center gap-2 transition-colors',
+              showMyTasksOnly
+                ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            ].join(' ')}
+          >
+            {showMyTasksOnly ? '👤 Mis tareas' : '👥 Todas'}
+          </button>
+        )}
         <button
           onClick={() => downloadCSV(filtered.map(t => ({
             title: t.title,
@@ -1899,3 +1916,4 @@ function LoadingSkeleton({ viewMode }: { viewMode: string }) {
     </div>
   )
 }
+
