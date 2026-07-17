@@ -47,7 +47,7 @@ export async function GET(request: Request) {
       .eq('workspace_id', workspaceId)
       .eq('status', 'completed')
       .contains('assignedTo', [userId])
-      .is('deleted_at', null)
+      // deleted_at no filtrado — rendimiento incluye tareas archivadas
       .limit(500)
 
     const userCompleted = ((allCompleted || []) as TaskRow[]).filter(t => {
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       .eq('workspace_id', workspaceId)
       .eq('status', 'completed')
       .contains('assignedTo', [userId])
-      .is('deleted_at', null)
+      // deleted_at no filtrado — rendimiento incluye tareas archivadas
       .limit(500)
 
     const userCompleted = ((allCompleted || []) as TaskRow[]).filter(t => {
@@ -163,3 +163,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
+
