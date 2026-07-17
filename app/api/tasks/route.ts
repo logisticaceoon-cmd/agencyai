@@ -32,6 +32,7 @@ export async function GET(request: Request) {
     const priority = searchParams.get('priority')
     const projectId = searchParams.get('project_id') || searchParams.get('projectId')
     const parentTaskId = searchParams.get('parent_task_id') || searchParams.get('parentTaskId')
+    const assignedTo = searchParams.get('assigned_to')  // filtro "mis tareas" para owner/admin
 
     const appRole = normalizeRole(role)
     const scope = getDataScope('tasks', appRole)
@@ -44,9 +45,12 @@ export async function GET(request: Request) {
       .order('createdAt', { ascending: true })
       .range(offset, offset + pageSize - 1)
 
-    // Filtrar por asignado si el rol no tiene acceso total
+    // Filtrar por asignado: si el rol no tiene acceso total, filtro automático
+    // Si owner/admin pasa assigned_to=userId, filtro manual (toggle "mis tareas")
     if (scope === 'assigned') {
       query = query.contains('assignedTo', [userId])
+    } else if (assignedTo) {
+      query = query.contains('assignedTo', [assignedTo])
     }
 
     if (status) query = query.eq('status', status)
@@ -115,3 +119,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
+
