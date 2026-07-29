@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { validateApiKey, isApiAuthError } from '@/lib/api-auth'
 
 type TaskRow = {
   id: string
@@ -22,10 +23,23 @@ function wasOnTime(task: TaskRow) {
   return getCompletedAt(task) <= new Date(task.deadline)
 }
 
+/** Dual auth: accepts API key OR session cookie */
+async function resolveAuth(request: Request) {
+  const authHeader = request.headers.get('Authorization')
+  if (authHeader?.startsWith('Bearer sk_agencyai_')) {
+    const result = await validateApiKey(request)
+    if (isApiAuthError(result)) return { error: result }
+    return { supabase: result.supabase, workspaceId: result.organizationId }
+  }
+  const result = await getAuthContext()
+  if (isAuthError(result)) return { error: result }
+  return { supabase: result.supabase, workspaceId: result.workspaceId }
+}
+
 export async function GET(request: Request) {
   try {
-    const auth = await getAuthContext()
-    if (isAuthError(auth)) return auth
+    const auth = await resolveAuth(request)
+    if ('error' in auth) return auth.error
     const { supabase, workspaceId } = auth
 
     const { searchParams } = new URL(request.url)
@@ -40,14 +54,12 @@ export async function GET(request: Request) {
     const targetMonth = parseInt(month)
     const targetYear = parseInt(year)
 
-    // Completed tasks assigned to this user in the given month/year (filter by updatedAt)
     const { data: allCompleted } = await supabase
       .from('tasks')
       .select('id, title, status, createdById, assignedTo, deadline, createdAt, updatedAt, clientId')
       .eq('workspace_id', workspaceId)
       .eq('status', 'completed')
       .contains('assignedTo', [userId])
-      // deleted_at no filtrado — rendimiento incluye tareas archivadas
       .limit(500)
 
     const userCompleted = ((allCompleted || []) as TaskRow[]).filter(t => {
@@ -60,7 +72,6 @@ export async function GET(request: Request) {
       ? Math.round(((userCompleted.length - delayed.length) / userCompleted.length) * 100)
       : 0
 
-    // Pending tasks assigned to this user (current state, no month filter)
     const { data: pending } = await supabase
       .from('tasks')
       .select('id')
@@ -97,8 +108,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const auth = await getAuthContext()
-    if (isAuthError(auth)) return auth
+    const auth = await resolveAuth(request)
+    if ('error' in auth) return auth.error
     const { supabase, workspaceId } = auth
 
     const body = await request.json()
@@ -113,7 +124,6 @@ export async function POST(request: Request) {
       .eq('workspace_id', workspaceId)
       .eq('status', 'completed')
       .contains('assignedTo', [userId])
-      // deleted_at no filtrado — rendimiento incluye tareas archivadas
       .limit(500)
 
     const userCompleted = ((allCompleted || []) as TaskRow[]).filter(t => {
@@ -129,7 +139,6 @@ export async function POST(request: Request) {
       ? Math.round(((userCompleted.length - delayed.length) / userCompleted.length) * 100)
       : 0
 
-    // Pending tasks for this user
     const { data: pendingAll } = await supabase
       .from('tasks')
       .select('id')
@@ -163,4 +172,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
-
