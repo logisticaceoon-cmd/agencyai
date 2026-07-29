@@ -1,12 +1,24 @@
 import { NextResponse } from 'next/server'
 import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
+import { validateApiKey, isApiAuthError } from '@/lib/api-auth'
 
-// This route now just redirects to the main performance endpoint
-// Kept for backwards compatibility
+/** Dual auth: accepts API key OR session cookie */
+async function resolveAuth(request: Request) {
+  const authHeader = request.headers.get('Authorization')
+  if (authHeader?.startsWith('Bearer sk_agencyai_')) {
+    const result = await validateApiKey(request)
+    if (isApiAuthError(result)) return { error: result }
+    return { supabase: result.supabase, workspaceId: result.organizationId }
+  }
+  const result = await getAuthContext()
+  if (isAuthError(result)) return { error: result }
+  return { supabase: result.supabase, workspaceId: result.workspaceId }
+}
+
 export async function GET(request: Request) {
   try {
-    const auth = await getAuthContext()
-    if (isAuthError(auth)) return auth
+    const auth = await resolveAuth(request)
+    if ('error' in auth) return auth.error
     const { supabase, workspaceId } = auth
 
     const { searchParams } = new URL(request.url)
