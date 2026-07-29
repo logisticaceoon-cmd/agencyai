@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export async function GET(request: Request) {
   // Seguridad básica: verificar header de Vercel Cron
   const authHeader = request.headers.get('authorization')
@@ -15,6 +10,14 @@ export async function GET(request: Request) {
   if (!isVercelCron && !isManual) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  // Create client inside handler (not at module level) to avoid build-time errors
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+  }
+  const supabase = createClient(supabaseUrl, supabaseKey)
 
   try {
     const now = new Date()
@@ -26,7 +29,7 @@ export async function GET(request: Request) {
     const from = prevMonthStart.toISOString()
     const to = prevMonthEnd.toISOString()
 
-    // 1. Obtener todas las tareas completadas del mes anterior (en cualquier workspace)
+    // 1. Obtener todas las tareas completadas del mes anterior
     const { data: completedTasks, error } = await supabase
       .from('tasks')
       .select('id, title, workspace_id, assignedTo, assignee_id, createdById, deadline, updatedAt, createdAt, priority')
@@ -52,12 +55,9 @@ export async function GET(request: Request) {
     }
 
     // 2. Soft-delete todas las tareas completadas del mes anterior
-    //    El módulo Rendimiento YA NO filtra por deleted_at para completadas
-    //    por lo que los datos históricos se preservan en los reportes
     const ids = tasks.map(t => t.id)
     const archivedAt = new Date().toISOString()
 
-    // Procesar en lotes de 50 para evitar timeouts
     let archived = 0
     const batchSize = 50
     for (let i = 0; i < ids.length; i += batchSize) {
