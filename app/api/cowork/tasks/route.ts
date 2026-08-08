@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     const clientId = searchParams.get('client_id')
     const status = searchParams.get('status')
     const projectId = searchParams.get('project_id')
+    const noProject = searchParams.get('no_project') // "true" = solo tareas sueltas (sin proyecto)
 
     let query = supabase
       .from('tasks')
@@ -28,9 +29,20 @@ export async function GET(request: Request) {
         .gte('deadline', `${date}T00:00:00Z`)
         .lte('deadline', `${date}T23:59:59Z`)
     }
-    if (status) query = query.eq('status', status)
+
+    // status: acepta un valor o varios separados por coma (ej: "pending,in_progress")
+    if (status) {
+      const statuses = status.split(',').map(s => s.trim()).filter(Boolean)
+      if (statuses.length === 1) {
+        query = query.eq('status', statuses[0])
+      } else {
+        query = query.in('status', statuses)
+      }
+    }
+
     if (clientId) query = query.eq('clientId', clientId)
     if (projectId) query = query.eq('projectId', projectId)
+    if (noProject === 'true') query = query.is('projectId', null)
     if (assignedTo) query = query.contains('assignedTo', [assignedTo])
 
     const { data, error } = await query
@@ -63,7 +75,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 })
     }
 
-    // Resolver createdById: use authenticated userId, fallback to body or workspace owner
     let createdById = userId || body.created_by || body.createdById || null
 
     if (!createdById) {
@@ -76,7 +87,6 @@ export async function POST(request: Request) {
       createdById = ownerData?.user_id || null
     }
 
-    // Accept both snake_case and camelCase for assignedTo
     const assignedTo = body.assigned_to || body.assignedTo || []
 
     const { data, error } = await supabase
