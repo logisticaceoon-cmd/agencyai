@@ -87,7 +87,7 @@ export async function POST(request: Request) {
       createdById = ownerData?.user_id || null
     }
 
-    const assignedTo = body.assigned_to || body.assignedTo || []
+    const assignedTo = body.assigned_to || body.assignedTo || body.assignedToIds || []
 
     const { data, error } = await supabase
       .from('tasks')
