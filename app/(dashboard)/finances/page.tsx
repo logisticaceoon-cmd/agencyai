@@ -306,7 +306,12 @@ export default function FinancesPage() {
   const expenseTx = transactions.filter(t => t.type === 'expense')
   const totalPayroll = payroll.reduce((s, p) => s + Number(p.net_salary), 0)
 
-  const activeClients = useMemo(() => financeClients.filter(c => !c.deleted_at), [financeClients])
+  const activeClients = useMemo(() => financeClients.filter(c => {
+    if (c.deleted_at) return false
+    if (!c.start_date) return true
+    const sd = new Date(c.start_date + 'T12:00:00')
+    return sd.getFullYear() < year || (sd.getFullYear() === year && sd.getMonth() + 1 <= month)
+  }), [financeClients, month, year])
   const totalContractCost = activeClients.reduce((s, c) => s + Number(c.contract_cost), 0)
   const totalCancelled = activeClients.reduce((s, c) => s + Number(c.cancelled_amount), 0)
 
@@ -1037,7 +1042,12 @@ export default function FinancesPage() {
                 const catClients = clientsByCategory[cat.id] || []
                 const expanded = expandedCats[cat.id]
                 const catRecords = monthlyRecords.filter(r => catClients.some(c => c.id === r.client_id))
-                const activeCatClients = catClients.filter(c => !c.deleted_at)
+                const activeCatClients = catClients.filter(c => {
+                  if (c.deleted_at) return false
+                  if (!c.start_date) return true
+                  const sd = new Date(c.start_date + 'T12:00:00')
+                  return sd.getFullYear() < year || (sd.getFullYear() === year && sd.getMonth() + 1 <= month)
+                })
                 const catTotal = activeCatClients.reduce((s, c) => {
                   const rec = catRecords.find(r => r.client_id === c.id)
                   return s + (rec ? Number(rec.billed_amount) : Number(c.contract_cost))
@@ -1134,6 +1144,10 @@ export default function FinancesPage() {
                             </thead>
                             <tbody>
                               {catClients.filter(c => {
+                                if (c.start_date) {
+                                  const sd = new Date(c.start_date + 'T12:00:00')
+                                  if (sd.getFullYear() > year || (sd.getFullYear() === year && sd.getMonth() + 1 > month)) return false
+                                }
                                 const sub = subcatFilters[cat.id] || 'Todos'
                                 if (sub === 'Todos') return true
                                 return c.company_name === sub
@@ -1163,7 +1177,7 @@ export default function FinancesPage() {
                                       <span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span>
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>
-                                      {c.start_date ? new Date(c.start_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
+                                      {c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'right' }}>
                                       {(() => {
@@ -1336,7 +1350,7 @@ export default function FinancesPage() {
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{Number(rec ? rec.billed_amount : c.contract_cost).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{Number(c.commission_percent) > 0 ? <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span> : <span style={{ color: '#cbd5e1', fontSize: '12px' }}>$0</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
-                              <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right' }}>{!rec || Number(rec.commission_amount) === 0 ? <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span> : <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '6px', height: '6px', borderRadius: '50%', background: rec.status === 'paid' ? '#16a34a' : '#f59e0b', display: 'inline-block' }} /><span style={{ color: rec.status === 'paid' ? '#16a34a' : '#92400e', fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>{sym}{Number(rec.commission_amount).toLocaleString()}</span></div>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{(Number(rec ? rec.billed_amount : c.contract_cost) + (rec ? Number(rec.commission_amount) : 0)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
