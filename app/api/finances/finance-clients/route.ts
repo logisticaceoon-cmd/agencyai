@@ -26,8 +26,8 @@ export async function GET(request: Request) {
     if (includeDeleted !== 'true') {
       const nm = month === 12 ? 1 : month + 1
       const ny = month === 12 ? year + 1 : year
-      const nextMonthStart = \`\${ny}-\${String(nm).padStart(2, '0')}-01\`
-      query = query.or(\`deleted_at.is.null,deleted_at.gte.\${nextMonthStart}\`)
+      const nextMonthStart = `${ny}-${String(nm).padStart(2, '0')}-01`
+      query = query.or(`deleted_at.is.null,deleted_at.gte.${nextMonthStart}`)
     }
 
     const { data: clients, error: clientsError } = await query
