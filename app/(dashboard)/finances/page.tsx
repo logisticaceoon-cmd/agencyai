@@ -973,7 +973,14 @@ export default function FinancesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {financeClients.filter(c => !c.deleted_at).map((c, idx) => {
+                        {financeClients.filter(c => {
+                          if (c.deleted_at) return false;
+                          if (!c.start_date) return true;
+                          const sd = new Date(c.start_date + 'T12:00:00');
+                          const clientYear = sd.getFullYear();
+                          const clientMonth = sd.getMonth() + 1;
+                          return clientYear < year || (clientYear === year && clientMonth <= month);
+                        }).map((c, idx) => {
                           const sym = getCurrencySymbol(c.currency)
                           const rec = monthlyRecords.find(r => r.client_id === c.id)
                           return (
@@ -983,7 +990,7 @@ export default function FinancesPage() {
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{Number(rec ? rec.billed_amount : c.contract_cost).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{Number(c.commission_percent) > 0 ? <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span> : <span style={{ color: '#cbd5e1', fontSize: '12px' }}>$0</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
-                              <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right' }}>
                                 {!rec || Number(rec.commission_amount) === 0 ? <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span> : (
                                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
