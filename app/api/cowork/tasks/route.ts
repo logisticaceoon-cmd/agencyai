@@ -14,15 +14,30 @@ export async function GET(request: Request) {
     const clientId = searchParams.get('client_id')
     const status = searchParams.get('status')
     const projectId = searchParams.get('project_id')
-    const noProject = searchParams.get('no_project') // "true" = solo tareas sueltas (sin proyecto)
+    const noProject = searchParams.get('no_project')
+
+    // Pagination + sorting params
+    const limit = Math.min(parseInt(searchParams.get('limit') || '200'), 500)
+    const offset = parseInt(searchParams.get('offset') || '0')
+    const sortBy = searchParams.get('sortBy') || 'createdAt'
+    const sortOrder = searchParams.get('sortOrder') === 'asc' ? true : false
+
+    const validSortFields: Record<string, string> = {
+      deadline: 'deadline',
+      createdAt: 'createdAt',
+      priority: 'priority',
+      status: 'status',
+      title: 'title',
+    }
+    const sortField = validSortFields[sortBy] || 'createdAt'
 
     let query = supabase
       .from('tasks')
       .select('id, title, description, status, priority, deadline, createdAt, clientId, projectId, assignedTo, createdById')
       .eq('workspace_id', organizationId)
       .is('deleted_at', null)
-      .order('deadline', { ascending: true })
-      .limit(200)
+      .order(sortField, { ascending: sortOrder })
+      .range(offset, offset + limit - 1)
 
     if (date) {
       query = query
@@ -30,7 +45,6 @@ export async function GET(request: Request) {
         .lte('deadline', `${date}T23:59:59Z`)
     }
 
-    // status: acepta un valor o varios separados por coma (ej: "pending,in_progress")
     if (status) {
       const statuses = status.split(',').map(s => s.trim()).filter(Boolean)
       if (statuses.length === 1) {
@@ -54,7 +68,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      data: { tasks: data || [], total: data?.length || 0 },
+      data: {
+        tasks: data || [],
+        total: data?.length || 0,
+        pagination: { limit, offset, sortBy: sortField, sortOrder: sortOrder ? 'asc' : 'desc' }
+      },
       timestamp: new Date().toISOString(),
     })
   } catch (err) {
