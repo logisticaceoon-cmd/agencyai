@@ -1414,7 +1414,7 @@ export default function FinancesPage() {
                 <div style={{ width: '3px', height: '20px', background: '#2563eb', borderRadius: '2px' }} />
                 <h3 style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ingresos por servicio — {MONTHS[month - 1]} {year}</h3>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '16px', alignItems: 'start' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'start' }}>
 
                 {/* Tabla de ingresos por categoría */}
                 <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
