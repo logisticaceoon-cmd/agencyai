@@ -1,4 +1,5 @@
 'use client'
+import { Cell } from 'recharts'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
@@ -19,7 +20,6 @@ const Legend = dynamic(() => import('recharts').then(m => m.Legend), { ssr: fals
 const ResponsiveContainer = dynamic(() => import('recharts').then(m => m.ResponsiveContainer), { ssr: false })
 const PieChart = dynamic(() => import('recharts').then(m => m.PieChart), { ssr: false })
 const Pie = dynamic(() => import('recharts').then(m => m.Pie), { ssr: false })
-const Cell = dynamic(() => import('recharts').then(m => m.Cell), { ssr: false })
 import * as Tabs from '@radix-ui/react-tabs'
 import { AgentWidget } from '@/components/ai/AgentWidget'
 import { InfoBanner } from '@/components/shared/InfoBanner'
