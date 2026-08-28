@@ -265,7 +265,12 @@ export default function FinancesPage() {
           // Egresos totales = gastos + nóminas
           const egresos = gastosFijos + nominasMes
           // Ingresos: fees (con fallback) + comisiones
-          const activeC = (fcJson?.data || []).filter((c: { deleted_at: string | null }) => !c.deleted_at)
+          const activeC = (fcJson?.data || []).filter((c: { deleted_at: string | null; start_date?: string | null }) => {
+            if (c.deleted_at) return false
+            if (!c.start_date) return true
+            const sd = new Date(c.start_date + 'T12:00:00')
+            return sd.getFullYear() < y || (sd.getFullYear() === y && sd.getMonth() + 1 <= m)
+          })
           const recs: { client_id: string; billed_amount: number; commission_amount: number }[] = fcJson?.monthlyRecords || []
           const fees = activeC.reduce((s: number, c: { id: string; contract_cost: number }) => {
             const rec = recs.find(r => r.client_id === c.id)
