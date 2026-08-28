@@ -807,16 +807,16 @@ export default function FinancesPage() {
                       <h3 className="text-sm font-semibold text-slate-900">Distribución de egresos — {MONTHS[month - 1]} {year}</h3>
                       <p className="text-xs text-slate-400 mt-0.5">Total: <span className="font-semibold text-slate-600">${totalEgr.toLocaleString()}</span></p>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
-                      <div style={{ flexShrink: 0 }}>
-                        <PieChart width={260} height={260}>
-                          <Pie data={eRows} cx={130} cy={130} innerRadius={72} outerRadius={117} paddingAngle={2} dataKey="value" labelLine={false} label={mkLabel(totalEgr)}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'center' }}>
+                        <PieChart width={220} height={220}>
+                          <Pie data={eRows} cx={110} cy={110} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" labelLine={false} label={mkLabel(totalEgr)}>
                             {eRows.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
                           </Pie>
                           <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }} formatter={(v: any) => [`$${Number(v ?? 0).toLocaleString()} · ${((Number(v ?? 0) / totalEgr) * 100).toFixed(1)}%`]} />
                         </PieChart>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '180px', maxWidth: '280px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {[...eRows].sort((a, b) => b.value - a.value).map((row, idx) => {
                           const pct = (row.value / totalEgr) * 100
                           return (
@@ -849,16 +849,16 @@ export default function FinancesPage() {
                       <h3 className="text-sm font-semibold text-slate-900">Distribución de ingresos — {MONTHS[month - 1]} {year}</h3>
                       <p className="text-xs text-slate-400 mt-0.5">Total: <span className="font-semibold text-slate-600">${totalIng.toLocaleString()}</span></p>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
-                      <div style={{ flexShrink: 0 }}>
-                        <PieChart width={260} height={260}>
-                          <Pie data={iRows} cx={130} cy={130} innerRadius={72} outerRadius={117} paddingAngle={2} dataKey="value" labelLine={false} label={mkLabel(totalIng)}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'center' }}>
+                        <PieChart width={220} height={220}>
+                          <Pie data={iRows} cx={110} cy={110} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" labelLine={false} label={mkLabel(totalIng)}>
                             {iRows.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
                           </Pie>
                           <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }} formatter={(v: any) => [`$${Number(v ?? 0).toLocaleString()} · ${((Number(v ?? 0) / totalIng) * 100).toFixed(1)}%`]} />
                         </PieChart>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '180px', maxWidth: '280px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {[...iRows].sort((a, b) => b.value - a.value).map((row, idx) => {
                           const pct = (row.value / totalIng) * 100
                           return (
