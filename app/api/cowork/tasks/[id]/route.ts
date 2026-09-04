@@ -105,13 +105,6 @@ export async function PATCH(
     }
     if (body.assignee_id !== undefined) updates.assignee_id = body.assignee_id
 
-    // Track completed_at
-    if (body.status === 'completed') {
-      updates.completed_at = new Date().toISOString()
-    } else if (body.status && body.status !== 'completed') {
-      updates.completed_at = null
-    }
-
     updates.updated_at = new Date().toISOString()
 
     if (Object.keys(updates).length <= 1) {
@@ -232,7 +225,7 @@ export async function POST(
 
     const { data, error } = await supabase
       .from('tasks')
-      .update({ status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({ status: 'completed', updated_at: new Date().toISOString() })
       .eq('id', id)
       .eq('workspace_id', organizationId)
       .select()
