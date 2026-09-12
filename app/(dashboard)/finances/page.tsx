@@ -757,6 +757,41 @@ export default function FinancesPage() {
             </div>
           )}
 
+          {/* ── Tabla de clientes del mes (incluye $0) ── */}
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <h3 className="text-sm font-semibold text-slate-900 mb-4">Clientes — {MONTHS[month - 1]} {year}</h3>
+            <div className="space-y-2">
+              {activeClients.map((c, i) => {
+                const rec = monthlyRecords.find(r => r.client_id === c.id)
+                const fee = Number(rec?.billed_amount ?? c.contract_cost ?? 0)
+                const comm = Number(rec?.commission_amount ?? 0)
+                const total = fee + comm
+                return (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '8px', background: i % 2 === 0 ? '#f8fafc' : '#fff', border: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: total > 0 ? '#22c55e' : '#94a3b8', flexShrink: 0, display: 'inline-block' }} />
+                      <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: 600 }}>{c.client_name}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fee</p>
+                        <p style={{ fontSize: '13px', color: '#0f172a', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${fee.toLocaleString()}</p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Comisión</p>
+                        <p style={{ fontSize: '13px', color: comm > 0 ? '#16a34a' : '#94a3b8', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${comm.toLocaleString()}</p>
+                      </div>
+                      <div style={{ textAlign: 'right', minWidth: '72px' }}>
+                        <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total</p>
+                        <p style={{ fontSize: '14px', color: total > 0 ? '#0f172a' : '#94a3b8', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>${total.toLocaleString()}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
           {/* ── Gráficos de dona: egresos + ingresos del mes ── */}
           {(() => {
             const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
