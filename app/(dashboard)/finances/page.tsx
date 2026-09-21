@@ -313,6 +313,7 @@ export default function FinancesPage() {
 
   const activeClients = useMemo(() => financeClients.filter(c => {
     if (c.deleted_at) return false
+    if (c.status === 'inactive') return false
     if (!c.start_date) return true
     const sd = new Date(c.start_date + 'T12:00:00')
     return sd.getFullYear() < year || (sd.getFullYear() === year && sd.getMonth() + 1 <= month)
