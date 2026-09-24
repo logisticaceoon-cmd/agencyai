@@ -63,6 +63,9 @@ export async function PUT(
       observations,
       contract_pdf_url,
       contract_pdf_name,
+      deleted_at,
+      end_month,
+      end_year,
     } = body
 
     const { data, error } = await supabase
@@ -84,6 +87,9 @@ export async function PUT(
         observations,
         contract_pdf_url,
         contract_pdf_name,
+        deleted_at: deleted_at !== undefined ? deleted_at : undefined,
+        end_month: end_month !== undefined ? end_month : undefined,
+        end_year: end_year !== undefined ? end_year : undefined,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
