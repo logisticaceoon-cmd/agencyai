@@ -52,6 +52,7 @@ interface FinanceClient {
   accounts_count: number; start_date: string | null; status: string
   observations: string | null; contract_pdf_url: string | null; contract_pdf_name: string | null
   deleted_at: string | null; created_at: string; updated_at: string
+  end_month: number | null; end_year: number | null
 }
 
 interface ClientMonthly {
@@ -188,6 +189,7 @@ export default function FinancesPage() {
   const [editingClient, setEditingClient] = useState<FinanceClient | null>(null)
   const [closingClient, setClosingClient] = useState<FinanceClient | null>(null)
   const [deletingClient, setDeletingClient] = useState<FinanceClient | null>(null)
+  const [deleteMode, setDeleteMode] = useState<'this' | 'next'>('this')
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [showPayrollForm, setShowPayrollForm] = useState(false)
   const [editingPayroll, setEditingPayroll] = useState<PayrollEntry | null>(null)
@@ -313,7 +315,13 @@ export default function FinancesPage() {
 
   const activeClients = useMemo(() => financeClients.filter(c => {
     if (c.deleted_at) return false
-    if (c.status === 'inactive') return false
+    // Si tiene fecha de baja, solo ocultar en los meses A PARTIR de esa fecha
+    if (c.end_year != null && c.end_month != null) {
+      if (year > c.end_year) return false
+      if (year === c.end_year && month >= c.end_month) return false
+    } else if (c.status === 'inactive') {
+      return false // legacy: sin end_date, ocultar globalmente
+    }
     if (!c.start_date) return true
     const sd = new Date(c.start_date + 'T12:00:00')
     return sd.getFullYear() < year || (sd.getFullYear() === year && sd.getMonth() + 1 <= month)
@@ -475,14 +483,34 @@ export default function FinancesPage() {
   async function handleDeleteClient() {
     if (!deletingClient) return
     const id = deletingClient.id
-    // Optimistic: quitar de la lista inmediatamente
-    setFinanceClients(prev => prev.filter(c => c.id !== id))
+    const c = deletingClient
+    // Calcular end_month / end_year según el modo elegido
+    let endMonth = month
+    let endYear = year
+    if (deleteMode === 'next') {
+      endMonth = month + 1
+      if (endMonth > 12) { endMonth = 1; endYear = year + 1 }
+    }
+    // Optimistic: actualizar en lista local
+    setFinanceClients(prev => prev.map(fc => fc.id === id
+      ? { ...fc, status: 'inactive', end_month: endMonth, end_year: endYear }
+      : fc
+    ))
     setDeletingClient(null)
-    // Llamada en background — sin bloquear la UI
-    fetch(`/api/finances/finance-clients/${id}`, { method: 'DELETE' }).catch(() => {
-      // Si falla, recargar para recuperar estado real
-      fetchData()
-    })
+    // Persistir en backend via PUT (no DELETE — conserva historial de meses anteriores)
+    fetch(`/api/finances/finance-clients/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category_id: c.category_id, client_name: c.client_name, company_name: c.company_name,
+        assigned_to: c.assigned_to, contract_cost: c.contract_cost, commission_percent: c.commission_percent,
+        commission_amount: c.commission_amount, currency: c.currency, total_amount: c.total_amount,
+        cancelled_amount: c.cancelled_amount, accounts_count: c.accounts_count, start_date: c.start_date,
+        status: 'inactive', observations: c.observations, contract_pdf_url: c.contract_pdf_url,
+        contract_pdf_name: c.contract_pdf_name, deleted_at: null,
+        end_month: endMonth, end_year: endYear,
+      }),
+    }).catch(() => fetchData())
   }
 
   async function handleRestoreClient(c: FinanceClient) {
@@ -1927,13 +1955,30 @@ export default function FinancesPage() {
 
       {deletingClient && (
         <Modal onClose={() => setDeletingClient(null)}>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Eliminar cliente {deletingClient.client_name}?</h3>
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 mb-4">
-            <p className="text-sm text-amber-800">Los registros de meses anteriores se conservaran en el historial.</p>
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">Dar de baja a {deletingClient.client_name}</h3>
+          <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 mb-4">
+            <p className="text-sm text-blue-800 font-medium mb-1">⚠️ Los meses anteriores siempre se conservan</p>
+            <p className="text-sm text-blue-700">Elegí a partir de cuándo desaparece este cliente:</p>
+          </div>
+          <div className="flex flex-col gap-3 mb-4">
+            <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-slate-50 transition-colors" style={{borderColor: deleteMode === 'this' ? '#2563eb' : '#e2e8f0', background: deleteMode === 'this' ? '#eff6ff' : ''}}>
+              <input type="radio" name="deleteMode" value="this" checked={deleteMode === 'this'} onChange={() => setDeleteMode('this')} className="mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-slate-900">Desde este mes ({MONTHS[month - 1]} {year})</div>
+                <div className="text-xs text-slate-500">Este mes y los siguientes desaparecen. Meses anteriores intactos.</div>
+              </div>
+            </label>
+            <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-slate-50 transition-colors" style={{borderColor: deleteMode === 'next' ? '#2563eb' : '#e2e8f0', background: deleteMode === 'next' ? '#eff6ff' : ''}}>
+              <input type="radio" name="deleteMode" value="next" checked={deleteMode === 'next'} onChange={() => setDeleteMode('next')} className="mt-0.5" />
+              <div>
+                <div className="text-sm font-medium text-slate-900">Desde el mes siguiente ({MONTHS[month % 12]} {month === 12 ? year + 1 : year})</div>
+                <div className="text-xs text-slate-500">Este mes todavía aparece (ya facturado). Solo desaparece desde el próximo.</div>
+              </div>
+            </label>
           </div>
           <div className="flex justify-end gap-3">
             <button onClick={() => setDeletingClient(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
-            <button onClick={handleDeleteClient} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar cliente</button>
+            <button onClick={handleDeleteClient} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Confirmar baja</button>
           </div>
         </Modal>
       )}
