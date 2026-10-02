@@ -1055,14 +1055,14 @@ export default function FinancesPage() {
                           return (
                             <tr key={c.id} style={{ background: idx % 2 === 0 ? '#ffffff' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
-                              <td style={{ padding: '10px 8px', fontSize: '13px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', fontSize: '14px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
-                              <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                 <div style={{ display: 'inline-flex', gap: '3px' }}>
                                   <button onClick={() => { setEditingClient(c); setShowClientModal({ categoryId: c.category_id }) }} style={{ background: '#f8fafc', color: '#475569', padding: '5px 7px', borderRadius: '6px', border: '1px solid #e2e8f0', cursor: 'pointer' }}><Pencil style={{ width: '13px', height: '13px' }} /></button>
@@ -1210,7 +1210,7 @@ export default function FinancesPage() {
                                 return (
                                   <tr key={c.id} style={{ background: isDeleted ? '#f8fafc' : rowBg, borderBottom: '1px solid #f1f5f9', opacity: isDeleted ? 0.7 : 1 }}>
                                     <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
-                                    <td style={{ padding: '10px 8px', fontSize: '13px', fontWeight: 700, color: '#0f172a', textDecoration: isDeleted ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    <td style={{ padding: '10px 8px', fontSize: '14px', fontWeight: 700, color: '#0f172a', textDecoration: isDeleted ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                       {c.client_name}
                                       {isDeleted && <span style={{ marginLeft: '6px', fontSize: '10px', background: '#e2e8f0', color: '#64748b', padding: '1px 6px', borderRadius: '4px' }}>Eliminado</span>}
                                       {c.contract_pdf_url && (
@@ -1219,14 +1219,14 @@ export default function FinancesPage() {
                                         </a>
                                       )}
                                     </td>
-                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{(() => { const rec = getMonthlyRecord(c.id); return <>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</>; })()}</td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>{(() => { const rec = getMonthlyRecord(c.id); return <>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</>; })()}</td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                       <span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span>
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>
                                       {c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
                                     </td>
-                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>
+                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#16a34a' }}>
                                       {(() => {
                                         const rec = getMonthlyRecord(c.id)
                                         const feeAmt = (rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)
@@ -1234,7 +1234,7 @@ export default function FinancesPage() {
                                         return <>{sym}{rowTotal.toLocaleString()}</>
                                       })()}
                                     </td>
-                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>
+                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px' }}>
                                       {Number(c.cancelled_amount) > 0
                                         ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span>
                                         : <span style={{ color: '#cbd5e1' }}>&mdash;</span>}
@@ -1304,13 +1304,13 @@ export default function FinancesPage() {
                               <tr style={{ background: '#0f172a', color: 'white', fontWeight: 700 }}>
                                 <td style={{ padding: '11px 8px', textAlign: 'center', color: '#64748b', fontSize: '10px', fontWeight: 800, letterSpacing: '0.05em' }}>TOTAL</td>
                                 <td style={{ padding: '11px 8px', fontSize: '12px', color: '#94a3b8' }}>{catClients.filter(c => !c.deleted_at).length} clientes</td>
-                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '13px', color: '#e2e8f0', fontWeight: 700 }}>${catTotal.toLocaleString()}</td>
+                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#e2e8f0', fontWeight: 700 }}>${catTotal.toLocaleString()}</td>
                                 <td style={{ padding: '11px 8px' }}></td>
                                 <td style={{ padding: '11px 8px' }}></td>
                                 <td style={{ padding: '11px 8px' }}></td>
-                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '13px', color: '#4ade80', fontWeight: 700 }}>${catCommissions.toLocaleString()}</td>
+                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#4ade80', fontWeight: 700 }}>${catCommissions.toLocaleString()}</td>
                                 <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#f0fdf4', fontWeight: 800 }}>${(catTotal + catCommissions).toLocaleString()}</td>
-                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '13px', color: '#fca5a5', fontWeight: 700 }}>{catCancelled > 0 ? `$${catCancelled.toLocaleString()}` : '—'}</td>
+                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#fca5a5', fontWeight: 700 }}>{catCancelled > 0 ? `$${catCancelled.toLocaleString()}` : '—'}</td>
                                 <td style={{ padding: '11px 8px' }}></td>
                                 <td style={{ padding: '11px 8px' }}></td>
                                 <td style={{ padding: '11px 8px' }}></td>
@@ -1368,14 +1368,14 @@ export default function FinancesPage() {
                           return (
                             <tr key={c.id} style={{ background: isDeleted ? '#f8fafc' : idx % 2 === 0 ? '#ffffff' : '#fafafa', borderBottom: '1px solid #f1f5f9', opacity: isDeleted ? 0.7 : 1 }}>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
-                              <td style={{ padding: '10px 8px', fontSize: '13px', fontWeight: 700, color: '#0f172a', textDecoration: isDeleted ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}{isDeleted && <span style={{ marginLeft: '6px', fontSize: '10px', background: '#e2e8f0', color: '#64748b', padding: '1px 6px', borderRadius: '4px' }}>Eliminado</span>}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', fontSize: '14px', fontWeight: 700, color: '#0f172a', textDecoration: isDeleted ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}{isDeleted && <span style={{ marginLeft: '6px', fontSize: '10px', background: '#e2e8f0', color: '#64748b', padding: '1px 6px', borderRadius: '4px' }}>Eliminado</span>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
-                              <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                 {!isDeleted ? (
                                   <div style={{ display: 'inline-flex', gap: '3px' }}>
@@ -1459,8 +1459,8 @@ export default function FinancesPage() {
                               </div>
                             </td>
                             <td style={{ padding: '10px 10px', textAlign: 'center', fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{cc.length}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>${catFee.toLocaleString()}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>${catTotal.toLocaleString()}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>${catFee.toLocaleString()}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>${catTotal.toLocaleString()}</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                                 <div style={{ width: '52px', height: '5px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
@@ -1489,8 +1489,8 @@ export default function FinancesPage() {
                               </div>
                             </td>
                             <td style={{ padding: '10px 10px', textAlign: 'center', fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{uc.length}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>${ucFee.toLocaleString()}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>${ucTotal.toLocaleString()}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>${ucFee.toLocaleString()}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>${ucTotal.toLocaleString()}</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                                 <div style={{ width: '52px', height: '5px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
@@ -1507,8 +1507,8 @@ export default function FinancesPage() {
                       <tr style={{ background: '#0f172a' }}>
                         <td style={{ padding: '11px 14px', fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TOTAL</td>
                         <td style={{ padding: '11px 10px', textAlign: 'center', color: '#64748b', fontSize: '12px', fontWeight: 700 }}>{activeClients.length}</td>
-                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#e2e8f0' }}>${totalBilled.toLocaleString()}</td>
-                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#4ade80' }}>${totalCommissions.toLocaleString()}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#e2e8f0' }}>${totalBilled.toLocaleString()}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#4ade80' }}>${totalCommissions.toLocaleString()}</td>
                         <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 800, color: '#f0fdf4' }}>${(totalBilled + totalCommissions).toLocaleString()}</td>
                         <td style={{ padding: '11px 14px', textAlign: 'right', color: '#64748b', fontSize: '12px', fontWeight: 700 }}>100%</td>
                       </tr>
