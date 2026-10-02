@@ -4,7 +4,8 @@
  */
 
 interface CacheEntry {
-  data: unknown
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: any
   ts: number
 }
 
@@ -13,21 +14,23 @@ const cache = new Map<string, CacheEntry>()
 // Default TTL: 60 seconds
 const DEFAULT_TTL = 60_000
 
-export async function cachedFetch<T = unknown>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function cachedFetch(
   url: string,
   options?: RequestInit,
   ttl = DEFAULT_TTL
-): Promise<T> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
   const now = Date.now()
   const cached = cache.get(url)
   if (cached && (now - cached.ts) < ttl) {
-    return cached.data as T
+    return cached.data
   }
   const res = await fetch(url, options)
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   const data = await res.json()
   cache.set(url, { data, ts: now })
-  return data as T
+  return data
 }
 
 export function invalidateCache(pattern?: string) {
@@ -39,4 +42,3 @@ export function invalidateCache(pattern?: string) {
     if (key.includes(pattern)) cache.delete(key)
   }
 }
-
