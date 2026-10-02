@@ -1,4 +1,5 @@
 'use client'
+import { cachedFetch } from '@/lib/data-cache'
 import { Cell } from 'recharts'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -210,12 +211,12 @@ export default function FinancesPage() {
     const prevYear = month === 1 ? year - 1 : year
 
     const [txRes, catsRes, clientsRes, payrollRes, clientListRes, prevRes] = await Promise.all([
-      fetch(`/api/finances?month=${month}&year=${year}`),
-      fetch('/api/finances/categories'),
-      fetch(`/api/finances/finance-clients?month=${month}&year=${year}${showDeleted ? '&include_deleted=true' : ''}`),
-      fetch(`/api/finances/payroll?period=${currentPeriod}`),
-      fetch('/api/clients'),
-      fetch(`/api/finances/finance-clients?month=${prevMonth}&year=${prevYear}`),
+      cachedFetch(`/api/finances?month=${month}&year=${year}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
+      cachedFetch('/api/finances/categories').then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
+      cachedFetch(`/api/finances/finance-clients?month=${month}&year=${year}${showDeleted ? '&include_deleted=true' : ''}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
+      cachedFetch(`/api/finances/payroll?period=${currentPeriod}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
+      cachedFetch('/api/clients').then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
+      cachedFetch(`/api/finances/finance-clients?month=${prevMonth}&year=${prevYear}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
     ])
 
     if (txRes.ok) { const j = await txRes.json(); setTransactions(j.data || []) }
@@ -254,9 +255,9 @@ export default function FinancesPage() {
         const y = d.getFullYear()
         const period = `${y}-${String(m).padStart(2, '0')}`
         return Promise.all([
-          fetch(`/api/finances?month=${m}&year=${y}`).then(r => r.ok ? r.json() : null),
-          fetch(`/api/finances/finance-clients?month=${m}&year=${y}`).then(r => r.ok ? r.json() : null),
-          fetch(`/api/finances/payroll?period=${period}`).then(r => r.ok ? r.json() : null),
+          cachedFetch(`/api/finances?month=${m}&year=${y}`).catch(() => null),
+          cachedFetch(`/api/finances/finance-clients?month=${m}&year=${y}`).catch(() => null),
+          cachedFetch(`/api/finances/payroll?period=${period}`).catch(() => null),
         ]).then(([txJson, fcJson, payrollJson]) => {
           // Gastos fijos: desde transactions
           const gastosFijos = (txJson?.data || [])
