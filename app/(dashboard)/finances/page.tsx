@@ -1301,10 +1301,7 @@ export default function FinancesPage() {
                                 <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#e2e8f0', fontWeight: 700 }}>${catTotal.toLocaleString()}</td>
                                 <td style={{ padding: '11px 8px' }}></td>
                                 <td style={{ padding: '11px 8px' }}></td>
-                                <td style={{ padding: '11px 8px' }}></td>
-                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#4ade80', fontWeight: 700 }}>${catCommissions.toLocaleString()}</td>
-                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#f0fdf4', fontWeight: 800 }}>${(catTotal + catCommissions).toLocaleString()}</td>
-                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#fca5a5', fontWeight: 700 }}>{catCancelled > 0 ? `$${catCancelled.toLocaleString()}` : '—'}</td>
+                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#f0fdf4', fontWeight: 800 }}>${catTotal.toLocaleString()}</td>
                                 <td style={{ padding: '11px 8px' }}></td>
                                 <td style={{ padding: '11px 8px' }}></td>
                                 <td style={{ padding: '11px 8px' }}></td>
