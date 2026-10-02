@@ -739,10 +739,10 @@ export default function FinancesPage() {
               const totalCosts = totalExpenses + totalPayroll
               const realNetProfit = totalRealIncome - totalCosts
               return [
-                { label: 'Ingresos del mes', value: `$${totalRealIncome.toLocaleString()}`, color: '#16a34a' },
-                { label: 'Nóminas', value: `$${totalPayroll.toLocaleString()}`, color: '#7c3aed' },
-                { label: 'Gastos del mes', value: `$${totalExpenses.toLocaleString()}`, color: '#dc2626' },
-                { label: 'Ganancia neta', value: `$${realNetProfit.toLocaleString()}`, color: realNetProfit >= 0 ? '#2563eb' : '#dc2626' },
+                { label: 'Ingresos del mes', value: `$${totalRealIncome.toLocaleString(undefined, {maximumFractionDigits: 0})}`, color: '#16a34a' },
+                { label: 'Nóminas', value: `$${totalPayroll.toLocaleString(undefined, {maximumFractionDigits: 0})}`, color: '#7c3aed' },
+                { label: 'Gastos del mes', value: `$${totalExpenses.toLocaleString(undefined, {maximumFractionDigits: 0})}`, color: '#dc2626' },
+                { label: 'Ganancia neta', value: `$${realNetProfit.toLocaleString(undefined, {maximumFractionDigits: 0})}`, color: realNetProfit >= 0 ? '#2563eb' : '#dc2626' },
               ]
             })().map((k, i) => (
               <div key={i} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px 18px' }}>
@@ -755,7 +755,7 @@ export default function FinancesPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-xl border border-slate-200 bg-white p-5">
               <h3 className="text-sm font-semibold text-slate-900 mb-2">Nomina del mes</h3>
-              <p className="text-2xl font-bold text-slate-900">${totalPayroll.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-slate-900">${totalPayroll.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
               <p className="text-xs text-slate-500 mt-1">{payroll.length} empleados | Periodo {currentPeriod}</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-5">
@@ -763,7 +763,7 @@ export default function FinancesPage() {
               <div className="space-y-1.5">
                 <div className="flex justify-between text-sm"><span className="text-slate-500">Clientes activos</span><span className="font-semibold text-slate-900">{activeClients.length}</span></div>
                 <div className="flex justify-between text-sm"><span className="text-slate-500">Categorias</span><span className="font-semibold text-slate-900">{categories.length}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-slate-500">Comisiones del mes</span><span className="font-semibold text-green-600">${totalCommissions.toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">Comisiones del mes</span><span className="font-semibold text-green-600">${totalCommissions.toLocaleString(undefined, {maximumFractionDigits: 0})}</span></div>
               </div>
             </div>
           </div>
@@ -779,7 +779,7 @@ export default function FinancesPage() {
                   <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={56} tickFormatter={(v) => `$${Number(v) >= 1000 ? (Number(v)/1000).toFixed(0)+'k' : Number(v)}`} />
                   <Tooltip
                     contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)', fontSize: '12px', padding: '8px 12px' }}
-                    formatter={(v, name) => [`$${Number(v ?? 0).toLocaleString()}`, name === 'ingresos' ? 'Ingresos' : 'Egresos totales']}
+                    formatter={(v, name) => [`$${Number(v ?? 0).toLocaleString(undefined, {maximumFractionDigits: 0})}`, name === 'ingresos' ? 'Ingresos' : 'Egresos totales']}
                     cursor={{ fill: '#f8fafc', radius: 4 }}
                   />
                   <Legend formatter={(v) => v === 'ingresos' ? 'Ingresos' : 'Egresos totales'} wrapperStyle={{ fontSize: '11px', paddingTop: '12px' }} />
@@ -808,15 +808,15 @@ export default function FinancesPage() {
                     <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fee</p>
-                        <p style={{ fontSize: '13px', color: '#0f172a', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${fee.toLocaleString()}</p>
+                        <p style={{ fontSize: '13px', color: '#0f172a', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${fee.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Comisión</p>
-                        <p style={{ fontSize: '13px', color: comm > 0 ? '#16a34a' : '#94a3b8', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${comm.toLocaleString()}</p>
+                        <p style={{ fontSize: '13px', color: comm > 0 ? '#16a34a' : '#94a3b8', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${comm.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
                       </div>
                       <div style={{ textAlign: 'right', minWidth: '72px' }}>
                         <p style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total</p>
-                        <p style={{ fontSize: '14px', color: total > 0 ? '#0f172a' : '#94a3b8', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>${total.toLocaleString()}</p>
+                        <p style={{ fontSize: '14px', color: total > 0 ? '#0f172a' : '#94a3b8', fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>${total.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
                       </div>
                     </div>
                   </div>
@@ -873,7 +873,7 @@ export default function FinancesPage() {
                   <div className="rounded-xl border border-slate-200 bg-white p-6">
                     <div className="mb-5">
                       <h3 className="text-sm font-semibold text-slate-900">Distribución de egresos — {MONTHS[month - 1]} {year}</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">Total: <span className="font-semibold text-slate-600">${totalEgr.toLocaleString()}</span></p>
+                      <p className="text-xs text-slate-400 mt-0.5">Total: <span className="font-semibold text-slate-600">${totalEgr.toLocaleString(undefined, {maximumFractionDigits: 0})}</span></p>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', gap: '16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -881,7 +881,7 @@ export default function FinancesPage() {
                           <Pie data={eRows} cx={110} cy={110} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" labelLine={false} label={mkLabel(totalEgr)}>
                             {eRows.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
                           </Pie>
-                          <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }} formatter={(v: any) => [`$${Number(v ?? 0).toLocaleString()} · ${((Number(v ?? 0) / totalEgr) * 100).toFixed(1)}%`]} />
+                          <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }} formatter={(v: any) => [`$${Number(v ?? 0).toLocaleString(undefined, {maximumFractionDigits: 0})} · ${((Number(v ?? 0) / totalEgr) * 100).toFixed(1)}%`]} />
                         </PieChart>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -896,7 +896,7 @@ export default function FinancesPage() {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, width: '32px', textAlign: 'right' }}>{pct.toFixed(0)}%</span>
-                                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums', width: '64px', textAlign: 'right' }}>${row.value.toLocaleString()}</span>
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums', width: '64px', textAlign: 'right' }}>${row.value.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
                                 </div>
                               </div>
                               <div style={{ height: '4px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
@@ -915,7 +915,7 @@ export default function FinancesPage() {
                   <div className="rounded-xl border border-slate-200 bg-white p-6">
                     <div className="mb-5">
                       <h3 className="text-sm font-semibold text-slate-900">Distribución de ingresos — {MONTHS[month - 1]} {year}</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">Total: <span className="font-semibold text-slate-600">${totalIng.toLocaleString()}</span></p>
+                      <p className="text-xs text-slate-400 mt-0.5">Total: <span className="font-semibold text-slate-600">${totalIng.toLocaleString(undefined, {maximumFractionDigits: 0})}</span></p>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', gap: '16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -923,7 +923,7 @@ export default function FinancesPage() {
                           <Pie data={iRows} cx={110} cy={110} innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" labelLine={false} label={mkLabel(totalIng)}>
                             {iRows.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
                           </Pie>
-                          <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }} formatter={(v: any) => [`$${Number(v ?? 0).toLocaleString()} · ${((Number(v ?? 0) / totalIng) * 100).toFixed(1)}%`]} />
+                          <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontSize: '12px' }} formatter={(v: any) => [`$${Number(v ?? 0).toLocaleString(undefined, {maximumFractionDigits: 0})} · ${((Number(v ?? 0) / totalIng) * 100).toFixed(1)}%`]} />
                         </PieChart>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -938,7 +938,7 @@ export default function FinancesPage() {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, width: '32px', textAlign: 'right' }}>{pct.toFixed(0)}%</span>
-                                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums', width: '64px', textAlign: 'right' }}>${row.value.toLocaleString()}</span>
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums', width: '64px', textAlign: 'right' }}>${row.value.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
                                 </div>
                               </div>
                               <div style={{ height: '4px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
@@ -985,7 +985,7 @@ export default function FinancesPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 20px 16px', borderTop: '3px solid #0f172a' }}>
                 <p style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Facturado del mes</p>
-                <p style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>${totalBilled.toLocaleString()}</p>
+                <p style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>${totalBilled.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
                 {prevBilled > 0 && (
                   <p style={{ fontSize: '11px', marginTop: '6px', color: billedChange >= 0 ? '#16a34a' : '#dc2626', display: 'flex', alignItems: 'center', gap: '3px' }}>
                     {billedChange >= 0 ? '↑' : '↓'} {Math.abs(billedChange).toFixed(1)}% vs mes anterior
@@ -994,7 +994,7 @@ export default function FinancesPage() {
               </div>
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 20px 16px', borderTop: '3px solid #0f172a' }}>
                 <p style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Comisiones del mes</p>
-                <p style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>${totalCommissions.toLocaleString()}</p>
+                <p style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>${totalCommissions.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
                 <p style={{ fontSize: '11px', color: '#64748b', marginTop: '6px' }}>
                   {monthlyRecords.length} registradas
                 </p>
@@ -1060,10 +1060,10 @@ export default function FinancesPage() {
                             <tr key={c.id} style={{ background: idx % 2 === 0 ? '#ffffff' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
                               <td style={{ padding: '10px 8px', fontSize: '14px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', verticalAlign: 'top' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', lineHeight: '1.5', width: '100%', display: 'block', wordBreak: 'break-word' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>
@@ -1129,7 +1129,7 @@ export default function FinancesPage() {
                       </div>
                       <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                         <div style={{ textAlign: 'right', marginRight: '8px' }}>
-                          <p style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${(catTotal + catCommissions).toLocaleString()}</p>
+                          <p style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${(catTotal + catCommissions).toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
                           <p style={{ fontSize: '10px', color: '#94a3b8' }}>total mensual</p>
                         </div>
                         <button onClick={() => { setShowClientModal({ categoryId: cat.id }); setEditingClient(null) }} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fff', border: '1px solid #e2e8f0', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, color: '#334155', cursor: 'pointer' }}>
@@ -1218,7 +1218,7 @@ export default function FinancesPage() {
                                         </a>
                                       )}
                                     </td>
-                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>{(() => { const rec = getMonthlyRecord(c.id); return <>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</>; })()}</td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>{(() => { const rec = getMonthlyRecord(c.id); return <>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString(undefined, {maximumFractionDigits: 0})}</>; })()}</td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                       <span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span>
                                     </td>
@@ -1230,7 +1230,7 @@ export default function FinancesPage() {
                                         const rec = getMonthlyRecord(c.id)
                                         const feeAmt = (rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)
                                         const rowTotal = feeAmt + (rec ? Number(rec.commission_amount) : 0)
-                                        return <>{sym}{rowTotal.toLocaleString()}</>
+                                        return <>{sym}{rowTotal.toLocaleString(undefined, {maximumFractionDigits: 0})}</>
                                       })()}
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
@@ -1298,10 +1298,10 @@ export default function FinancesPage() {
                               <tr style={{ background: '#0f172a', color: 'white', fontWeight: 700 }}>
                                 <td style={{ padding: '11px 8px', textAlign: 'center', color: '#64748b', fontSize: '10px', fontWeight: 800, letterSpacing: '0.05em' }}>TOTAL</td>
                                 <td style={{ padding: '11px 8px', fontSize: '12px', color: '#94a3b8' }}>{catClients.filter(c => !c.deleted_at).length} clientes</td>
-                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#e2e8f0', fontWeight: 700 }}>${catTotal.toLocaleString()}</td>
+                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#e2e8f0', fontWeight: 700 }}>${catTotal.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                                 <td style={{ padding: '11px 8px' }}></td>
                                 <td style={{ padding: '11px 8px' }}></td>
-                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#f0fdf4', fontWeight: 800 }}>${catTotal.toLocaleString()}</td>
+                                <td style={{ padding: '11px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: '14px', color: '#f0fdf4', fontWeight: 800 }}>${catTotal.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                                 <td style={{ padding: '11px 8px' }}></td>
                                 <td style={{ padding: '11px 8px' }}></td>
                                 <td style={{ padding: '11px 8px' }}></td>
@@ -1364,10 +1364,10 @@ export default function FinancesPage() {
                             <tr key={c.id} style={{ background: isDeleted ? '#f8fafc' : idx % 2 === 0 ? '#ffffff' : '#fafafa', borderBottom: '1px solid #f1f5f9', opacity: isDeleted ? 0.7 : 1 }}>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
                               <td style={{ padding: '10px 8px', fontSize: '14px', fontWeight: 700, color: '#0f172a', textDecoration: isDeleted ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}{isDeleted && <span style={{ marginLeft: '6px', fontSize: '10px', background: '#e2e8f0', color: '#64748b', padding: '1px 6px', borderRadius: '4px' }}>Eliminado</span>}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', verticalAlign: 'top' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', lineHeight: '1.5', width: '100%', display: 'block', wordBreak: 'break-word' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>
@@ -1398,19 +1398,19 @@ export default function FinancesPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div>
                   <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Total fees</p>
-                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${totalBilled.toLocaleString()}</p>
+                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${totalBilled.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Total comisiones</p>
-                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${totalCommissions.toLocaleString()}</p>
+                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${totalCommissions.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
                 </div>
                 <div style={{ borderLeft: '1px solid #f1f5f9', paddingLeft: '24px' }}>
                   <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Total general</p>
-                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>${(totalBilled + totalCommissions).toLocaleString()}</p>
+                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>${(totalBilled + totalCommissions).toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
                 </div>
                 <div>
                   <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Neto (− cancelados)</p>
-                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>${(totalBilled + totalCommissions - totalCancelled).toLocaleString()}</p>
+                  <p style={{ fontSize: '20px', fontWeight: 800, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>${(totalBilled + totalCommissions - totalCancelled).toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
                 </div>
               </div>
             </div>
@@ -1453,8 +1453,8 @@ export default function FinancesPage() {
                               </div>
                             </td>
                             <td style={{ padding: '10px 10px', textAlign: 'center', fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{cc.length}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>${catFee.toLocaleString()}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>${catTotal.toLocaleString()}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>${catFee.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>${catTotal.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                                 <div style={{ width: '52px', height: '5px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
@@ -1483,8 +1483,8 @@ export default function FinancesPage() {
                               </div>
                             </td>
                             <td style={{ padding: '10px 10px', textAlign: 'center', fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{uc.length}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>${ucFee.toLocaleString()}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>${ucTotal.toLocaleString()}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', color: '#334155' }}>${ucFee.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>${ucTotal.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                                 <div style={{ width: '52px', height: '5px', background: '#f1f5f9', borderRadius: '999px', overflow: 'hidden' }}>
@@ -1501,8 +1501,8 @@ export default function FinancesPage() {
                       <tr style={{ background: '#0f172a' }}>
                         <td style={{ padding: '11px 14px', fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TOTAL</td>
                         <td style={{ padding: '11px 10px', textAlign: 'center', color: '#64748b', fontSize: '12px', fontWeight: 700 }}>{activeClients.length}</td>
-                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#e2e8f0' }}>${totalBilled.toLocaleString()}</td>
-                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 800, color: '#f0fdf4' }}>${totalBilled.toLocaleString()}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#e2e8f0' }}>${totalBilled.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 800, color: '#f0fdf4' }}>${totalBilled.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                         <td style={{ padding: '11px 14px', textAlign: 'right', color: '#64748b', fontSize: '12px', fontWeight: 700 }}>100%</td>
                       </tr>
                     </tfoot>
@@ -1537,7 +1537,7 @@ export default function FinancesPage() {
                         </Pie>
                         <Tooltip
                           contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)', fontSize: '12px' }}
-                          formatter={(v: any, name: any) => [`$${Number(v).toLocaleString()} · ${((Number(v) / totalPie) * 100).toFixed(1)}%`, name]}
+                          formatter={(v: any, name: any) => [`$${Number(v).toLocaleString(undefined, {maximumFractionDigits: 0})} · ${((Number(v) / totalPie) * 100).toFixed(1)}%`, name]}
                         />
                       </PieChart>
                       <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
@@ -1549,7 +1549,7 @@ export default function FinancesPage() {
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                               <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>{((e.value / totalPie) * 100).toFixed(0)}%</span>
-                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${e.value.toLocaleString()}</span>
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${e.value.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
                             </div>
                           </div>
                         ))}
@@ -1611,10 +1611,10 @@ export default function FinancesPage() {
                     <tr key={p.id} className="hover:bg-slate-50">
                       <td className="px-5 py-3 text-sm font-medium text-slate-800">{p.employee_name}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{p.role || '-'}</td>
-                      <td className="px-5 py-3 text-right text-sm text-slate-700">${Number(p.base_salary).toLocaleString()}</td>
-                      <td className="px-5 py-3 text-right text-sm text-green-600">{Number(p.bonus) > 0 ? `+$${Number(p.bonus).toLocaleString()}` : '-'}</td>
-                      <td className="px-5 py-3 text-right text-sm text-red-600">{Number(p.deductions) > 0 ? `-$${Number(p.deductions).toLocaleString()}` : '-'}</td>
-                      <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">${Number(p.net_salary).toLocaleString()}</td>
+                      <td className="px-5 py-3 text-right text-sm text-slate-700">${Number(p.base_salary).toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                      <td className="px-5 py-3 text-right text-sm text-green-600">{Number(p.bonus) > 0 ? `+$${Number(p.bonus).toLocaleString(undefined, {maximumFractionDigits: 0})}` : '-'}</td>
+                      <td className="px-5 py-3 text-right text-sm text-red-600">{Number(p.deductions) > 0 ? `-$${Number(p.deductions).toLocaleString(undefined, {maximumFractionDigits: 0})}` : '-'}</td>
+                      <td className="px-5 py-3 text-right text-sm font-semibold text-slate-900">${Number(p.net_salary).toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                       <td className="px-5 py-3 text-center"><PayrollStatusBadge status={p.status} /></td>
                       <td className="px-5 py-3 text-center">
                         <div className="relative">
@@ -1638,10 +1638,10 @@ export default function FinancesPage() {
                   <tr style={{ background: '#0f172a', color: 'white' }}>
                     <td className="px-5 py-3 text-xs font-bold" style={{ color: '#64748b', letterSpacing: '0.05em' }}>TOTAL</td>
                     <td className="px-5 py-3 text-xs" style={{ color: '#94a3b8' }}>{payroll.length} empleados</td>
-                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#e2e8f0' }}>${payroll.reduce((s, p) => s + Number(p.base_salary), 0).toLocaleString()}</td>
-                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#4ade80' }}>${payroll.reduce((s, p) => s + Number(p.bonus), 0).toLocaleString()}</td>
-                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#fca5a5' }}>${payroll.reduce((s, p) => s + Number(p.deductions), 0).toLocaleString()}</td>
-                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#f0fdf4', fontSize: '14px' }}>${totalPayroll.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#e2e8f0' }}>${payroll.reduce((s, p) => s + Number(p.base_salary), 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#4ade80' }}>${payroll.reduce((s, p) => s + Number(p.bonus), 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#fca5a5' }}>${payroll.reduce((s, p) => s + Number(p.deductions), 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#f0fdf4', fontSize: '14px' }}>${totalPayroll.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                     <td className="px-5 py-3" colSpan={2}></td>
                   </tr>
                 </>)}
@@ -1808,7 +1808,7 @@ export default function FinancesPage() {
                       <td className="px-5 py-3"><CategoryBadge category={t.category} /></td>
                       <td className="px-5 py-3 text-sm text-slate-800 max-w-[250px] truncate">{t.description}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{t.clients?.name || '-'}</td>
-                      <td className="px-5 py-3 text-right text-sm font-semibold text-red-600">-${Number(t.amount).toLocaleString()}</td>
+                      <td className="px-5 py-3 text-right text-sm font-semibold text-red-600">-${Number(t.amount).toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                           <button
@@ -1833,7 +1833,7 @@ export default function FinancesPage() {
                     <td className="px-5 py-3 text-xs font-bold" style={{ color: '#64748b', letterSpacing: '0.05em' }}>TOTAL</td>
                     <td className="px-5 py-3 text-xs" style={{ color: '#94a3b8' }}>{expenseTx.length} gastos</td>
                     <td className="px-5 py-3" colSpan={3}></td>
-                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#fca5a5', fontSize: '14px' }}>${totalExpenses.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right text-sm font-bold" style={{ fontVariantNumeric: 'tabular-nums', color: '#fca5a5', fontSize: '14px' }}>${totalExpenses.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
                   </tr>
                 </>)}
               </tbody>
@@ -1844,15 +1844,15 @@ export default function FinancesPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="rounded-xl border border-red-200 bg-red-50 p-4">
                 <p className="text-xs text-red-600 font-medium">Total del periodo</p>
-                <p className="text-lg font-bold text-red-800">${totalExpenses.toLocaleString()}</p>
+                <p className="text-lg font-bold text-red-800">${totalExpenses.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
               </div>
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <p className="text-xs text-amber-600 font-medium">Promedio por gasto</p>
-                <p className="text-lg font-bold text-amber-800">${expenseTx.length > 0 ? Math.round(totalExpenses / expenseTx.length).toLocaleString() : 0}</p>
+                <p className="text-lg font-bold text-amber-800">${expenseTx.length > 0 ? Math.round(totalExpenses / expenseTx.length).toLocaleString(undefined, {maximumFractionDigits: 0}) : 0}</p>
               </div>
               <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
                 <p className="text-xs text-purple-600 font-medium">Mayor categoria</p>
-                <p className="text-lg font-bold text-purple-800">{topExpenseCategory ? <><CategoryBadge category={topExpenseCategory[0]} /> ${topExpenseCategory[1].toLocaleString()}</> : '-'}</p>
+                <p className="text-lg font-bold text-purple-800">{topExpenseCategory ? <><CategoryBadge category={topExpenseCategory[0]} /> ${topExpenseCategory[1].toLocaleString(undefined, {maximumFractionDigits: 0})}</> : '-'}</p>
               </div>
             </div>
           )}
@@ -1997,7 +1997,7 @@ export default function FinancesPage() {
               </div>
             </div>
             <p className="text-sm text-slate-600 mb-4">
-              Se eliminara el gasto de <strong>${Number(deletingExpense.amount).toLocaleString()}</strong> del {new Date(deletingExpense.date).toLocaleDateString('es-ES')}. Esta accion no se puede deshacer.
+              Se eliminara el gasto de <strong>${Number(deletingExpense.amount).toLocaleString(undefined, {maximumFractionDigits: 0})}</strong> del {new Date(deletingExpense.date).toLocaleDateString('es-ES')}. Esta accion no se puede deshacer.
             </p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setDeletingExpense(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
@@ -2322,7 +2322,7 @@ function ClientModal({ client, categoryId, categories, onSave, onClose }: {
             </div>
             <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
               <p className="text-[10px] text-blue-600 uppercase font-semibold">Total</p>
-              <p className="text-base font-bold text-blue-700">{sym}{total.toLocaleString()}</p>
+              <p className="text-base font-bold text-blue-700">{sym}{total.toLocaleString(undefined, {maximumFractionDigits: 0})}</p>
             </div>
             <div>
               <label className="text-[10px] text-red-600 uppercase font-semibold block mb-1">Monto cancelado</label>
@@ -2422,7 +2422,7 @@ function CloseMonthModal({ client, month, year, existingRecord, onSave, onClose 
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-lg bg-slate-50 p-3">
             <p className="text-xs text-slate-500">Fee contractual</p>
-            <p className="text-lg font-bold text-slate-900">{sym}{Number(client.contract_cost).toLocaleString()} <span className="text-xs text-slate-400">{client.currency}</span></p>
+            <p className="text-lg font-bold text-slate-900">{sym}{Number(client.contract_cost).toLocaleString(undefined, {maximumFractionDigits: 0})} <span className="text-xs text-slate-400">{client.currency}</span></p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
             <p className="text-xs text-slate-500">% comision (referencial)</p>
