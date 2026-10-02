@@ -1,4 +1,5 @@
 'use client'
+import { cachedFetch } from '@/lib/data-cache'
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
