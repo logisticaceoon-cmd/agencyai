@@ -1502,8 +1502,7 @@ export default function FinancesPage() {
                         <td style={{ padding: '11px 14px', fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>TOTAL</td>
                         <td style={{ padding: '11px 10px', textAlign: 'center', color: '#64748b', fontSize: '12px', fontWeight: 700 }}>{activeClients.length}</td>
                         <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#e2e8f0' }}>${totalBilled.toLocaleString()}</td>
-                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#4ade80' }}>${totalCommissions.toLocaleString()}</td>
-                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 800, color: '#f0fdf4' }}>${(totalBilled + totalCommissions).toLocaleString()}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 800, color: '#f0fdf4' }}>${totalBilled.toLocaleString()}</td>
                         <td style={{ padding: '11px 14px', textAlign: 'right', color: '#64748b', fontSize: '12px', fontWeight: 700 }}>100%</td>
                       </tr>
                     </tfoot>
