@@ -224,7 +224,7 @@ export default function TasksPage() {
     loadProjects()
     loadMembers()
     // Load clients for template generation
-    cachedFetch('/api/clients?limit=200').then((d: {data?: unknown[]}) => setClients(d.data || [])).catch(() => {})
+    cachedFetch('/api/clients?limit=200').then((d: {data?: any[]}) => setClients(d.data || [])).catch(() => {})
   }, [loadProjects, loadMembers])
 
   async function openTemplateModal() {
