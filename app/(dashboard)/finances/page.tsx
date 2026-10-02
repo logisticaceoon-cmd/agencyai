@@ -1027,12 +1027,18 @@ export default function FinancesPage() {
                     </button>
                   </div>
                   <div className="bg-white overflow-x-auto">
-                    <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse', minWidth: '1320px' }}>
+                    <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse' }}>
                       <colgroup>
-                        <col style={{ width: '36px' }} /><col style={{ width: '155px' }} /><col style={{ width: '125px' }} />
-                        <col style={{ width: '80px' }} /><col style={{ width: '65px' }} /><col style={{ width: '95px' }} />
-                        <col style={{ width: '125px' }} /><col style={{ width: '100px' }} /><col style={{ width: '90px' }} />
-                        <col style={{ width: '100px' }} /><col /><col style={{ width: '165px' }} />
+                        <col style={{ width: '3%' }} />
+                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '9%' }} />
+                        <col style={{ width: '5%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '9%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '27%' }} />
+                        <col style={{ width: '8%' }} />
                       </colgroup>
                       <thead>
                         <tr style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
@@ -1062,7 +1068,7 @@ export default function FinancesPage() {
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
-                              <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px', verticalAlign: 'top' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', lineHeight: '1.5', width: '100%', display: 'block', wordBreak: 'break-word' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                 <div style={{ display: 'inline-flex', gap: '3px' }}>
                                   <button onClick={() => { setEditingClient(c); setShowClientModal({ categoryId: c.category_id }) }} style={{ background: '#f8fafc', color: '#475569', padding: '5px 7px', borderRadius: '6px', border: '1px solid #e2e8f0', cursor: 'pointer' }}><Pencil style={{ width: '13px', height: '13px' }} /></button>
@@ -1165,20 +1171,18 @@ export default function FinancesPage() {
                               </div>
                             )
                           })()}
-                          <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse', minWidth: '1320px' }}>
+                          <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse' }}>
                             <colgroup>
-                              <col style={{ width: '36px' }} />
-                              <col style={{ width: '155px' }} />
-                              <col style={{ width: '125px' }} />
-                              <col style={{ width: '80px' }} />
-                              <col style={{ width: '65px' }} />
-                              <col style={{ width: '95px' }} />
-                              <col style={{ width: '125px' }} />
-                              <col style={{ width: '100px' }} />
-                              <col style={{ width: '90px' }} />
-                              <col style={{ width: '100px' }} />
-                              <col />
-                              <col style={{ width: '165px' }} />
+                              <col style={{ width: '3%' }} />
+                              <col style={{ width: '15%' }} />
+                              <col style={{ width: '9%' }} />
+                              <col style={{ width: '5%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '9%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '27%' }} />
+                              <col style={{ width: '8%' }} />
                             </colgroup>
                             <thead>
                               <tr style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
@@ -1339,12 +1343,18 @@ export default function FinancesPage() {
                     </div>
                   </div>
                   <div className="bg-white overflow-x-auto">
-                    <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse', minWidth: '1320px' }}>
+                    <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse' }}>
                       <colgroup>
-                        <col style={{ width: '36px' }} /><col style={{ width: '155px' }} /><col style={{ width: '125px' }} />
-                        <col style={{ width: '80px' }} /><col style={{ width: '65px' }} /><col style={{ width: '95px' }} />
-                        <col style={{ width: '125px' }} /><col style={{ width: '100px' }} /><col style={{ width: '90px' }} />
-                        <col style={{ width: '100px' }} /><col /><col style={{ width: '165px' }} />
+                        <col style={{ width: '3%' }} />
+                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '9%' }} />
+                        <col style={{ width: '5%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '9%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '27%' }} />
+                        <col style={{ width: '8%' }} />
                       </colgroup>
                       <thead>
                         <tr style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
@@ -1375,7 +1385,7 @@ export default function FinancesPage() {
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
-                              <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                              <td style={{ padding: '10px 8px', verticalAlign: 'top' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', lineHeight: '1.5', width: '100%', display: 'block', wordBreak: 'break-word' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                 {!isDeleted ? (
                                   <div style={{ display: 'inline-flex', gap: '3px' }}>
