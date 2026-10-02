@@ -276,7 +276,7 @@ export default function FinancesPage() {
           const recs: { client_id: string; billed_amount: number; commission_amount: number }[] = fcJson?.monthlyRecords || []
           const fees = activeC.reduce((s: number, c: { id: string; contract_cost: number }) => {
             const rec = recs.find(r => r.client_id === c.id)
-            return s + (rec ? Number(rec.billed_amount) : Number(c.contract_cost))
+            return s + ((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost))
           }, 0)
           const comms = recs
             .filter(r => activeC.some((c: { id: string }) => c.id === r.client_id))
@@ -332,7 +332,7 @@ export default function FinancesPage() {
   // Lógica unificada: fee = billed_amount si existe el registro, sino contract_cost (mismo criterio que el header de categoría)
   const totalBilled = activeClients.reduce((s, c) => {
     const rec = monthlyRecords.find(r => r.client_id === c.id)
-    return s + (rec ? Number(rec.billed_amount) : Number(c.contract_cost))
+    return s + ((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost))
   }, 0)
   // Comisiones: solo de clientes activos
   const totalCommissions = monthlyRecords
@@ -342,7 +342,7 @@ export default function FinancesPage() {
   // Mes anterior: misma lógica para comparación
   const prevBilled = activeClients.reduce((s, c) => {
     const rec = prevMonthlyRecords.find(r => r.client_id === c.id)
-    return s + (rec ? Number(rec.billed_amount) : Number(c.contract_cost))
+    return s + ((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost))
   }, 0)
   const billedChange = prevBilled > 0 ? ((totalBilled - prevBilled) / prevBilled) * 100 : 0
 
@@ -792,7 +792,7 @@ export default function FinancesPage() {
             <div className="space-y-2">
               {activeClients.map((c, i) => {
                 const rec = monthlyRecords.find(r => r.client_id === c.id)
-                const fee = Number(rec?.billed_amount ?? c.contract_cost ?? 0)
+                const fee = Number((rec && Number(rec.billed_amount) > 0 ? Number(rec.billed_amount) : Number(c.contract_cost ?? 0)))
                 const comm = Number(rec?.commission_amount ?? 0)
                 const total = fee + comm
                 return (
@@ -842,7 +842,7 @@ export default function FinancesPage() {
             // ── Ingresos por cliente ──
             const iRows: { name: string; value: number; color: string }[] = activeClients.map((c, i) => {
               const rec = monthlyRecords.find(r => r.client_id === c.id)
-              const fee = Number(rec?.billed_amount ?? c.contract_cost ?? 0)
+              const fee = Number((rec && Number(rec.billed_amount) > 0 ? Number(rec.billed_amount) : Number(c.contract_cost ?? 0)))
               const comm = Number(rec?.commission_amount ?? 0)
               return { name: c.client_name, value: fee + comm, color: PIE_CLIENT_COLORS[i % PIE_CLIENT_COLORS.length] }
             }).filter(r => r.value > 0)
@@ -1061,7 +1061,7 @@ export default function FinancesPage() {
                             <tr key={c.id} style={{ background: idx % 2 === 0 ? '#ffffff' : '#fafafa', borderBottom: '1px solid #f1f5f9' }}>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
                               <td style={{ padding: '10px 8px', fontSize: '13px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{Number(rec ? rec.billed_amount : c.contract_cost).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{Number(c.commission_percent) > 0 ? <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span> : <span style={{ color: '#cbd5e1', fontSize: '12px' }}>$0</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
@@ -1073,7 +1073,7 @@ export default function FinancesPage() {
                                   </div>
                                 )}
                               </td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{(Number(rec ? rec.billed_amount : c.contract_cost) + (rec ? Number(rec.commission_amount) : 0)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{(((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)) + (rec ? Number(rec.commission_amount) : 0)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
@@ -1119,7 +1119,7 @@ export default function FinancesPage() {
                 })
                 const catTotal = activeCatClients.reduce((s, c) => {
                   const rec = catRecords.find(r => r.client_id === c.id)
-                  return s + (rec ? Number(rec.billed_amount) : Number(c.contract_cost))
+                  return s + ((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost))
                 }, 0)
                 const catCommissions = catRecords
                   .filter(r => activeCatClients.some(c => c.id === r.client_id))
@@ -1236,7 +1236,7 @@ export default function FinancesPage() {
                                         </a>
                                       )}
                                     </td>
-                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{(() => { const rec = getMonthlyRecord(c.id); return <>{sym}{Number(rec ? rec.billed_amount : c.contract_cost).toLocaleString()}</>; })()}</td>
+                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{(() => { const rec = getMonthlyRecord(c.id); return <>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</>; })()}</td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                       {Number(c.commission_percent) > 0 ? (
                                         <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span>
@@ -1267,7 +1267,7 @@ export default function FinancesPage() {
                                     <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>
                                       {(() => {
                                         const rec = getMonthlyRecord(c.id)
-                                        const feeAmt = rec ? Number(rec.billed_amount) : Number(c.contract_cost)
+                                        const feeAmt = (rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)
                                         const rowTotal = feeAmt + (rec ? Number(rec.commission_amount) : 0)
                                         return <>{sym}{rowTotal.toLocaleString()}</>
                                       })()}
@@ -1416,12 +1416,12 @@ export default function FinancesPage() {
                             <tr key={c.id} style={{ background: isDeleted ? '#f8fafc' : idx % 2 === 0 ? '#ffffff' : '#fafafa', borderBottom: '1px solid #f1f5f9', opacity: isDeleted ? 0.7 : 1 }}>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
                               <td style={{ padding: '10px 8px', fontSize: '13px', fontWeight: 700, color: '#0f172a', textDecoration: isDeleted ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}{isDeleted && <span style={{ marginLeft: '6px', fontSize: '10px', background: '#e2e8f0', color: '#64748b', padding: '1px 6px', borderRadius: '4px' }}>Eliminado</span>}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{Number(rec ? rec.billed_amount : c.contract_cost).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{Number(c.commission_percent) > 0 ? <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span> : <span style={{ color: '#cbd5e1', fontSize: '12px' }}>$0</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right' }}>{!rec || Number(rec.commission_amount) === 0 ? <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span> : <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '6px', height: '6px', borderRadius: '50%', background: rec.status === 'paid' ? '#16a34a' : '#f59e0b', display: 'inline-block' }} /><span style={{ color: rec.status === 'paid' ? '#16a34a' : '#92400e', fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>{sym}{Number(rec.commission_amount).toLocaleString()}</span></div>}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{(Number(rec ? rec.billed_amount : c.contract_cost) + (rec ? Number(rec.commission_amount) : 0)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{(((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)) + (rec ? Number(rec.commission_amount) : 0)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
@@ -1497,7 +1497,7 @@ export default function FinancesPage() {
                       {categories.map(cat => {
                         const cc = (clientsByCategory[cat.id] || []).filter(c => !c.deleted_at)
                         const catRecs = monthlyRecords.filter(r => cc.some(c => c.id === r.client_id))
-                        const catFee = cc.reduce((s, c) => { const r = catRecs.find(x => x.client_id === c.id); return s + (r ? Number(r.billed_amount) : Number(c.contract_cost)) }, 0)
+                        const catFee = cc.reduce((s, c) => { const r = catRecs.find(x => x.client_id === c.id); return s + ((r && Number(r.billed_amount) > 0) ? Number(r.billed_amount) : Number(c.contract_cost)) }, 0)
                         const catComm = catRecs.filter(r => cc.some(c => c.id === r.client_id)).reduce((s, r) => s + Number(r.commission_amount), 0)
                         const catTotal = catFee + catComm
                         const grandTotal = totalBilled + totalCommissions
@@ -1529,7 +1529,7 @@ export default function FinancesPage() {
                       {(clientsByCategory.__uncategorized__ || []).filter(c => !c.deleted_at).length > 0 && (() => {
                         const uc = (clientsByCategory.__uncategorized__ || []).filter(c => !c.deleted_at)
                         const ucRecs = monthlyRecords.filter(r => uc.some(c => c.id === r.client_id))
-                        const ucFee = uc.reduce((s, c) => { const r = ucRecs.find(x => x.client_id === c.id); return s + (r ? Number(r.billed_amount) : Number(c.contract_cost)) }, 0)
+                        const ucFee = uc.reduce((s, c) => { const r = ucRecs.find(x => x.client_id === c.id); return s + ((r && Number(r.billed_amount) > 0) ? Number(r.billed_amount) : Number(c.contract_cost)) }, 0)
                         const ucComm = ucRecs.reduce((s, r) => s + Number(r.commission_amount), 0)
                         const ucTotal = ucFee + ucComm
                         const grandTotal = totalBilled + totalCommissions
@@ -1576,7 +1576,7 @@ export default function FinancesPage() {
                   const PIE_CLIENT_COLORS = ['#2563eb','#16a34a','#ea580c','#9333ea','#0d9488','#dc2626','#f59e0b','#3b82f6','#ec4899','#64748b']
                   const clientPie = activeClients.map((c, i) => {
                     const rec = monthlyRecords.find(r => r.client_id === c.id)
-                    const fee = rec ? Number(rec.billed_amount) : Number(c.contract_cost)
+                    const fee = (rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)
                     const comm = rec ? Number(rec.commission_amount) : 0
                     return { name: c.client_name, value: fee + comm, color: PIE_CLIENT_COLORS[i % PIE_CLIENT_COLORS.length] }
                   }).filter(x => x.value > 0)
@@ -2609,3 +2609,4 @@ function FormField({ label, name, type = 'text', ...props }: { label: string; na
 function LoadingSkeleton() {
   return <div className="p-4 space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 bg-slate-100 rounded animate-pulse" />)}</div>
 }
+
