@@ -139,7 +139,7 @@ export default function ProjectsPage() {
       const params = new URLSearchParams()
       if (filterClient) params.set('client_id', filterClient)
       if (filterStatus) params.set('status', filterStatus)
-      const res = await fetch(`/api/projects?${params}`)
+      const res = await cachedFetch(`/api/projects?${params}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) }))
       if (res.ok) {
         const json = await res.json()
         setProjects(json.data || [])
