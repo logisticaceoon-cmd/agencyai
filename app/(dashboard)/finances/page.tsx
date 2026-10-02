@@ -1039,10 +1039,8 @@ export default function FinancesPage() {
                           <th style={{ ...thStyle('center'), color: '#cbd5e1', fontSize: '10px' }}>Nº</th>
                           <th style={thStyle('left')}>Cliente</th>
                           <th style={thStyle('right')}>Fee mensual</th>
-                          <th style={thStyle('center')}>Comis. %</th>
                           <th style={thStyle('center')}>Cuentas</th>
                           <th style={thStyle('center')}>Inicio</th>
-                          <th style={thStyle('right')}>Comisión mes</th>
                           <th style={thStyle('right')}>Total</th>
                           <th style={thStyle('right')}>Cancelado</th>
                           <th style={thStyle('center')}>Asignado</th>
@@ -1059,23 +1057,14 @@ export default function FinancesPage() {
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
                               <td style={{ padding: '10px 8px', fontSize: '13px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'center' }}>{Number(c.commission_percent) > 0 ? <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span> : <span style={{ color: '#cbd5e1', fontSize: '12px' }}>$0</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right' }}>
-                                {!rec || Number(rec.commission_amount) === 0 ? <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span> : (
-                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                    <span style={{ fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums', color: '#16a34a' }}>{sym}{Number(rec.commission_amount).toLocaleString()}</span>
-                                  </div>
-                                )}
-                              </td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{(((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)) + (rec ? Number(rec.commission_amount) : 0)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                 <div style={{ display: 'inline-flex', gap: '3px' }}>
-                                  <button onClick={() => setClosingClient(c)} style={{ background: '#f0fdf4', color: '#16a34a', padding: '5px 9px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bbf7d0', cursor: 'pointer' }}>Comisión</button>
                                   <button onClick={() => { setEditingClient(c); setShowClientModal({ categoryId: c.category_id }) }} style={{ background: '#f8fafc', color: '#475569', padding: '5px 7px', borderRadius: '6px', border: '1px solid #e2e8f0', cursor: 'pointer' }}><Pencil style={{ width: '13px', height: '13px' }} /></button>
                                   <button onClick={() => setDeletingClient(c)} style={{ background: '#fff5f5', color: '#dc2626', padding: '5px 7px', borderRadius: '6px', border: '1px solid #fecaca', cursor: 'pointer' }}><Trash2 style={{ width: '13px', height: '13px' }} /></button>
                                 </div>
@@ -1196,10 +1185,8 @@ export default function FinancesPage() {
                                 <th style={{ ...thStyle('center'), color: '#cbd5e1', fontSize: '10px' }}>Nº</th>
                                 <th style={thStyle('left')}>Cliente</th>
                                 <th style={thStyle('right')}>Fee mensual</th>
-                                <th style={thStyle('center')}>Comis. %</th>
                                 <th style={thStyle('center')}>Cuentas</th>
                                 <th style={thStyle('center')}>Inicio</th>
-                                <th style={thStyle('right')}>Comisión mes</th>
                                 <th style={thStyle('right')}>Total</th>
                                 <th style={thStyle('right')}>Cancelado</th>
                                 <th style={thStyle('center')}>Asignado</th>
@@ -1234,31 +1221,10 @@ export default function FinancesPage() {
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{(() => { const rec = getMonthlyRecord(c.id); return <>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</>; })()}</td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-                                      {Number(c.commission_percent) > 0 ? (
-                                        <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span>
-                                      ) : <span style={{ color: '#cbd5e1', fontSize: '12px' }}>$0</span>}
-                                    </td>
-                                    <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                       <span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span>
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>
                                       {c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
-                                    </td>
-                                    <td style={{ padding: '10px 8px', textAlign: 'right' }}>
-                                      {(() => {
-                                        const rec = getMonthlyRecord(c.id)
-                                        if (!rec || Number(rec.commission_amount) === 0) return <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span>
-                                        const amt = Number(rec.commission_amount)
-                                        const isPaid = rec.status === 'paid'
-                                        return (
-                                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isPaid ? '#16a34a' : '#f59e0b', display: 'inline-block', flexShrink: 0 }} />
-                                            <span style={{ color: isPaid ? '#16a34a' : '#92400e', fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>
-                                              {sym}{amt.toLocaleString()}
-                                            </span>
-                                          </div>
-                                        )
-                                      })()}
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>
                                       {(() => {
@@ -1306,13 +1272,6 @@ export default function FinancesPage() {
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                       {!isDeleted ? (
                                         <div style={{ display: 'inline-flex', gap: '3px', alignItems: 'center' }}>
-                                          <button
-                                            onClick={() => setClosingClient(c)}
-                                            title="Registrar comisión del mes"
-                                            style={{ background: '#f0fdf4', color: '#16a34a', padding: '5px 9px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bbf7d0', cursor: 'pointer' }}
-                                          >
-                                            Comisión
-                                          </button>
                                           <button
                                             onClick={() => { setEditingClient(c); setShowClientModal({ categoryId: c.category_id }) }}
                                             title="Editar cliente"
@@ -1392,10 +1351,8 @@ export default function FinancesPage() {
                           <th style={{ ...thStyle('center'), color: '#cbd5e1', fontSize: '10px' }}>Nº</th>
                           <th style={thStyle('left')}>Cliente</th>
                           <th style={thStyle('right')}>Fee mensual</th>
-                          <th style={thStyle('center')}>Comis. %</th>
                           <th style={thStyle('center')}>Cuentas</th>
                           <th style={thStyle('center')}>Inicio</th>
-                          <th style={thStyle('right')}>Comisión mes</th>
                           <th style={thStyle('right')}>Total</th>
                           <th style={thStyle('right')}>Cancelado</th>
                           <th style={thStyle('center')}>Asignado</th>
@@ -1413,18 +1370,15 @@ export default function FinancesPage() {
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>{idx + 1}</td>
                               <td style={{ padding: '10px 8px', fontSize: '13px', fontWeight: 700, color: '#0f172a', textDecoration: isDeleted ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.client_name}{isDeleted && <span style={{ marginLeft: '6px', fontSize: '10px', background: '#e2e8f0', color: '#64748b', padding: '1px 6px', borderRadius: '4px' }}>Eliminado</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'center' }}>{Number(c.commission_percent) > 0 ? <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span> : <span style={{ color: '#cbd5e1', fontSize: '12px' }}>$0</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right' }}>{!rec || Number(rec.commission_amount) === 0 ? <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span> : <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><span style={{ fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums', color: '#16a34a' }}>{sym}{Number(rec.commission_amount).toLocaleString()}</span></div>}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{(((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)) + (rec ? Number(rec.commission_amount) : 0)).toLocaleString()}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                 {!isDeleted ? (
                                   <div style={{ display: 'inline-flex', gap: '3px' }}>
-                                    <button onClick={() => setClosingClient(c)} style={{ background: '#f0fdf4', color: '#16a34a', padding: '5px 9px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: '1px solid #bbf7d0', cursor: 'pointer' }}>Comisión</button>
                                     <button onClick={() => { setEditingClient(c); setShowClientModal({ categoryId: c.category_id }) }} style={{ background: '#f8fafc', color: '#475569', padding: '5px 7px', borderRadius: '6px', border: '1px solid #e2e8f0', cursor: 'pointer' }}><Pencil style={{ width: '13px', height: '13px' }} /></button>
                                     <button onClick={() => setDeletingClient(c)} style={{ background: '#fff5f5', color: '#dc2626', padding: '5px 7px', borderRadius: '6px', border: '1px solid #fecaca', cursor: 'pointer' }}><Trash2 style={{ width: '13px', height: '13px' }} /></button>
                                   </div>
@@ -1484,7 +1438,6 @@ export default function FinancesPage() {
                         <th style={{ ...thStyle('left'), padding: '10px 14px' }}>Servicio / Categoría</th>
                         <th style={{ ...thStyle('center'), padding: '10px 10px' }}>Clientes</th>
                         <th style={{ ...thStyle('right'), padding: '10px 14px' }}>Fees</th>
-                        <th style={{ ...thStyle('right'), padding: '10px 14px' }}>Comisiones</th>
                         <th style={{ ...thStyle('right'), padding: '10px 14px' }}>Total</th>
                         <th style={{ ...thStyle('right'), padding: '10px 14px', minWidth: '90px' }}>% del total</th>
                       </tr>
@@ -1494,8 +1447,7 @@ export default function FinancesPage() {
                         const cc = (clientsByCategory[cat.id] || []).filter(c => !c.deleted_at)
                         const catRecs = monthlyRecords.filter(r => cc.some(c => c.id === r.client_id))
                         const catFee = cc.reduce((s, c) => { const r = catRecs.find(x => x.client_id === c.id); return s + ((r && Number(r.billed_amount) > 0) ? Number(r.billed_amount) : Number(c.contract_cost)) }, 0)
-                        const catComm = catRecs.filter(r => cc.some(c => c.id === r.client_id)).reduce((s, r) => s + Number(r.commission_amount), 0)
-                        const catTotal = catFee + catComm
+                        const catTotal = catFee
                         const grandTotal = totalBilled + totalCommissions
                         const pct = grandTotal > 0 ? (catTotal / grandTotal) * 100 : 0
                         return (
@@ -1508,7 +1460,6 @@ export default function FinancesPage() {
                             </td>
                             <td style={{ padding: '10px 10px', textAlign: 'center', fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{cc.length}</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>${catFee.toLocaleString()}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>{catComm > 0 ? `$${catComm.toLocaleString()}` : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>${catTotal.toLocaleString()}</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
@@ -1526,8 +1477,7 @@ export default function FinancesPage() {
                         const uc = (clientsByCategory.__uncategorized__ || []).filter(c => !c.deleted_at)
                         const ucRecs = monthlyRecords.filter(r => uc.some(c => c.id === r.client_id))
                         const ucFee = uc.reduce((s, c) => { const r = ucRecs.find(x => x.client_id === c.id); return s + ((r && Number(r.billed_amount) > 0) ? Number(r.billed_amount) : Number(c.contract_cost)) }, 0)
-                        const ucComm = ucRecs.reduce((s, r) => s + Number(r.commission_amount), 0)
-                        const ucTotal = ucFee + ucComm
+                        const ucTotal = ucFee
                         const grandTotal = totalBilled + totalCommissions
                         const pct = grandTotal > 0 ? (ucTotal / grandTotal) * 100 : 0
                         return (
@@ -1540,7 +1490,6 @@ export default function FinancesPage() {
                             </td>
                             <td style={{ padding: '10px 10px', textAlign: 'center', fontSize: '12px', color: '#64748b', fontWeight: 600 }}>{uc.length}</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>${ucFee.toLocaleString()}</td>
-                            <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>{ucComm > 0 ? `$${ucComm.toLocaleString()}` : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>${ucTotal.toLocaleString()}</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
