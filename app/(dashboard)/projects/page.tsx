@@ -158,8 +158,8 @@ export default function ProjectsPage() {
     async function loadAux() {
       try {
         const [clientsRes, teamRes] = await Promise.all([
-          fetch('/api/clients'),
-          fetch('/api/team'),
+          cachedFetch('/api/clients').then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
+          cachedFetch('/api/team').then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
         ])
         if (!mounted) return
         if (clientsRes.ok) {
