@@ -993,7 +993,7 @@ export default function FinancesPage() {
                 <p style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>Comisiones del mes</p>
                 <p style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>${totalCommissions.toLocaleString()}</p>
                 <p style={{ fontSize: '11px', color: '#64748b', marginTop: '6px' }}>
-                  {monthlyRecords.filter(r => r.status === 'paid').length} cobradas · {monthlyRecords.filter(r => r.status !== 'paid').length} pendientes
+                  {monthlyRecords.length} registradas
                 </p>
               </div>
               <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 20px 16px', borderTop: '3px solid #0f172a' }}>
@@ -1069,8 +1069,7 @@ export default function FinancesPage() {
                               <td style={{ padding: '10px 8px', textAlign: 'right' }}>
                                 {!rec || Number(rec.commission_amount) === 0 ? <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span> : (
                                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: rec.status === 'paid' ? '#16a34a' : '#f59e0b', display: 'inline-block' }} />
-                                    <span style={{ color: rec.status === 'paid' ? '#16a34a' : '#92400e', fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>{sym}{Number(rec.commission_amount).toLocaleString()}</span>
+                                    <span style={{ fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums', color: '#16a34a' }}>{sym}{Number(rec.commission_amount).toLocaleString()}</span>
                                   </div>
                                 )}
                               </td>
@@ -1421,7 +1420,7 @@ export default function FinancesPage() {
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{Number(c.commission_percent) > 0 ? <span style={{ background: '#f3e8ff', color: '#7e22ce', padding: '3px 8px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>%{c.commission_percent}</span> : <span style={{ color: '#cbd5e1', fontSize: '12px' }}>$0</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right' }}>{!rec || Number(rec.commission_amount) === 0 ? <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span> : <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '6px', height: '6px', borderRadius: '50%', background: rec.status === 'paid' ? '#16a34a' : '#f59e0b', display: 'inline-block' }} /><span style={{ color: rec.status === 'paid' ? '#16a34a' : '#92400e', fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums' }}>{sym}{Number(rec.commission_amount).toLocaleString()}</span></div>}</td>
+                              <td style={{ padding: '10px 8px', textAlign: 'right' }}>{!rec || Number(rec.commission_amount) === 0 ? <span style={{ color: '#cbd5e1', fontSize: '12px' }}>—</span> : <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><span style={{ fontWeight: 700, fontSize: '12px', fontVariantNumeric: 'tabular-nums', color: '#16a34a' }}>{sym}{Number(rec.commission_amount).toLocaleString()}</span></div>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>{sym}{(((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)) + (rec ? Number(rec.commission_amount) : 0)).toLocaleString()}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
@@ -2472,7 +2471,7 @@ function CloseMonthModal({ client, month, year, existingRecord, onSave, onClose 
   const [billedAmount, setBilledAmount] = useState<number>(existingRecord ? Number(existingRecord.billed_amount) : 0)
   const [commissionAmount, setCommissionAmount] = useState<number>(existingRecord ? Number(existingRecord.commission_amount) : 0)
   const [notes, setNotes] = useState(existingRecord?.notes || '')
-  const [paid, setPaid] = useState(existingRecord?.status === 'paid')
+  // status removed — no paid/unpaid distinction
   const pct = Number(client.commission_percent) || 0
   const sym = getCurrencySymbol(client.currency)
 
@@ -2530,10 +2529,7 @@ function CloseMonthModal({ client, month, year, existingRecord, onSave, onClose 
         </div>
 
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => setPaid(!paid)} className={cn('relative inline-flex h-6 w-11 items-center rounded-full transition-colors', paid ? 'bg-green-500' : 'bg-slate-300')}>
-            <span className={cn('inline-block h-4 w-4 transform rounded-full bg-white transition-transform', paid ? 'translate-x-6' : 'translate-x-1')} />
-          </button>
-          <span className="text-sm text-slate-700">{paid ? '✅ Comision pagada' : '⏳ Pendiente de pago'}</span>
+          {/* paid/unpaid toggle removed — just register the amount */}
         </div>
 
         <div>
@@ -2544,7 +2540,7 @@ function CloseMonthModal({ client, month, year, existingRecord, onSave, onClose 
 
       <div className="flex justify-end gap-3 mt-6">
         <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
-        <button onClick={() => onSave({ billed_amount: billedAmount, commission_amount: commissionAmount, currency: client.currency, status: paid ? 'paid' : 'pending', notes })} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">{t('common.save')}</button>
+        <button onClick={() => onSave({ billed_amount: billedAmount, commission_amount: commissionAmount, currency: client.currency, status: 'pending', notes })} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">{t('common.save')}</button>
       </div>
     </Modal>
   )
