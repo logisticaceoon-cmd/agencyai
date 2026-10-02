@@ -186,7 +186,7 @@ export default function TasksPage() {
       if (priorityFilter) params.set('priority', priorityFilter)
       // Si showMyTasksOnly está activo y el usuario es owner/CEO → filtrar solo sus tareas
       if (showMyTasksOnly && user?.id) params.set('assigned_to', user.id)
-      const res = await cachedFetch<{data: Task[]}>(`/api/tasks?${params}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) }))
+      const res = await cachedFetch(`/api/tasks?${params}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) }))
       if (res.ok) {
         const data = await res.json()
         setTasks(data.data || [])
@@ -1917,4 +1917,3 @@ function LoadingSkeleton({ viewMode }: { viewMode: string }) {
     </div>
   )
 }
-
