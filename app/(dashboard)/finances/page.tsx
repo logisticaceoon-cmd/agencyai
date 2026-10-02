@@ -1030,15 +1030,14 @@ export default function FinancesPage() {
                     <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse' }}>
                       <colgroup>
                         <col style={{ width: '3%' }} />
-                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '16%' }} />
                         <col style={{ width: '9%' }} />
                         <col style={{ width: '5%' }} />
                         <col style={{ width: '8%' }} />
                         <col style={{ width: '9%' }} />
                         <col style={{ width: '8%' }} />
-                        <col style={{ width: '8%' }} />
-                        <col style={{ width: '27%' }} />
-                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '35%' }} />
+                        <col style={{ width: '7%' }} />
                       </colgroup>
                       <thead>
                         <tr style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
@@ -1048,7 +1047,6 @@ export default function FinancesPage() {
                           <th style={thStyle('center')}>Cuentas</th>
                           <th style={thStyle('center')}>Inicio</th>
                           <th style={thStyle('right')}>Total</th>
-                          <th style={thStyle('right')}>Cancelado</th>
                           <th style={thStyle('center')}>Asignado</th>
                           <th style={thStyle('left')}>Observación</th>
                           <th style={thStyle('center')}>Acciones</th>
@@ -1066,7 +1064,6 @@ export default function FinancesPage() {
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', verticalAlign: 'top' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', lineHeight: '1.5', width: '100%', display: 'block', wordBreak: 'break-word' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>
@@ -1174,15 +1171,14 @@ export default function FinancesPage() {
                           <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse' }}>
                             <colgroup>
                               <col style={{ width: '3%' }} />
-                              <col style={{ width: '15%' }} />
+                              <col style={{ width: '16%' }} />
                               <col style={{ width: '9%' }} />
                               <col style={{ width: '5%' }} />
                               <col style={{ width: '8%' }} />
                               <col style={{ width: '9%' }} />
                               <col style={{ width: '8%' }} />
-                              <col style={{ width: '8%' }} />
-                              <col style={{ width: '27%' }} />
-                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '35%' }} />
+                              <col style={{ width: '7%' }} />
                             </colgroup>
                             <thead>
                               <tr style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
@@ -1192,7 +1188,6 @@ export default function FinancesPage() {
                                 <th style={thStyle('center')}>Cuentas</th>
                                 <th style={thStyle('center')}>Inicio</th>
                                 <th style={thStyle('right')}>Total</th>
-                                <th style={thStyle('right')}>Cancelado</th>
                                 <th style={thStyle('center')}>Asignado</th>
                                 <th style={thStyle('left')}>Observación</th>
                                 <th style={thStyle('center')}>Acciones</th>
@@ -1237,11 +1232,6 @@ export default function FinancesPage() {
                                         const rowTotal = feeAmt + (rec ? Number(rec.commission_amount) : 0)
                                         return <>{sym}{rowTotal.toLocaleString()}</>
                                       })()}
-                                    </td>
-                                    <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px' }}>
-                                      {Number(c.cancelled_amount) > 0
-                                        ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span>
-                                        : <span style={{ color: '#cbd5e1' }}>&mdash;</span>}
                                     </td>
                                     <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                                       {c.assigned_to ? (() => {
@@ -1346,15 +1336,14 @@ export default function FinancesPage() {
                     <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse' }}>
                       <colgroup>
                         <col style={{ width: '3%' }} />
-                        <col style={{ width: '15%' }} />
+                        <col style={{ width: '16%' }} />
                         <col style={{ width: '9%' }} />
                         <col style={{ width: '5%' }} />
                         <col style={{ width: '8%' }} />
                         <col style={{ width: '9%' }} />
                         <col style={{ width: '8%' }} />
-                        <col style={{ width: '8%' }} />
-                        <col style={{ width: '27%' }} />
-                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '35%' }} />
+                        <col style={{ width: '7%' }} />
                       </colgroup>
                       <thead>
                         <tr style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
@@ -1364,7 +1353,6 @@ export default function FinancesPage() {
                           <th style={thStyle('center')}>Cuentas</th>
                           <th style={thStyle('center')}>Inicio</th>
                           <th style={thStyle('right')}>Total</th>
-                          <th style={thStyle('right')}>Cancelado</th>
                           <th style={thStyle('center')}>Asignado</th>
                           <th style={thStyle('left')}>Observación</th>
                           <th style={thStyle('center')}>Acciones</th>
@@ -1383,7 +1371,6 @@ export default function FinancesPage() {
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}><span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700 }}>{c.accounts_count}</span></td>
                               <td style={{ padding: '10px 8px', textAlign: 'center', fontFamily: 'monospace', fontSize: '12px', color: '#64748b' }}>{c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#334155' }}>{sym}{((rec && Number(rec.billed_amount) > 0) ? Number(rec.billed_amount) : Number(c.contract_cost)).toLocaleString()}</td>
-                              <td style={{ padding: '10px 8px', textAlign: 'right', fontFamily: 'monospace', fontSize: '14px' }}>{Number(c.cancelled_amount) > 0 ? <span style={{ color: '#dc2626', fontWeight: 600 }}>{sym}{Number(c.cancelled_amount).toLocaleString()}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>{c.assigned_to ? <span style={{ background: c.assigned_to.toUpperCase().includes('RAFA') ? '#eff6ff' : '#fff7ed', color: c.assigned_to.toUpperCase().includes('RAFA') ? '#1d4ed8' : '#c2410c', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700 }}>{c.assigned_to.toUpperCase().split(' ')[0]}</span> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', verticalAlign: 'top' }}>{c.observations ? <div title={c.observations} style={{ background: '#dcfce7', color: '#166534', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', lineHeight: '1.5', width: '100%', display: 'block', wordBreak: 'break-word' }}>{c.observations}</div> : <span style={{ color: '#cbd5e1' }}>—</span>}</td>
                               <td style={{ padding: '10px 8px', textAlign: 'center' }}>
