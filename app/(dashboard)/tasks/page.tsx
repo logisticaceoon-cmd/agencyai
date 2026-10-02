@@ -1,4 +1,5 @@
 'use client'
+import { cachedFetch } from '@/lib/data-cache'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
@@ -185,7 +186,7 @@ export default function TasksPage() {
       if (priorityFilter) params.set('priority', priorityFilter)
       // Si showMyTasksOnly está activo y el usuario es owner/CEO → filtrar solo sus tareas
       if (showMyTasksOnly && user?.id) params.set('assigned_to', user.id)
-      const res = await fetch(`/api/tasks?${params}`)
+      const res = await cachedFetch<{data: Task[]}>(`/api/tasks?${params}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) }))
       if (res.ok) {
         const data = await res.json()
         setTasks(data.data || [])
@@ -197,7 +198,7 @@ export default function TasksPage() {
 
   const loadProjects = useCallback(async () => {
     try {
-      const res = await fetch('/api/projects?limit=100')
+      const res = await cachedFetch('/api/projects?limit=100').then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) }))
       if (res.ok) {
         const data = await res.json()
         setProjects(data.data || [])
@@ -207,7 +208,7 @@ export default function TasksPage() {
 
   const loadMembers = useCallback(async () => {
     try {
-      const res = await fetch('/api/members')
+      const res = await cachedFetch('/api/members').then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) }))
       if (res.ok) {
         const data = await res.json()
         setMembers(data.data || [])
@@ -223,7 +224,7 @@ export default function TasksPage() {
     loadProjects()
     loadMembers()
     // Load clients for template generation
-    fetch('/api/clients?limit=200').then(r => r.json()).then(d => setClients(d.data || [])).catch(() => {})
+    cachedFetch('/api/clients?limit=200').then((d: {data?: unknown[]}) => setClients(d.data || [])).catch(() => {})
   }, [loadProjects, loadMembers])
 
   async function openTemplateModal() {
