@@ -351,14 +351,17 @@ export default function FinancesPage() {
     const map: Record<string, FinanceClient[]> = {}
     categories.forEach(c => { map[c.id] = [] })
     map.__uncategorized__ = []
+    const activeIds = new Set(activeClients.map(c => c.id))
     financeClients.forEach(fc => {
       if (showDeleted || !fc.deleted_at) {
+        // Only show clients that pass the active filter (no inactive/ended clients)
+        if (!showDeleted && !activeIds.has(fc.id)) return
         if (fc.category_id && map[fc.category_id]) map[fc.category_id].push(fc)
         else map.__uncategorized__.push(fc)
       }
     })
     return map
-  }, [categories, financeClients, showDeleted])
+  }, [categories, financeClients, activeClients, showDeleted])
 
   // ═══ Category handlers ═══
 
@@ -1048,14 +1051,7 @@ export default function FinancesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {financeClients.filter(c => {
-                          if (c.deleted_at) return false;
-                          if (!c.start_date) return true;
-                          const sd = new Date(c.start_date + 'T12:00:00');
-                          const clientYear = sd.getFullYear();
-                          const clientMonth = sd.getMonth() + 1;
-                          return clientYear < year || (clientYear === year && clientMonth <= month);
-                        }).map((c, idx) => {
+                        {activeClients.map((c, idx) => {
                           const sym = getCurrencySymbol(c.currency)
                           const rec = monthlyRecords.find(r => r.client_id === c.id)
                           return (
