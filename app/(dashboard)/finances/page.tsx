@@ -1553,15 +1553,11 @@ export default function FinancesPage() {
                       </PieChart>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
                         {clientPie.sort((a, b) => b.value - a.value).map((e, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: e.color, flexShrink: 0, display: 'inline-block' }} />
-                              <span style={{ fontSize: '12px', color: '#334155', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                              <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>{((e.value / totalPie) * 100).toFixed(0)}%</span>
-                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>${e.value.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
-                            </div>
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: e.color, flexShrink: 0, display: 'inline-block' }} />
+                            <span style={{ fontSize: '14px', color: '#334155', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</span>
+                            <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600, flexShrink: 0 }}>{((e.value / totalPie) * 100).toFixed(0)}%</span>
+                            <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums', flexShrink: 0, minWidth: '52px', textAlign: 'right' }}>${e.value.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
                           </div>
                         ))}
                       </div>
