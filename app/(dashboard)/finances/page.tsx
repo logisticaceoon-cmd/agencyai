@@ -1030,13 +1030,14 @@ export default function FinancesPage() {
                     <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse' }}>
                       <colgroup>
                         <col style={{ width: '3%' }} />
-                        <col style={{ width: '16%' }} />
-                        <col style={{ width: '9%' }} />
+                        <col style={{ width: '14%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '10%' }} />
                         <col style={{ width: '5%' }} />
                         <col style={{ width: '8%' }} />
-                        <col style={{ width: '9%' }} />
                         <col style={{ width: '8%' }} />
-                        <col style={{ width: '35%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '30%' }} />
                         <col style={{ width: '7%' }} />
                       </colgroup>
                       <thead>
@@ -1172,15 +1173,16 @@ export default function FinancesPage() {
                           })()}
                           <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse' }}>
                             <colgroup>
-                              <col style={{ width: '3%' }} />
-                              <col style={{ width: '16%' }} />
-                              <col style={{ width: '9%' }} />
-                              <col style={{ width: '5%' }} />
-                              <col style={{ width: '8%' }} />
-                              <col style={{ width: '9%' }} />
-                              <col style={{ width: '8%' }} />
-                              <col style={{ width: '35%' }} />
-                              <col style={{ width: '7%' }} />
+                            <col style={{ width: '3%' }} />
+                            <col style={{ width: '14%' }} />
+                            <col style={{ width: '8%' }} />
+                            <col style={{ width: '10%' }} />
+                            <col style={{ width: '5%' }} />
+                            <col style={{ width: '8%' }} />
+                            <col style={{ width: '8%' }} />
+                            <col style={{ width: '7%' }} />
+                            <col style={{ width: '30%' }} />
+                            <col style={{ width: '7%' }} />
                             </colgroup>
                             <thead>
                               <tr style={{ background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
@@ -1338,13 +1340,14 @@ export default function FinancesPage() {
                     <table style={{ tableLayout: 'fixed', width: '100%', borderCollapse: 'collapse' }}>
                       <colgroup>
                         <col style={{ width: '3%' }} />
-                        <col style={{ width: '16%' }} />
-                        <col style={{ width: '9%' }} />
+                        <col style={{ width: '14%' }} />
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '10%' }} />
                         <col style={{ width: '5%' }} />
                         <col style={{ width: '8%' }} />
-                        <col style={{ width: '9%' }} />
                         <col style={{ width: '8%' }} />
-                        <col style={{ width: '35%' }} />
+                        <col style={{ width: '7%' }} />
+                        <col style={{ width: '30%' }} />
                         <col style={{ width: '7%' }} />
                       </colgroup>
                       <thead>
