@@ -1539,10 +1539,11 @@ export default function FinancesPage() {
                     return <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" style={{ fontSize: '11px', fontWeight: 700 }}>{`${(percent * 100).toFixed(0)}%`}</text>
                   }
                   return (
-                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 20px 16px', minWidth: '260px', maxWidth: '300px' }}>
+                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px 20px 16px' }}>
                       <p style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>Por cliente</p>
-                      <PieChart width={220} height={220} style={{ display: 'block', margin: '0 auto' }}>
-                        <Pie data={clientPie} cx={110} cy={110} innerRadius={60} outerRadius={98} paddingAngle={2} dataKey="value" labelLine={false} label={renderLabel}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '16px', alignItems: 'center' }}>
+                      <PieChart width={260} height={260} style={{ display: 'block', margin: '0 auto' }}>
+                        <Pie data={clientPie} cx={130} cy={130} innerRadius={72} outerRadius={118} paddingAngle={2} dataKey="value" labelLine={false} label={renderLabel}>
                           {clientPie.map((e, i) => <Cell key={i} fill={e.color} />)}
                         </Pie>
                         <Tooltip
@@ -1550,7 +1551,7 @@ export default function FinancesPage() {
                           formatter={(v: any, name: any) => [`$${Number(v).toLocaleString(undefined, {maximumFractionDigits: 0})} · ${((Number(v) / totalPie) * 100).toFixed(1)}%`, name]}
                         />
                       </PieChart>
-                      <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
                         {clientPie.sort((a, b) => b.value - a.value).map((e, i) => (
                           <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
@@ -1563,6 +1564,7 @@ export default function FinancesPage() {
                             </div>
                           </div>
                         ))}
+                      </div>
                       </div>
                     </div>
                   )
