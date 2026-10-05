@@ -142,6 +142,7 @@ interface ClientData {
   pays_percentage: boolean
   percentage_value: number | null
   logo_url?: string | null
+  contract_url?: string | null
   created_at?: string
 }
 
@@ -792,6 +793,22 @@ export default function ClientDetailPage() {
                         {contractStart && contractEnd && ' - '}
                         {contractEnd && formatDate(contractEnd)}
                       </p>
+                    </div>
+                  </div>
+                )}
+                {client.contract_url && (
+                  <div className="flex items-start gap-3">
+                    <FileText className="h-4 w-4 text-slate-400 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-slate-500">Contrato</p>
+                      <a
+                        href={client.contract_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                      >
+                        Ver contrato
+                      </a>
                     </div>
                   </div>
                 )}
