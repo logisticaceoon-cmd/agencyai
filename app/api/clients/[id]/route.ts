@@ -46,19 +46,19 @@ export async function PUT(
       .from('clients')
       .update({
         name: body.name,
-        company: body.company,
+        brand: body.brand,
         email: body.email,
         phone: body.phone,
         website: body.website,
-        logo_url: body.logo_url,
+
         status: body.status,
         industry: body.industry,
         notes: body.notes,
-        monthly_value: body.monthly_value,
+        monthlyFee: body.monthlyFee ?? body.monthly_value,
         currency: body.currency,
         pays_percentage: body.pays_percentage,
         percentage_value: body.percentage_value,
-        updated_at: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       })
       .eq('id', id)
       .eq('workspace_id', workspaceId)
@@ -77,7 +77,7 @@ export async function PUT(
         .update({
           client_name: body.name,
           status: body.status === 'active' ? 'active' : 'inactive',
-          updated_at: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         })
         .eq('workspace_id', workspaceId)
         .eq('client_name', data.name)
