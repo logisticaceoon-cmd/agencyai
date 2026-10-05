@@ -64,6 +64,7 @@ export async function PATCH(
     if (body.commission_pct !== undefined) updates.commissionPct = body.commission_pct
     if (body.service_type !== undefined) updates.serviceType = body.service_type
     if (body.payment_status !== undefined) updates.paymentStatus = body.payment_status
+    if (body.contract_url !== undefined) updates.contract_url = body.contract_url
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -133,3 +134,4 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
