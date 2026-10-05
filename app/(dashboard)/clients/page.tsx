@@ -82,6 +82,7 @@ const clientSchema = z.object({
   percentage_value: z.number().min(0).max(100).optional().nullable(),
   contract: z.string().optional(),
   contractStart: z.string().optional(),
+  contract_url: z.string().optional(),
 })
 
 type ClientFormData = z.infer<typeof clientSchema>
@@ -225,6 +226,7 @@ export default function ClientsPage() {
       percentage_value: null,
       contract: '',
       contractStart: '',
+      contract_url: '',
     })
     setDialogOpen(true)
   }
@@ -245,6 +247,7 @@ export default function ClientsPage() {
       percentage_value: client.percentage_value ?? null,
       contract: (client as any).contract || '',
       contractStart: (client as any).contractStart || '',
+      contract_url: (client as any).contract_url || '',
     })
     setDialogOpen(true)
   }
@@ -269,6 +272,7 @@ export default function ClientsPage() {
         percentage_value: formData.pays_percentage ? formData.percentage_value : null,
         contract: formData.contract,
         contractStart: formData.contractStart || undefined,
+        contract_url: (formData as any).contract_url || undefined,
       }
 
       if (editingClient) {
@@ -914,6 +918,18 @@ export default function ClientsPage() {
                   rows={2}
                   className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
                   placeholder="Detalles del contrato..."
+                />
+              </div>
+
+              {/* Link al contrato */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Link al contrato (Drive)
+                </label>
+                <input
+                  {...register('contract_url')}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="https://drive.google.com/..."
                 />
               </div>
 
