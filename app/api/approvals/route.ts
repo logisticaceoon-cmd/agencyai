@@ -15,7 +15,7 @@ export async function GET(request: Request) {
       .from('approval_requests')
       .select('*')
       .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (status) query = query.eq('status', status)
     if (clientId) query = query.eq('client_id', clientId)
