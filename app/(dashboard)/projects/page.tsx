@@ -134,16 +134,18 @@ export default function ProjectsPage() {
 
   // ── Data fetching ──────────────────────────────────────────────────────
 
-  const loadProjects = useCallback(async () => {
-    setLoading(true)
+  const loadProjects = useCallback(async (force = false) => {
+    if (!force) setLoading(true)
     try {
       const params = new URLSearchParams()
       if (filterClient) params.set('client_id', filterClient)
       if (filterStatus) params.set('status', filterStatus)
-      const res = await cachedFetch(`/api/projects?${params}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) }))
-      if (res.ok) {
-        const json = await res.json()
-        setProjects(json.data || [])
+      if (force) {
+        const r = await fetch(`/api/projects?${params}`)
+        if (r.ok) { const j = await r.json(); setProjects(j.data || []) }
+      } else {
+        const res = await cachedFetch(`/api/projects?${params}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) }))
+        if (res.ok) { const json = await res.json(); setProjects(json.data || []) }
       }
     } finally {
       setLoading(false)
@@ -251,8 +253,14 @@ export default function ProjectsPage() {
           body: JSON.stringify(payload),
         })
         if (res.ok) {
+          const updated = await res.json().catch(() => ({}))
+          setProjects(prev => prev.map(p => p.id === editingProject!.id ? { ...p, ...updated } : p))
           setDialogOpen(false)
-          loadProjects()
+          toast({ title: 'Proyecto actualizado', variant: 'default' })
+          setTimeout(() => loadProjects(true), 2000)
+        } else {
+          const err = await res.json().catch(() => ({}))
+          toast({ title: err.error || 'Error al guardar', description: 'Intentá de nuevo', variant: 'destructive' })
         }
       } else {
         const res = await fetch('/api/projects', {
@@ -261,8 +269,14 @@ export default function ProjectsPage() {
           body: JSON.stringify(payload),
         })
         if (res.ok) {
+          const { data: newProj } = await res.json().catch(() => ({ data: null }))
+          if (newProj) setProjects(prev => [newProj, ...prev])
           setDialogOpen(false)
-          loadProjects()
+          toast({ title: 'Proyecto creado', variant: 'default' })
+          setTimeout(() => loadProjects(true), 2000)
+        } else {
+          const err = await res.json().catch(() => ({}))
+          toast({ title: err.error || 'Error al crear', variant: 'destructive' })
         }
       }
     } finally {
@@ -272,7 +286,15 @@ export default function ProjectsPage() {
 
   async function handleDeleteProject(project: Project) {
     const res = await fetch(`/api/projects/${project.id}`, { method: 'DELETE' })
-    if (res.ok) { setDeletingProject(null); loadProjects() }
+    if (res.ok) {
+      setProjects(prev => prev.filter(p => p.id !== project.id))
+      setDeletingProject(null)
+      toast({ title: 'Proyecto eliminado', variant: 'default' })
+    } else {
+      const err = await res.json().catch(() => ({}))
+      toast({ title: err.error || 'Error al eliminar', variant: 'destructive' })
+      setDeletingProject(null)
+    }
   }
 
   // ── Bulk actions ──────────────────────────────────────────────────────
@@ -307,9 +329,11 @@ export default function ProjectsPage() {
           body: JSON.stringify({ status: newStatus }),
         })
       )
+      const toDelete = new Set(selectedIds)
       await Promise.all(promises)
+      setProjects(prev => prev.filter(p => !toDelete.has(p.id)))
       setSelectedIds(new Set())
-      loadProjects()
+      toast({ title: `${toDelete.size} proyectos eliminados`, variant: 'default' })
     } finally {
       setBulkLoading(false)
     }
