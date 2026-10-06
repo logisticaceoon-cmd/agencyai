@@ -293,8 +293,14 @@ export default function ClientsPage() {
           body: JSON.stringify(payload),
         })
         if (res.ok) {
+          const updated = await res.json()
+          const updatedClient = updated.data ?? updated
+          setClients((prev) =>
+            prev.map((c) =>
+              c.id === editingClient.id ? { ...c, ...updatedClient, ...payload } : c
+            )
+          )
           setDialogOpen(false)
-          loadClients()
         }
       } else {
         const res = await fetch('/api/clients', {
@@ -303,8 +309,10 @@ export default function ClientsPage() {
           body: JSON.stringify(payload),
         })
         if (res.ok) {
+          const created = await res.json()
+          const newClient = created.data ?? created
+          setClients((prev) => [newClient, ...prev])
           setDialogOpen(false)
-          loadClients()
         } else {
           const err = await res.json()
           if (err.limitReached) {
@@ -322,9 +330,9 @@ export default function ClientsPage() {
     try {
       const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' })
       if (res.ok) {
+        setClients((prev) => prev.filter((c) => c.id !== id))
         setDeleteConfirm(null)
         setDeleteInput('')
-        loadClients()
       }
     } catch {
       // silently fail
