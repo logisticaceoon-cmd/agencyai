@@ -193,8 +193,15 @@ export default function ClientsPage() {
   // -- Group clients by industry ----------------------------------------------
 
   const groupedClients = useMemo(() => {
+    const activeStatuses = ['active', 'onboarding', 'lead']
     const groups: Record<string, Client[]> = {}
+    const inactiveClients: Client[] = []
+
     for (const client of clients) {
+      if (!activeStatuses.includes(client.status || 'inactive')) {
+        inactiveClients.push(client)
+        continue
+      }
       const key = client.industry || 'Sin categoria'
       if (!groups[key]) groups[key] = []
       groups[key].push(client)
@@ -205,7 +212,11 @@ export default function ClientsPage() {
       if (b === 'Sin categoria') return -1
       return a.localeCompare(b)
     })
-    return sortedKeys.map((key) => ({ industry: key, clients: groups[key] }))
+    const result = sortedKeys.map((key) => ({ industry: key, clients: groups[key] }))
+    if (inactiveClients.length > 0) {
+      result.push({ industry: 'Inactivos', clients: inactiveClients })
+    }
+    return result
   }, [clients])
 
   // -- Handlers ---------------------------------------------------------------
