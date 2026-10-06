@@ -58,6 +58,7 @@ export async function PUT(
         currency: body.currency,
         pays_percentage: body.pays_percentage,
         percentage_value: body.percentage_value,
+        contract_url: body.contract_url ?? null,
         updatedAt: new Date().toISOString(),
       })
       .eq('id', id)
