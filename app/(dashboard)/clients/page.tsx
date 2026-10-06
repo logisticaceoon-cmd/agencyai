@@ -293,14 +293,23 @@ export default function ClientsPage() {
           body: JSON.stringify(payload),
         })
         if (res.ok) {
-          const updated = await res.json()
-          const updatedClient = updated.data ?? updated
+          let updatedClient: Partial<Client> = payload as Partial<Client>
+          try {
+            const json = await res.json()
+            updatedClient = { ...updatedClient, ...(json.data ?? json) }
+          } catch { /* use payload fallback */ }
           setClients((prev) =>
             prev.map((c) =>
-              c.id === editingClient.id ? { ...c, ...updatedClient, ...payload } : c
+              c.id === editingClient.id ? { ...c, ...updatedClient } : c
             )
           )
           setDialogOpen(false)
+          toast({ title: 'Cliente actualizado', variant: 'default' })
+          // Silent background reconciliation — no skeleton, just sync
+          setTimeout(() => loadClients(), 3000)
+        } else {
+          const err = await res.json().catch(() => ({}))
+          toast({ title: err.message || 'Error al guardar', description: 'Intentá de nuevo', variant: 'destructive' })
         }
       } else {
         const res = await fetch('/api/clients', {
@@ -309,15 +318,22 @@ export default function ClientsPage() {
           body: JSON.stringify(payload),
         })
         if (res.ok) {
-          const created = await res.json()
-          const newClient = created.data ?? created
-          setClients((prev) => [newClient, ...prev])
+          let newClient: Partial<Client> = payload as Partial<Client>
+          try {
+            const json = await res.json()
+            newClient = json.data ?? json
+          } catch { /* use payload fallback */ }
+          setClients((prev) => [newClient as Client, ...prev])
           setDialogOpen(false)
+          toast({ title: 'Cliente creado', variant: 'default' })
+          setTimeout(() => loadClients(), 3000)
         } else {
-          const err = await res.json()
+          const err = await res.json().catch(() => ({}))
           if (err.limitReached) {
             setDialogOpen(false)
             setUpgradeModal(true)
+          } else {
+            toast({ title: err.message || 'Error al crear cliente', variant: 'destructive' })
           }
         }
       }
