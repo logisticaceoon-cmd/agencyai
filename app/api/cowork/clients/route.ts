@@ -10,7 +10,7 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabase
       .from('clients')
-      .select('id, name, brand, email, phone, status, monthlyFee, currency')
+      .select('id, name, brand, email, phone, status, monthlyFee, currency, industry, notes, contract_url')
       .eq('workspace_id', organizationId)
       .is('deleted_at', null)
       .order('name', { ascending: true })
