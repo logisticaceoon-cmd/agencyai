@@ -205,18 +205,22 @@ export default function FinancesPage() {
 
   // fetchData: solo carga datos operativos (transacciones, clientes, nominas)
   // NO incluye el gráfico — el gráfico tiene su propio effect para no bloquear operaciones
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (force = false) => {
     setLoading(true)
     const prevMonth = month === 1 ? 12 : month - 1
     const prevYear = month === 1 ? year - 1 : year
 
+    // ft: bypass 30s stale cache when force=true (post-mutation refreshes)
+    const ft = (url: string) => force
+      ? fetch(url).then(r => r.json()).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) }))
+      : cachedFetch(url).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) }))
     const [txRes, catsRes, clientsRes, payrollRes, clientListRes, prevRes] = await Promise.all([
-      cachedFetch(`/api/finances?month=${month}&year=${year}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
-      cachedFetch('/api/finances/categories').then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
-      cachedFetch(`/api/finances/finance-clients?month=${month}&year=${year}${showDeleted ? '&include_deleted=true' : ''}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
-      cachedFetch(`/api/finances/payroll?period=${currentPeriod}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
-      cachedFetch('/api/clients').then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
-      cachedFetch(`/api/finances/finance-clients?month=${prevMonth}&year=${prevYear}`).then(d => ({ ok: true, json: async () => d })).catch(() => ({ ok: false, json: async () => ({}) })),
+      ft(`/api/finances?month=${month}&year=${year}`),
+      ft('/api/finances/categories'),
+      ft(`/api/finances/finance-clients?month=${month}&year=${year}${showDeleted ? '&include_deleted=true' : ''}`),
+      ft(`/api/finances/payroll?period=${currentPeriod}`),
+      ft('/api/clients'),
+      ft(`/api/finances/finance-clients?month=${prevMonth}&year=${prevYear}`),
     ])
 
     if (txRes.ok) { const j = await txRes.json(); setTransactions(j.data || []) }
@@ -481,7 +485,7 @@ export default function FinancesPage() {
       return
     }
 
-    setShowClientModal(null); setEditingClient(null); await fetchData()
+    setShowClientModal(null); setEditingClient(null); await fetchData(true)
   }
 
   async function handleDeleteClient() {
@@ -539,7 +543,7 @@ export default function FinancesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ month, year, ...data }),
     })
-    setClosingClient(null); fetchData()
+    setClosingClient(null); fetchData(true)
   }
 
   // ═══ Payroll & Expense handlers ═══
@@ -1883,6 +1887,7 @@ export default function FinancesPage() {
           client={editingClient}
           categoryId={showClientModal.categoryId}
           categories={categories}
+          monthlyRecord={editingClient ? getMonthlyRecord(editingClient.id) : null}
           onSave={handleSaveClient}
           onClose={() => { setShowClientModal(null); setEditingClient(null) }}
         />
@@ -2141,10 +2146,11 @@ function CategoryModal({ category, onSave, onDelete, onClose }: {
 // CLIENT MODAL (Create/Edit)
 // ═══════════════════════════════════════
 
-function ClientModal({ client, categoryId, categories, onSave, onClose }: {
+function ClientModal({ client, categoryId, categories, monthlyRecord, onSave, onClose }: {
   client: FinanceClient | null
   categoryId: string | null
   categories: ServiceCategory[]
+  monthlyRecord?: { billed_amount?: number | null } | null
   onSave: (data: Record<string, unknown>, pdfFile: File | null, mode?: 'this_month' | 'forward') => void
   onClose: () => void
 }) {
@@ -2153,7 +2159,7 @@ function ClientModal({ client, categoryId, categories, onSave, onClose }: {
   const [clientName, setClientName] = useState(client?.client_name || '')
   const [companyName, setCompanyName] = useState(client?.company_name || '')
   const [assignedTo, setAssignedTo] = useState(client?.assigned_to || '')
-  const [contractCost, setContractCost] = useState(Number(client?.contract_cost || 0))
+  const [contractCost, setContractCost] = useState(Number(monthlyRecord?.billed_amount || client?.contract_cost || 0))
   const [currency, setCurrency] = useState(client?.currency || 'USD')
   const [commissionPct, setCommissionPct] = useState(Number(client?.commission_percent || 0))
   const [accountsCount, setAccountsCount] = useState(Number(client?.accounts_count || 1))
