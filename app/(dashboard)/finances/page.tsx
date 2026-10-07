@@ -2169,6 +2169,7 @@ function ClientModal({ client, categoryId, categories, monthlyRecord, onSave, on
   const [observations, setObservations] = useState(client?.observations || '')
   const [pdfFile, setPdfFile] = useState<File | null>(null)
   const [showModeConfirm, setShowModeConfirm] = useState(false)
+  const [savingMode, setSavingMode] = useState<'this_month' | 'forward' | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const commissionAmount = Math.round(contractCost * commissionPct / 100 * 100) / 100
@@ -2200,21 +2201,72 @@ function ClientModal({ client, categoryId, categories, monthlyRecord, onSave, on
   }
 
   if (showModeConfirm) {
+    const handleModeClick = async (mode: 'this_month' | 'forward') => {
+      if (savingMode) return
+      setSavingMode(mode)
+      try {
+        await onSave(buildData(), pdfFile, mode)
+      } finally {
+        setSavingMode(null)
+      }
+    }
     return (
-      <Modal onClose={() => setShowModeConfirm(false)}>
+      <Modal onClose={() => !savingMode && setShowModeConfirm(false)}>
         <h3 className="text-lg font-semibold text-slate-900 mb-3">Como aplicar los cambios?</h3>
         <div className="space-y-3">
-          <button onClick={() => onSave(buildData(), pdfFile, 'this_month')} className="w-full text-left p-4 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50">
-            <p className="text-sm font-semibold text-slate-900">Solo este mes</p>
-            <p className="text-xs text-slate-500 mt-0.5">Crea un registro mensual con los nuevos valores. El cliente base no cambia.</p>
+          <button
+            onClick={() => handleModeClick('this_month')}
+            disabled={!!savingMode}
+            className={[
+              'w-full text-left p-4 rounded-lg border transition-all duration-75 select-none',
+              savingMode === 'this_month'
+                ? 'border-blue-500 bg-blue-100 scale-[0.97] shadow-inner'
+                : savingMode
+                ? 'border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed'
+                : 'border-slate-200 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.97] active:bg-blue-100 active:border-blue-500 active:shadow-inner cursor-pointer',
+            ].join(' ')}
+          >
+            <div className="flex items-center gap-2">
+              {savingMode === 'this_month' ? (
+                <svg className="w-4 h-4 text-blue-500 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+              ) : null}
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{savingMode === 'this_month' ? 'Aplicando...' : 'Solo este mes'}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Crea un registro mensual con los nuevos valores. El cliente base no cambia.</p>
+              </div>
+            </div>
           </button>
-          <button onClick={() => onSave(buildData(), pdfFile, 'forward')} className="w-full text-left p-4 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50">
-            <p className="text-sm font-semibold text-slate-900">Este mes y los siguientes</p>
-            <p className="text-xs text-slate-500 mt-0.5">Actualiza el cliente base. Los meses anteriores no se tocan.</p>
+          <button
+            onClick={() => handleModeClick('forward')}
+            disabled={!!savingMode}
+            className={[
+              'w-full text-left p-4 rounded-lg border transition-all duration-75 select-none',
+              savingMode === 'forward'
+                ? 'border-blue-500 bg-blue-100 scale-[0.97] shadow-inner'
+                : savingMode
+                ? 'border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed'
+                : 'border-slate-200 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.97] active:bg-blue-100 active:border-blue-500 active:shadow-inner cursor-pointer',
+            ].join(' ')}
+          >
+            <div className="flex items-center gap-2">
+              {savingMode === 'forward' ? (
+                <svg className="w-4 h-4 text-blue-500 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+              ) : null}
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{savingMode === 'forward' ? 'Aplicando...' : 'Este mes y los siguientes'}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Actualiza el cliente base. Los meses anteriores no se tocan.</p>
+              </div>
+            </div>
           </button>
         </div>
         <div className="flex justify-end mt-4">
-          <button onClick={() => setShowModeConfirm(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('common.cancel')}</button>
+          <button onClick={() => !savingMode && setShowModeConfirm(false)} disabled={!!savingMode} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-40">{t('common.cancel')}</button>
         </div>
       </Modal>
     )
