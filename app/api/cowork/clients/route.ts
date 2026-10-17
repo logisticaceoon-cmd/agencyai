@@ -13,6 +13,7 @@ export async function GET(request: Request) {
       .select('id, name, brand, email, phone, status, monthlyFee, currency, industry, notes, contract_url')
       .eq('workspace_id', organizationId)
       .is('deleted_at', null)
+      .eq('status', 'active')
       .order('name', { ascending: true })
 
     if (error) {
