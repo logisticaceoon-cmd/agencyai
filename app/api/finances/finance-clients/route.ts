@@ -59,6 +59,63 @@ export async function GET(request: Request) {
   }
 }
 
+// Helper: find existing CRM client by name or brand (case-insensitive), then create if not found
+async function syncNewClientToCRM(
+  supabase: any,
+  workspaceId: string,
+  clientName: string,
+  companyName: string | null,
+  currency: string,
+  contractCost: number | null,
+  status: string,
+  observations: string | null
+) {
+  const nameLower = clientName.toLowerCase()
+  const companyLower = (companyName || '').toLowerCase()
+
+  // Search for existing match by name or brand (case-insensitive)
+  const { data: existing } = await supabase
+    .from('clients')
+    .select('id, name, brand, status')
+    .eq('workspace_id', workspaceId)
+    .is('deleted_at', null)
+
+  const match = (existing || []).find((c: any) => {
+    const n = (c.name || '').toLowerCase()
+    const b = (c.brand || '').toLowerCase()
+    return n === nameLower || b === nameLower || n === companyLower || b === companyLower
+  })
+
+  const crmStatus = status === 'active' ? 'active' : 'inactive'
+
+  if (match) {
+    // Update existing CRM client
+    await supabase
+      .from('clients')
+      .update({
+        status: crmStatus,
+        monthlyFee: contractCost || null,
+        notes: observations || null,
+        updatedAt: new Date().toISOString(),
+      })
+      .eq('id', match.id)
+      .eq('workspace_id', workspaceId)
+  } else {
+    // Create new CRM client
+    await supabase
+      .from('clients')
+      .insert({
+        workspace_id: workspaceId,
+        name: clientName,
+        brand: companyName || clientName,
+        currency: currency || 'USD',
+        status: crmStatus,
+        monthlyFee: contractCost || null,
+        notes: observations || null,
+      })
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const auth = await getAuthContext()
@@ -114,18 +171,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
-    // Sync to clients table (upsert by name + workspace)
-    if (data) {
-      const { error: cError } = await supabase
-        .from('clients')
-        .upsert({
-          workspace_id: workspaceId,
-          name: data.client_name,
-          status: data.status === 'active' ? 'active' : 'inactive',
-          monthlyFee: data.contract_cost || null,
-          currency: data.currency || 'USD',
-        }, { onConflict: 'workspace_id,name', ignoreDuplicates: true })
-      if (cError) console.error('Sync to clients failed:', cError.message)
+    // Sync to CRM clients table (find-or-create, case-insensitive)
+    if (data && client_name) {
+      syncNewClientToCRM(
+        supabase, workspaceId,
+        client_name, company_name || null,
+        currency || 'USD', contract_cost || null,
+        status || 'active', observations || null
+      ).catch(e => console.error('CRM sync failed:', e))
     }
 
     return NextResponse.json({ data })
