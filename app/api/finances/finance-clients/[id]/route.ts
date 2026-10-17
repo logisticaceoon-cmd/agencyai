@@ -35,6 +35,41 @@ export async function GET(
   }
 }
 
+// Helper: sync status change to CRM clients table (case-insensitive, matches name OR brand)
+async function syncClientStatus(
+  supabase: ReturnType<typeof import('@/lib/auth-supabase').getSupabaseClient>,
+  workspaceId: string,
+  clientName: string,
+  newStatus: 'active' | 'inactive'
+) {
+  if (!clientName) return
+  const nameLower = clientName.toLowerCase()
+  // Get all workspace clients and match case-insensitively
+  const { data: crmClients } = await supabase
+    .from('clients')
+    .select('id, name, brand, status')
+    .eq('workspace_id', workspaceId)
+    .is('deleted_at', null)
+
+  if (!crmClients) return
+
+  const matches = crmClients.filter(c => {
+    const n = (c.name || '').toLowerCase()
+    const b = (c.brand || '').toLowerCase()
+    return n === nameLower || b === nameLower
+  })
+
+  for (const match of matches) {
+    if (match.status !== newStatus) {
+      await supabase
+        .from('clients')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', match.id)
+        .eq('workspace_id', workspaceId)
+    }
+  }
+}
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -102,17 +137,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
-    // Sync name/status to clients table
-    if (data && client_name) {
-      await supabase
-        .from('clients')
-        .update({
-          name: client_name,
-          status: status === 'active' ? 'active' : 'inactive',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('workspace_id', workspaceId)
-        .eq('name', data.client_name)
+    // Sync status to CRM clients table (case-insensitive, name OR brand)
+    if (data && (client_name || company_name)) {
+      const nameToSync = client_name || company_name
+      const crmStatus = status === 'active' ? 'active' : 'inactive'
+      await syncClientStatus(supabase as Parameters<typeof syncClientStatus>[0], workspaceId, nameToSync, crmStatus)
     }
 
     return NextResponse.json({ data })
@@ -133,6 +162,13 @@ export async function DELETE(
 
     const { id } = await params
 
+    // Get client name before deleting
+    const { data: fc } = await supabase
+      .from('finance_clients')
+      .select('client_name, company_name')
+      .eq('id', id)
+      .single()
+
     const { error } = await supabase
       .from('finance_clients')
       .update({ deleted_at: new Date().toISOString() })
@@ -144,19 +180,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
-    // Sync soft-delete to clients table
-    const { data: fc } = await supabase
-      .from('finance_clients')
-      .select('client_name')
-      .eq('id', id)
-      .single()
-    if (fc?.client_name) {
-      await supabase
-        .from('clients')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('workspace_id', workspaceId)
-        .eq('name', fc.client_name)
-        .is('deleted_at', null)
+    // Sync soft-delete to CRM clients table (case-insensitive, name OR brand)
+    if (fc?.client_name || fc?.company_name) {
+      const nameToSync = fc.client_name || fc.company_name
+      await syncClientStatus(supabase as Parameters<typeof syncClientStatus>[0], workspaceId, nameToSync, 'inactive')
     }
 
     return NextResponse.json({ success: true })
