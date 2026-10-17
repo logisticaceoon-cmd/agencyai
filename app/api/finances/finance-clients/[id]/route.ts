@@ -37,7 +37,8 @@ export async function GET(
 
 // Helper: sync status change to CRM clients table (case-insensitive, matches name OR brand)
 async function syncClientStatus(
-  supabase: ReturnType<typeof import('@/lib/auth-supabase').getSupabaseClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
   workspaceId: string,
   clientName: string,
   newStatus: 'active' | 'inactive'
