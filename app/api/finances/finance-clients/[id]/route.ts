@@ -54,7 +54,7 @@ async function syncClientStatus(
 
   if (!crmClients) return
 
-  const matches = crmClients.filter(c => {
+  const matches = crmClients.filter((c: { name: string; brand: string; id: string; status: string }) => {
     const n = (c.name || '').toLowerCase()
     const b = (c.brand || '').toLowerCase()
     return n === nameLower || b === nameLower
