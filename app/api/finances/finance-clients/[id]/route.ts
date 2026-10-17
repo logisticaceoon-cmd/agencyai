@@ -63,7 +63,7 @@ async function syncClientStatus(
     if (match.status !== newStatus) {
       await supabase
         .from('clients')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update({ status: newStatus, updatedAt: new Date().toISOString() })
         .eq('id', match.id)
         .eq('workspace_id', workspaceId)
     }
@@ -125,7 +125,7 @@ export async function PUT(
         deleted_at: deleted_at !== undefined ? deleted_at : undefined,
         end_month: end_month !== undefined ? end_month : undefined,
         end_year: end_year !== undefined ? end_year : undefined,
-        updated_at: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       })
       .eq('id', id)
       .eq('workspace_id', workspaceId)
