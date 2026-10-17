@@ -70,7 +70,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
     }
 
-    updates.updated_at = new Date().toISOString()
+    updates.updatedAt = new Date().toISOString()
 
     const { data, error } = await supabase
       .from('clients')
