@@ -103,6 +103,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 })
     }
 
+    // ─── Sync to finance_clients (so it appears in the Finance module) ───────
+    if (data) {
+      // Check if already exists in finance_clients (avoid duplicates)
+      const nameLower = (body.name || '').toLowerCase()
+      const { data: existing } = await supabase
+        .from('finance_clients')
+        .select('id')
+        .eq('workspace_id', organizationId)
+        .is('deleted_at', null)
+        .ilike('client_name', body.name)
+        .maybeSingle()
+
+      if (!existing) {
+        const { error: fcError } = await supabase
+          .from('finance_clients')
+          .insert({
+            workspace_id: organizationId,
+            client_name: body.name,
+            company_name: body.brand || body.name,
+            currency: body.currency || 'USD',
+            contract_cost: body.monthly_fee || null,
+            commission_percent: body.commission_pct || null,
+            status: body.status || 'active',
+            observations: body.notes || null,
+          })
+        if (fcError) console.error('Sync to finance_clients failed:', fcError.message)
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     return NextResponse.json({
       success: true,
       data: { client: data, message: 'Client created successfully from Cowork' },
