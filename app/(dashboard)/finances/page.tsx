@@ -179,6 +179,7 @@ export default function FinancesPage() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
   const [chartData, setChartData] = useState<{name:string;ingresos:number;egresos:number}[]>([])
+  const [chartKey, setChartKey] = useState(0)
   const [showDeleted, setShowDeleted] = useState(false)
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({})
   const [subcatFilters, setSubcatFilters] = useState<Record<string, string>>({})
@@ -259,9 +260,9 @@ export default function FinancesPage() {
         const y = d.getFullYear()
         const period = `${y}-${String(m).padStart(2, '0')}`
         return Promise.all([
-          cachedFetch(`/api/finances?month=${m}&year=${y}`).catch(() => null),
-          cachedFetch(`/api/finances/finance-clients?month=${m}&year=${y}`).catch(() => null),
-          cachedFetch(`/api/finances/payroll?period=${period}`).catch(() => null),
+          fetch(`/api/finances?month=${m}&year=${y}`).then(r=>r.ok?r.json():null).catch(() => null),
+          fetch(`/api/finances/finance-clients?month=${m}&year=${y}`).then(r=>r.ok?r.json():null).catch(() => null),
+          fetch(`/api/finances/payroll?period=${period}`).then(r=>r.ok?r.json():null).catch(() => null),
         ]).then(([txJson, fcJson, payrollJson]) => {
           // Gastos fijos: desde transactions
           const gastosFijos = (txJson?.data || [])
@@ -272,8 +273,12 @@ export default function FinancesPage() {
           // Egresos totales = gastos + nóminas
           const egresos = gastosFijos + nominasMes
           // Ingresos: fees (con fallback) + comisiones
-          const activeC = (fcJson?.data || []).filter((c: { deleted_at: string | null; start_date?: string | null }) => {
+          const activeC = (fcJson?.data || []).filter((c: { deleted_at: string | null; start_date?: string | null; end_month?: number | null; end_year?: number | null }) => {
             if (c.deleted_at) return false
+            if (c.end_month && c.end_year) {
+              const endedBefore = c.end_year < y || (c.end_year === y && c.end_month < m)
+              if (endedBefore) return false
+            }
             if (!c.start_date) return true
             const sd = new Date(c.start_date + 'T12:00:00')
             return sd.getFullYear() < y || (sd.getFullYear() === y && sd.getMonth() + 1 <= m)
@@ -297,7 +302,7 @@ export default function FinancesPage() {
     }
     loadChart()
     return () => { cancelled = true }
-  }, [month, year]) // Solo recarga cuando cambia mes/año, NO en cada CRUD
+  }, [month, year, chartKey]) // Recarga en mes/año Y cuando hay mutations (chartKey)
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -485,7 +490,7 @@ export default function FinancesPage() {
       return
     }
 
-    setShowClientModal(null); setEditingClient(null); await fetchData(true)
+    setShowClientModal(null); setEditingClient(null); await fetchData(true); setChartKey(k => k+1)
   }
 
   async function handleDeleteClient() {
@@ -543,7 +548,7 @@ export default function FinancesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ month, year, ...data }),
     })
-    setClosingClient(null); fetchData(true)
+    setClosingClient(null); fetchData(true); setChartKey(k => k+1)
   }
 
   // ═══ Payroll & Expense handlers ═══
