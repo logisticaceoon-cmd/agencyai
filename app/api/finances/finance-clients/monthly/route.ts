@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { getAuthContext } from '@/lib/auth-context'
+import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 // POST /api/finances/finance-clients/monthly
 // Creates or updates a monthly record for a finance client
 // Always injects workspace_id — prevents workspace_id = NULL bug
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createClient()
-    const auth = await getAuthContext(req)
-    if (!auth?.workspaceId) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
     const body = await req.json()
     const { client_id, month, year, billed_amount, commission_amount, currency, status, notes } = body
@@ -39,7 +36,7 @@ export async function POST(req: NextRequest) {
           currency: currency ?? 'USD',
           status: status ?? 'pending',
           notes: notes ?? null,
-          workspace_id: auth.workspaceId,
+          workspace_id: workspaceId,
         })
         .eq('id', existing.id)
         .select()
@@ -60,7 +57,7 @@ export async function POST(req: NextRequest) {
         currency: currency ?? 'USD',
         status: status ?? 'pending',
         notes: notes ?? null,
-        workspace_id: auth.workspaceId,
+        workspace_id: workspaceId,
       })
       .select()
       .single()
@@ -76,11 +73,9 @@ export async function POST(req: NextRequest) {
 // GET /api/finances/finance-clients/monthly?client_id=X&month=11&year=2026
 export async function GET(req: NextRequest) {
   try {
-    const supabase = createClient()
-    const auth = await getAuthContext(req)
-    if (!auth?.workspaceId) {
-      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-    }
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+    const { supabase, workspaceId } = auth
 
     const { searchParams } = new URL(req.url)
     const client_id = searchParams.get('client_id')
@@ -90,7 +85,7 @@ export async function GET(req: NextRequest) {
     let query = supabase
       .from('finance_client_monthly')
       .select('*')
-      .eq('workspace_id', auth.workspaceId)
+      .eq('workspace_id', workspaceId)
 
     if (client_id) query = query.eq('client_id', client_id)
     if (month) query = query.eq('month', parseInt(month))
