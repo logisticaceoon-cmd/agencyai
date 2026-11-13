@@ -3,13 +3,14 @@ import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
     const { supabase, workspaceId } = auth
 
+    const { id } = await params
     const body = await request.json()
     const { title, platform, post_type, scheduled_date, status, description, client_id } = body
 
@@ -27,7 +28,7 @@ export async function PATCH(
     const { data, error } = await supabase
       .from('content_items')
       .update(updates)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
       .select()
@@ -43,17 +44,19 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await getAuthContext()
     if (isAuthError(auth)) return auth
     const { supabase, workspaceId } = auth
 
+    const { id } = await params
+
     const { error } = await supabase
       .from('content_items')
       .update({ deleted_at: new Date().toISOString() })
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('workspace_id', workspaceId)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
