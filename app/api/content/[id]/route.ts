@@ -12,9 +12,8 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-    const { title, platform, post_type, scheduled_date, status, description, client_id } = body
+    const { title, platform, post_type, scheduled_date, status, description } = body
 
-    // Build update object with only provided fields
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
     if (title !== undefined) updates.title = title.trim()
@@ -23,7 +22,6 @@ export async function PATCH(
     if (scheduled_date !== undefined) updates.scheduled_date = scheduled_date || null
     if (status !== undefined) updates.status = status
     if (description !== undefined) updates.description = description?.trim() || null
-    if (client_id !== undefined) updates.client_id = client_id || null
 
     const { data, error } = await supabase
       .from('content_items')
