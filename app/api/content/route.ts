@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let query: any = supabase
       .from('content_items')
-      .select('id, title, platform, post_type, scheduled_date, status, description, client_id')
+      .select('id, title, platform, post_type, scheduled_date, status, description')
       .eq('workspace_id', workspaceId)
       .is('deleted_at', null)
       .order('scheduled_date', { ascending: true })
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const { supabase, workspaceId } = auth
 
     const body = await request.json()
-    const { title, platform, post_type, scheduled_date, status, description, client_id } = body
+    const { title, platform, post_type, scheduled_date, status, description } = body
 
     if (!title?.trim()) return NextResponse.json({ error: 'Título requerido' }, { status: 400 })
 
@@ -56,7 +56,6 @@ export async function POST(request: Request) {
         scheduled_date: scheduled_date || null,
         status: status || 'borrador',
         description: description?.trim() || null,
-        client_id: client_id || null,
       })
       .select()
       .single()
