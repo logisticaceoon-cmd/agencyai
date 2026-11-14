@@ -19,17 +19,10 @@ interface ContentItem {
   scheduled_date: string | null
   status: string
   description: string | null
-  client_id: string | null
-  client_name?: string | null
 }
 
-interface Client {
-  id: string
-  name: string
-}
-
-const PLATFORMS = ['instagram', 'facebook', 'tiktok', 'whatsapp']
-const POST_TYPES = ['imagen', 'video', 'reel', 'historia', 'carrusel']
+const PLATFORMS = ['instagram', 'facebook', 'tiktok', 'whatsapp', 'youtube']
+const POST_TYPES = ['imagen', 'video', 'reel', 'historia', 'carrusel', 'short']
 const STATUSES = ['borrador', 'programado', 'publicado', 'pausado']
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -37,6 +30,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   facebook: 'bg-blue-600 text-white',
   tiktok: 'bg-gray-800 text-white',
   whatsapp: 'bg-green-500 text-white',
+  youtube: 'bg-red-600 text-white',
 }
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -44,6 +38,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   facebook: 'Facebook',
   tiktok: 'TikTok',
   whatsapp: 'WhatsApp',
+  youtube: 'YouTube',
 }
 
 const STATUS_OPACITY: Record<string, string> = {
@@ -63,22 +58,19 @@ const STATUS_LABELS: Record<string, string> = {
 const emptyForm = {
   title: '',
   platform: 'instagram',
-  post_type: 'imagen',
+  post_type: 'reel',
   scheduled_date: '',
   status: 'borrador',
   description: '',
-  client_id: '',
 }
 
 export default function ContentCalendarPage() {
   const { org, isLoading: authLoading } = useCurrentUser()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [items, setItems] = useState<ContentItem[]>([])
-  const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [filterPlatform, setFilterPlatform] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [filterClient, setFilterClient] = useState('')
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null)
@@ -96,28 +88,10 @@ export default function ContentCalendarPage() {
     setLoading(true)
     const monthStr = format(currentMonth, 'yyyy-MM')
     try {
-      const [itemsRes, clientsRes] = await Promise.all([
-        fetch(`/api/content?month=${monthStr}`),
-        fetch('/api/cowork/clients'),
-      ])
-      const itemsJson = itemsRes.ok ? await itemsRes.json() : { data: [] }
-      const clientsJson = clientsRes.ok ? await clientsRes.json() : { data: [] }
-
-      const clientList: Client[] = (clientsJson.data || clientsJson || [])
-        .filter((c: { status?: string }) => c.status !== 'inactive')
-        .map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }))
-      setClients(clientList)
-
-      const clientMap: Record<string, string> = {}
-      clientList.forEach((c: Client) => { clientMap[c.id] = c.name })
-
-      const enriched = (itemsJson.data || []).map((item: ContentItem) => ({
-        ...item,
-        client_name: item.client_id ? (clientMap[item.client_id] || null) : null,
-      }))
-      setItems(enriched)
-    } catch (e) {
-      console.error('fetchData error:', e)
+      const res = await fetch(`/api/content?month=${monthStr}`)
+      const json = res.ok ? await res.json() : { data: [] }
+      setItems(json.data || [])
+    } catch {
       setItems([])
     } finally {
       setLoading(false)
@@ -137,7 +111,6 @@ export default function ContentCalendarPage() {
       if (item.scheduled_date.slice(0, 10) !== dateStr) return false
       if (filterPlatform && item.platform !== filterPlatform) return false
       if (filterStatus && item.status !== filterStatus) return false
-      if (filterClient && item.client_id !== filterClient) return false
       return true
     })
   }
@@ -157,7 +130,6 @@ export default function ContentCalendarPage() {
       scheduled_date: item.scheduled_date?.slice(0, 10) || '',
       status: item.status,
       description: item.description || '',
-      client_id: item.client_id || '',
     })
     setModalOpen(true)
   }
@@ -173,7 +145,7 @@ export default function ContentCalendarPage() {
         scheduled_date: form.scheduled_date || null,
         status: form.status,
         description: form.description.trim() || null,
-        client_id: form.client_id || null,
+        client_id: null,
       }
       let res: Response
       if (editingItem) {
@@ -219,11 +191,11 @@ export default function ContentCalendarPage() {
   }
 
   return (
-    <div className="p-4 space-y-4 max-w-7xl mx-auto">
+    <div className="p-4 space-y-4 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold">Calendario de Contenido</h1>
+          <h1 className="text-xl font-bold">Mi Calendario de Contenido</h1>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentMonth(m => subMonths(m, 1))}
@@ -245,14 +217,6 @@ export default function ContentCalendarPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <select
-            value={filterClient}
-            onChange={e => setFilterClient(e.target.value)}
-            className="text-xs border rounded px-2 py-1.5 bg-background"
-          >
-            <option value="">Todos los clientes</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <select
             value={filterPlatform}
             onChange={e => setFilterPlatform(e.target.value)}
             className="text-xs border rounded px-2 py-1.5 bg-background"
@@ -273,7 +237,7 @@ export default function ContentCalendarPage() {
             className="flex items-center gap-1.5 bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-md font-medium hover:bg-primary/90 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            Nuevo
+            Agregar
           </button>
         </div>
       </div>
@@ -285,7 +249,6 @@ export default function ContentCalendarPage() {
         </div>
       ) : (
         <div className="rounded-lg border overflow-hidden">
-          {/* Day headers */}
           <div className="grid grid-cols-7 bg-muted/30 border-b">
             {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map(d => (
               <div key={d} className="text-xs font-medium text-muted-foreground text-center py-2">
@@ -293,7 +256,6 @@ export default function ContentCalendarPage() {
               </div>
             ))}
           </div>
-          {/* Day cells */}
           <div className="grid grid-cols-7 divide-x divide-y">
             {days.map((day, i) => {
               const dayItems = getItemsForDay(day)
@@ -320,9 +282,9 @@ export default function ContentCalendarPage() {
                         className={`text-[10px] leading-tight px-1.5 py-0.5 rounded cursor-pointer truncate ${
                           PLATFORM_COLORS[item.platform] || 'bg-gray-400 text-white'
                         } ${STATUS_OPACITY[item.status] || ''}`}
-                        title={`${item.title}${item.client_name ? ` — ${item.client_name}` : ''} (${STATUS_LABELS[item.status]})`}
+                        title={`${item.title} · ${PLATFORM_LABELS[item.platform] || item.platform} · ${STATUS_LABELS[item.status]}`}
                       >
-                        {item.client_name ? `${item.client_name.split(' ')[0]}: ` : ''}{item.title}
+                        {item.title}
                       </div>
                     ))}
                     {dayItems.length > 4 && (
@@ -346,7 +308,7 @@ export default function ContentCalendarPage() {
             {PLATFORM_LABELS[p]}
           </span>
         ))}
-        <span className="text-muted-foreground ml-3">Estado: opaco=borrador/publicado · sólido=programado</span>
+        <span className="text-muted-foreground ml-2">· Opaco = borrador/publicado</span>
       </div>
 
       {/* Modal */}
@@ -363,18 +325,17 @@ export default function ContentCalendarPage() {
             </div>
 
             <div className="space-y-3">
-              {/* Title */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Título *</label>
                 <input
                   value={form.title}
                   onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="Ej: Post lanzamiento nueva línea"
+                  placeholder="Ej: Reel tips para escalar tu negocio"
                   className="w-full border rounded px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  autoFocus
                 />
               </div>
 
-              {/* Platform + Post type */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">Plataforma</label>
@@ -400,7 +361,6 @@ export default function ContentCalendarPage() {
                 </div>
               </div>
 
-              {/* Date + Status */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground mb-1 block">Fecha</label>
@@ -423,35 +383,20 @@ export default function ContentCalendarPage() {
                 </div>
               </div>
 
-              {/* Client */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Cliente</label>
-                <select
-                  value={form.client_id}
-                  onChange={e => setForm(f => ({ ...f, client_id: e.target.value }))}
-                  className="w-full border rounded px-3 py-2 text-sm bg-background"
-                >
-                  <option value="">Sin cliente</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-
-              {/* Description */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                  Descripción / Caption
+                  Descripción / Ideas / Caption
                 </label>
                 <textarea
                   value={form.description}
                   onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                  placeholder="Texto del post, notas, referencia visual..."
-                  rows={3}
+                  placeholder="Texto, ideas, referencias, gancho..."
+                  rows={4}
                   className="w-full border rounded px-3 py-2 text-sm bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex items-center justify-between pt-2">
               {editingItem ? (
                 <button
@@ -459,10 +404,7 @@ export default function ContentCalendarPage() {
                   disabled={deleting}
                   className="flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80 px-3 py-2 rounded hover:bg-destructive/10 transition-colors"
                 >
-                  {deleting
-                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    : <Trash2 className="w-3.5 h-3.5" />
-                  }
+                  {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                   Eliminar
                 </button>
               ) : <div />}
