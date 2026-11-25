@@ -328,7 +328,7 @@ export default function FinancesPage() {
     // Si tiene fecha de baja, solo ocultar en los meses A PARTIR de esa fecha
     if (c.end_year != null && c.end_month != null) {
       if (year > c.end_year) return false
-      if (year === c.end_year && month >= c.end_month) return false
+      if (year === c.end_year && month > c.end_month) return false
     } else if (c.status === 'inactive') {
       return false // legacy: sin end_date, ocultar globalmente
     }
