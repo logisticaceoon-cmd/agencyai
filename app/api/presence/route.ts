@@ -3,16 +3,14 @@ import { getAuthContext, isAuthError } from '@/lib/auth-supabase'
 
 // POST: Actualizar presencia del usuario
 export async function POST(req: NextRequest) {
-  const auth = await getAuthContext()
-  if (isAuthError(auth)) return auth
-
-  const { supabase, userId, fullName, workspaceId } = auth
-
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+
+    const { supabase, userId, fullName, workspaceId } = auth
     const body = await req.json()
     const { current_page, entity_type, entity_id } = body
 
-    // Upsert en la tabla user_presence
     const { error } = await supabase
       .from('user_presence')
       .upsert(
@@ -25,31 +23,31 @@ export async function POST(req: NextRequest) {
           entity_id: entity_id || null,
           last_seen: new Date().toISOString(),
         },
-        {
-          onConflict: 'user_id,workspace_id',
-        }
+        { onConflict: 'user_id,workspace_id' }
       )
 
+    // Table may not exist yet — fail silently, presence is non-critical
+    if (error && error.code === 'PGRST205') {
+      return NextResponse.json({ ok: true, note: 'presence_table_missing' })
+    }
+
     if (error) {
-      console.error('Error al actualizar presencia:', error)
-      return NextResponse.json({ error: 'Error al actualizar presencia' }, { status: 500 })
+      return NextResponse.json({ ok: true }) // non-critical, never return 500
     }
 
     return NextResponse.json({ ok: true })
-  } catch (error) {
-    console.error('Error en POST /api/presence:', error)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+  } catch {
+    return NextResponse.json({ ok: true }) // presence is never critical
   }
 }
 
-// GET: Obtener usuarios activos (vistos en los ultimos 5 minutos)
+// GET: Obtener usuarios activos
 export async function GET() {
-  const auth = await getAuthContext()
-  if (isAuthError(auth)) return auth
-
-  const { supabase, workspaceId } = auth
-
   try {
+    const auth = await getAuthContext()
+    if (isAuthError(auth)) return auth
+
+    const { supabase, workspaceId } = auth
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 
     const { data, error } = await supabase
@@ -60,16 +58,11 @@ export async function GET() {
       .order('last_seen', { ascending: false })
 
     if (error) {
-      console.error('Error al obtener presencia:', error)
-      return NextResponse.json({ error: 'Error al obtener presencia' }, { status: 500 })
+      return NextResponse.json({ users: [], count: 0 }) // fail silently
     }
 
-    return NextResponse.json({
-      users: data || [],
-      count: data?.length || 0,
-    })
-  } catch (error) {
-    console.error('Error en GET /api/presence:', error)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+    return NextResponse.json({ users: data || [], count: data?.length || 0 })
+  } catch {
+    return NextResponse.json({ users: [], count: 0 })
   }
 }
