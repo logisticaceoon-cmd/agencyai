@@ -317,6 +317,10 @@ export default function TasksPage() {
       if (res.ok) {
         setModalOpen(false)
         loadTasks()
+      } else {
+        const errData = await res.json().catch(() => ({}))
+        console.error('Error creando tarea:', res.status, errData)
+        alert('Error al crear la tarea (' + res.status + '): ' + (errData?.error || errData?.message || 'Error desconocido'))
       }
     }
   }
@@ -1917,3 +1921,4 @@ function LoadingSkeleton({ viewMode }: { viewMode: string }) {
     </div>
   )
 }
+
