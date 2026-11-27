@@ -104,7 +104,7 @@ export async function POST(request: Request) {
         priority: parsed.priority || 'medium',
         deadline: parsed.deadline || parsed.due_date || null,
         assignedTo: parsed.assignedTo || [],
-        createdById: userId,
+        // createdById omitted — avoids FK constraint with legacy users table (real users live in workspace_members)
       })
       .select()
       .single()
@@ -119,4 +119,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
   }
 }
-
